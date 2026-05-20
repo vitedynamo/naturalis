@@ -88,12 +88,25 @@ See `/app/memory/test_credentials.md`.
 - New palette replacing green: **Indigo `#4F46E5`** (primary) + **Coral pink `#EC4899`** (accent) + **Gold `#F59E0B`**.
 - Dark mode: deep midnight `#0B0B1F`, surface `#15152A`, brighter indigo `#818CF8` and pink `#F472B6`.
 
-### Tests (iteration 3)
-- 12/12 new redesign-suite pytest cases pass (security questions, image upload, file serving).
-- Frontend verified at 390×844 (mobile) and 1920×1080 (admin desktop).
-- Theme toggle persists; bottom nav has correct 5 items; deposit/withdraw inside More sheet.
-- Admin file upload works (real Emergent object storage round-trip verified).
-- Small post-test fix applied: improved contrast of /team referral-code card (white-on-white CTA replaced with proper indigo-on-white).
+## Updates — Feb 2026 (iteration 4) — Hardening & Admin Controls
+
+### Backend
+- **Security questions**: register endpoint now enforces all-or-none on the 4 fields (Q1/A1/Q2/A2) and rejects identical questions.
+- **Paystack Transfers**: `POST /api/admin/withdrawals/{id}/pay-paystack` creates a transfer recipient + initiates a transfer in live mode; simulates in mock mode. `GET /api/admin/banks` returns Paystack's NG list (cached 1h) or a static fallback.
+- **Admin-controlled home**: `featured_product_id` + `home_announcement` + `home_announcement_active` added to Settings. `PUT /admin/settings` clears featured_product_id on both explicit null and empty string (uses `dict(exclude_unset=True)`).
+- `GET /api/settings/public` exposes featured product + announcement so the user dashboard can fetch them.
+
+### Frontend
+- **Emergent badge removed** entirely from `public/index.html` (kept inert hidden anchor + JS auto-removal + MutationObserver guard). Title changed to "NaijaInvest — Daily Returns Platform".
+- **Mobile bottom navbar** padding rebalanced to `px-1` (no more pr-28 reserve).
+- **History/Transactions** redesign: card list on mobile, scroll-protected table on desktop. `UserLayout <main>` now uses `flex-1 min-w-0 overflow-x-hidden` to prevent flex-child overflow.
+- **Dashboard**: featured plan is admin-controlled (with auto-highest-ROI fallback); home announcement banner shows when active; "Recommended for you" grid REMOVED.
+- **Withdraw page**: removed method selector + bank-on-file card; "Add bank" button placed directly below the warning text (only shown when bank not yet set).
+- **Admin Settings**: featured-plan dropdown + announcement textarea with active toggle.
+- **Admin Withdrawals**: new "Pay via Paystack" button + dialog (auto-suggests bank code from user's saved bank name, manual override available).
+
+### Tests
+- iter 4: 23/24 backend + frontend pass; 2 issues fixed in iter 4.2 → 6/6 retest pass.
 
 ## Tech Notes
 - All backend routes are under `/api/*` (ingress requirement).
