@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 4.1 targeted retest. Badge removal (5/5 routes) PASSES — getElementById('emergent-badge') === null on /login, /register, /forgot-password, /dashboard, /admin. Desktop /history (1280x800) PASSES — history-table visible, history-list-mobile hidden, no overflow. Backend empty-string clearing of featured_product_id PASSES (response null + /settings/public null). Smoke subset PASSES (sec-questions all-or-none, /admin/banks, pay-paystack mock happy path). TWO FAILURES: (1) /history mobile (390x844) STILL has horizontal overflow — body.scrollWidth=806 vs clientWidth=390. The History.jsx 'overflow-x-hidden' wrapper hides scroll visually but the parent <main className='flex-1 pt-14 lg:pt-0 pb-24 lg:pb-0'> in UserLayout.jsx lacks min-w-0/overflow-x-hidden, so as a flex child it expands to content width (filter buttons in overflow-x-auto have natural width ~782px). The card list is visible and table is hidden as required, but the scrollWidth criterion fails. (2) Backend PUT /admin/settings with featured_product_id=null (explicit null) does NOT clear the value — server filters out None via `{k:v for k,v in data.dict().items() if v is not None}` BEFORE checking for empty-string. Only empty-string clears; explicit null leaves the value unchanged.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/settings", "issue": "featured_product_id=null (explicit None) does NOT clear the field. Filter `{k:v for k,v in data.dict().items() if v is not None}` drops the key before the empty-string-to-None branch. Spec said: 'PUT /api/admin/settings with featured_product_id=null still works (explicit null)'. Empty-string clearing works correctly. Suggested fix: change filter to detect SettingsUpdate.__fields_set__ instead of None, or special-case featured_product_id so that explicit None is preserved."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "UserLayout.jsx <main>", "issue": "/history mobile (390x844) body.scrollWidth=806 vs clientWidth=390. The History.jsx 'overflow-x-hidden' wrapper is correctly placed but is INSIDE <main className='flex-1 pt-14 lg:pt-0 pb-24 lg:pb-0'> which is a flex child with default min-width:auto, allowing it to expand to content width (806px) because the filter row .overflow-x-auto contains whitespace-nowrap buttons totalling ~782px. Fix: add `min-w-0 overflow-x-hidden` to the <main> in /app/frontend/src/components/UserLayout.jsx line 105. Visually the page does not show a scroll bar (children clip), but the scrollWidth criterion in the spec fails.", "selector": "main.flex-1.pt-14", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_1.py",
+    "/app/test_reports/pytest/iter4_1_results.xml",
+    "/app/backend/tests/test_iter4.py"
+  ],
+  "action_items": [
+    "(P1 Frontend) In /app/frontend/src/components/UserLayout.jsx line 105, change `<main className='flex-1 pt-14 lg:pt-0 pb-24 lg:pb-0'>` to `<main className='flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0 pb-24 lg:pb-0'>` so flex children cannot expand beyond viewport. This fixes /history mobile scrollWidth==clientWidth.",
+    "(P2 Backend) In /app/backend/routes_admin.py update_settings: handle explicit null for featured_product_id BEFORE filtering out None values. Example: `raw = data.dict(exclude_unset=True); if 'featured_product_id' in raw and raw['featured_product_id'] in (None, ''): payload['featured_product_id'] = None`. Currently only empty-string clears; the spec wanted explicit null to work too."
+  ],
+  "critical_code_review_comments": [
+    "UserLayout.jsx <main> uses `flex-1` without `min-w-0` — this is a well-known Tailwind/flexbox gotcha where flex children get min-width:auto and can blow past the parent. Any child with non-shrinking content (filter row, code block, long string) will overflow. Adding `min-w-0` is the recommended Tailwind fix.",
+    "routes_admin.update_settings still drops null values via the `if v is not None` filter; this prevents distinguishing 'unset' from 'explicit null'. Use Pydantic's `exclude_unset=True` for the proper semantic.",
+    "Badge removal via JS + MutationObserver is a robust solution and works across all 5 audited routes — good fix."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_1.py (new — 6 targeted pytest tests, 5 pass / 1 fail)"
+  ],
+  "success_rate": {"backend": "83% (5/6) — empty-string clearing works; explicit null clearing does NOT", "frontend": "92% — badge (5/5) + desktop history pass; mobile history scrollWidth still 806 vs 390"},
+  "test_credentials": "Admin: 08123456789 / personally · User: 08099887766 / newpwd",
+  "seed_data_creation": "≈4 TEST_41_* users created (TEST41_OnlyQ1, TEST41_SameQ rejected at register, TEST41_Pay had a paid withdrawal). Featured product was set then cleared during the empty-string test; final state in DB after test_set_then_clear_with_null leaves featured_product_id pointing at the first product (clean-up failed because explicit null clearing is broken). Recommend admin manually clear via UI (empty-string path works) or via PUT with empty string.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes UserLayout.jsx (add min-w-0 overflow-x-hidden to <main>) and routes_admin.update_settings (use exclude_unset for featured_product_id null), re-run /app/backend/tests/test_iter4_1.py (should be 6/6 pass) and the browser check: viewport 390x844, login as 08099887766/newpwd, goto /history, assert document.body.scrollWidth <= document.body.clientWidth + 5.",
+  "rca_of_the_issue": "Bug A (open, frontend): History.jsx wraps content in overflow-x-hidden but parent <main class='flex-1 ...'> in UserLayout.jsx has min-width:auto (flex default). Flex children can grow past the parent unless min-w-0 is set. Filter buttons (whitespace-nowrap, no wrap) push the wrapper to 782px and main to 806px. Fix: add `min-w-0 overflow-x-hidden` to <main>. Bug B (open, backend): update_settings filters out None values from payload BEFORE the empty-string-to-None branch runs, so featured_product_id=null in the JSON body is dropped and the value persists. Fix: use data.dict(exclude_unset=True) to keep explicit None values, then run the empty-string conversion."
+}

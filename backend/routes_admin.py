@@ -558,6 +558,9 @@ async def get_settings(request: Request, _admin=Depends(get_current_admin)):
 async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     payload = {k: v for k, v in data.dict().items() if v is not None}
+    # Allow admins to clear the featured plan via empty string
+    if payload.get("featured_product_id") == "":
+        payload["featured_product_id"] = None
     if payload:
         await db.settings.update_one({"id": "global"}, {"$set": payload}, upsert=True)
     return await db.settings.find_one({"id": "global"}, {"_id": 0})
