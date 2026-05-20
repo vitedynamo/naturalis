@@ -42,7 +42,7 @@ export default function History() {
       <div className="flex gap-2 mt-5 overflow-x-auto pb-1" data-testid="history-filters">
         {types.map(t => (
           <button key={t.v} onClick={() => setFilter(t.v)} data-testid={`filter-${t.v || "all"}`}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${filter === t.v ? "bg-[#0F4C3A] text-white border-[#0F4C3A]" : "border-[#E5E9E4] text-[#4A5D54] hover:bg-[#F3F5F1]"}`}>
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${filter === t.v ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"}`}>
             {t.label}
           </button>
         ))}
@@ -50,7 +50,7 @@ export default function History() {
 
       <div className="card-soft overflow-hidden mt-5">
         <table className="w-full text-sm" data-testid="history-table">
-          <thead className="bg-[#F3F5F1] text-[#4A5D54]">
+          <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
             <tr>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Type</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Description</th>
@@ -61,18 +61,18 @@ export default function History() {
           </thead>
           <tbody>
             {items.map(t => (
-              <tr key={t.id} className="border-t border-[#E5E9E4]">
+              <tr key={t.id} className="border-t border-[color:var(--border-default)]">
                 <td className="p-3"><span className={`pill ${typePill[t.type] || "pill-neutral"} capitalize`}>{t.type}</span></td>
-                <td className="p-3 text-[#0A1C16]">{t.description}</td>
-                <td className={`p-3 text-right font-semibold ${t.amount >= 0 ? "text-[#007a4d]" : "text-[#9c1239]"}`}>
+                <td className="p-3 text-[color:var(--text-primary)]">{t.description}</td>
+                <td className={`p-3 text-right font-semibold ${t.amount >= 0 ? "text-[color:var(--success)]" : "text-[color:var(--error)]"}`}>
                   {t.amount >= 0 ? "+" : ""}{formatNaira(t.amount)}
                 </td>
                 <td className="p-3 text-right font-mono">{formatNaira(t.balance_after)}</td>
-                <td className="p-3 text-[#4A5D54]">{formatDate(t.created_at)}</td>
+                <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(t.created_at)}</td>
               </tr>
             ))}
             {items.length === 0 && (
-              <tr><td colSpan={5} className="p-6 text-center text-[#8A9C93]">No transactions.</td></tr>
+              <tr><td colSpan={5} className="p-6 text-center text-[color:var(--text-tertiary)]">No transactions.</td></tr>
             )}
           </tbody>
         </table>

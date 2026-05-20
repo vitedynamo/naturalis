@@ -29,7 +29,7 @@ export default function AdminPasswordResets() {
         {["pending", "approved", "rejected", "all"].map((s) => (
           <button key={s} onClick={() => setFilter(s)} data-testid={`filter-${s}`}
             className={`px-4 py-1.5 rounded-full text-sm font-medium border whitespace-nowrap capitalize ${
-              filter === s ? "bg-[#0F4C3A] text-white border-[#0F4C3A]" : "border-[#E5E9E4] text-[#4A5D54] hover:bg-[#F3F5F1]"
+              filter === s ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
             }`}>
             {s}
           </button>
@@ -38,7 +38,7 @@ export default function AdminPasswordResets() {
 
       <div className="card-soft overflow-hidden">
         <table className="w-full text-sm" data-testid="admin-resets-table">
-          <thead className="bg-[#F3F5F1] text-[#4A5D54]">
+          <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
             <tr>
               <th className="text-left p-3 text-xs uppercase tracking-wider">User</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Reason</th>
@@ -49,32 +49,32 @@ export default function AdminPasswordResets() {
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.id} className="border-t border-[#E5E9E4]">
+              <tr key={r.id} className="border-t border-[color:var(--border-default)]">
                 <td className="p-3">
                   <div className="font-medium">{r.user_name || "—"}</div>
-                  <div className="font-mono text-xs text-[#8A9C93]">{r.phone}</div>
+                  <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{r.phone}</div>
                 </td>
-                <td className="p-3 max-w-xs text-[#4A5D54]">{r.reason || <span className="italic text-[#8A9C93]">No reason given</span>}</td>
+                <td className="p-3 max-w-xs text-[color:var(--text-secondary)]">{r.reason || <span className="italic text-[color:var(--text-tertiary)]">No reason given</span>}</td>
                 <td className="p-3">
                   <span className={`pill ${r.status === "approved" ? "pill-success" : r.status === "rejected" ? "pill-error" : "pill-warn"}`}>
                     {r.status}
                   </span>
                 </td>
-                <td className="p-3 text-[#4A5D54]">{formatDate(r.created_at)}</td>
+                <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(r.created_at)}</td>
                 <td className="p-3 text-right space-x-2">
                   {r.status === "pending" && (
                     <>
                       <button onClick={() => act(r, "approve")} data-testid={`approve-reset-${r.id}`}
-                        className="px-3 py-1.5 rounded-md text-xs bg-[#0F4C3A] text-white hover:bg-[#0A3629]">Approve</button>
+                        className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)]">Approve</button>
                       <button onClick={() => act(r, "reject")} data-testid={`reject-reset-${r.id}`}
-                        className="px-3 py-1.5 rounded-md text-xs bg-rose-50 text-[#9c1239]">Reject</button>
+                        className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--error-soft)] text-[color:var(--error)]">Reject</button>
                     </>
                   )}
-                  {r.admin_note && <div className="text-xs text-[#8A9C93] mt-1 italic">{r.admin_note}</div>}
+                  {r.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic">{r.admin_note}</div>}
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-[#8A9C93]">No requests.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-[color:var(--text-tertiary)]">No requests.</td></tr>}
           </tbody>
         </table>
       </div>

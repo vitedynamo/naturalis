@@ -1,0 +1,47 @@
+{
+  "summary": "Big-redesign update tested end-to-end. Added /app/backend/tests/test_redesign.py — 12/12 pass: security-questions on register (persistence + case-insensitive answers + wrong-answer 400 + 404 paths), admin-only image upload (jpg/png/webp validation, ≤5MB enforcement, RBAC), and /api/files/{path} serving uploaded bytes with image content-type and no auth. Frontend verified at 390x844 (mobile) and 1920x1080 (admin desktop): Login/Register/ForgotPassword all expose ThemeToggle; theme persists in localStorage 'ni_theme' (light↔dark switches html.dark class). Register has q1/a1/q2/a2 testids. ForgotPassword has the 2-tab UI (mode-questions/mode-admin) + step1 visible. Logged in as 08099887766/newpwd → dashboard shows NO old 4 stat cards and NO active investments list; featured-plan + cta-team + cta-coupon + cta-packages all render. Mobile bottom nav has exactly Home/Invest/Packages/Team/More — Deposit/Withdraw are NOT there but ARE inside the More sheet (more-deposit/more-withdraw). /my-packages renders with pkg-filter-all + invest-more. /team renders referral page. Admin login → /admin sidebar has theme-toggle. /admin/products → Add product modal → hidden #product-image-upload accepts a PNG via set_input_files, returns toast 'Image uploaded' and populates image_url with /api/files/naija-invest/products/<uuid>.png.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/register", "issue": "Server still stores security_question_1/2 even when only one of the two is provided. Pydantic does not enforce 'all-or-none' on the 4 security fields. Low risk because /auth/reset-with-questions correctly refuses when either hash missing, but cleaner to validate at register-time."},
+      {"endpoint": "/api/auth/forgot-password", "issue": "No rate-limit (carry-over from iter_2). Acceptable for MVP."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Team page (/team) referral-code hero card", "issues": ["The referral code itself (large 'KGCXBIA' text) and the small 'Copy code' label appear in white/very-light tone on the light pink/coral card — extremely low contrast on mobile. The pink 'Copy invite link' CTA below is fine. Consider darkening the code text or using a contrasting indigo on the coral card."]},
+      {"screen": "Admin Products → New product modal", "issues": ["Image preview area shows a thin empty white square when a 1x1 test PNG is uploaded — fine for production-sized photos but the preview <img> doesn't visually indicate a successful upload at small sizes. The 'Image uploaded' toast is the only confirmation. Minor."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_redesign.py",
+    "/app/backend/tests/test_incremental_update.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_redesign.xml"
+  ],
+  "action_items": [
+    "(Design polish) Improve contrast on /team referral-code hero card — code text barely visible on coral background.",
+    "(Optional backend hardening) Enforce all-or-none on register security_question_1/answer_1/question_2/answer_2.",
+    "(Carry-over from iter_2, not retested) Emergent badge overlapping the bottom-right of mobile bottom nav. Note: app now applies pr-28 to the bottom nav per the agent context — overlap should be mitigated."
+  ],
+  "critical_code_review_comments": [
+    "routes_user.py register stores hashed answers via bcrypt (hash_password) using strip().lower() → reset path uses same normalisation, so case-insensitive comparison works correctly. Good.",
+    "routes_user.py reset-with-questions returns generic 400 'One or more answers are incorrect' — does not reveal which one. Good for privacy.",
+    "routes_admin.py /admin/upload-image validates content_type set, but does NOT sniff actual bytes (magic-number check). A bad client could send an HTML payload with content-type 'image/png'. Low risk because the file is served back as image/png and not parsed, but worth noting.",
+    "storage.py: 403 retry path resets the cached storage key and retries once — good defensive design.",
+    "server.py /api/files/{path:path} unconditionally returns 404 on any get_object exception. This swallows real storage outages as 404s; logging would help observability.",
+    "models.py RegisterRequest does not validate security_question_1/2 length or that both Qs differ — frontend enforces it but backend does not (defence in depth)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_redesign.py (new — 12 tests)"
+  ],
+  "success_rate": {"backend": "100% on redesign suite (12/12)", "frontend": "100% of redesign flows tested"},
+  "test_credentials": "Admin: 08123456789 / personally. User WITH security questions: 08099887766 / newpwd (Q1 mother's maiden=smith, Q2 first pet=rex). Test users with random 11-digit phones created during pytest run.",
+  "seed_data_creation": "Approximately 4 TEST_* users (TEST_SQ, TEST_NoSQ + 2 others) created via /auth/register during pytest. Several test PNG bytes uploaded to object storage at naija-invest/products/<uuid>.png; one extra product image now linked into the admin Products list. Non-blocking.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Three pytest suites available now: backend_test.py (full regression), test_incremental_update.py (forgot-pwd admin-mediated flow), test_redesign.py (security questions + upload-image + /api/files). Run individually — backend_test.py shares module-scoped 'state' across tests so it must be run as a single suite. test_redesign.py is independent and fast (~6s). REACT_APP_BACKEND_URL is the public URL. Admin password is 'personally' (no leading capital). The Emergent object storage IS real and is initialised at startup via EMERGENT_LLM_KEY — uploads round-trip through the real storage backend; the test PNG is fetched back and byte-compared.",
+  "rca_of_the_issue": "Not applicable — no bugs blocking. Only minor design polish on /team referral-card contrast and an optional defensive validation on register security-question pairing."
+}

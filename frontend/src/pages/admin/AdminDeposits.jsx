@@ -18,7 +18,7 @@ export default function AdminDeposits() {
     <AdminLayout title="Deposits">
       <div className="card-soft overflow-hidden">
         <table className="w-full text-sm" data-testid="admin-deposits-table">
-          <thead className="bg-[#F3F5F1] text-[#4A5D54]">
+          <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
             <tr>
               <th className="text-left p-3 text-xs uppercase tracking-wider">User</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Reference</th>
@@ -31,25 +31,25 @@ export default function AdminDeposits() {
           </thead>
           <tbody>
             {items.map(d => (
-              <tr key={d.id} className="border-t border-[#E5E9E4]">
+              <tr key={d.id} className="border-t border-[color:var(--border-default)]">
                 <td className="p-3">
                   <div className="font-medium">{d.user_name}</div>
-                  <div className="font-mono text-xs text-[#8A9C93]">{d.user_phone}</div>
+                  <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{d.user_phone}</div>
                 </td>
                 <td className="p-3 font-mono text-xs">{d.reference}</td>
                 <td className="p-3 text-right font-semibold">{formatNaira(d.amount)}</td>
                 <td className="p-3 capitalize">{d.method}</td>
                 <td className="p-3"><span className={`pill ${d.status === "success" ? "pill-success" : d.status === "failed" ? "pill-error" : "pill-warn"}`}>{d.status}</span></td>
-                <td className="p-3 text-[#4A5D54]">{formatDate(d.created_at)}</td>
+                <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(d.created_at)}</td>
                 <td className="p-3 text-right">
                   {d.status === "pending" && (
                     <button onClick={() => approve(d)} data-testid={`approve-deposit-${d.id}`}
-                      className="px-3 py-1.5 rounded-md text-xs bg-[#0F4C3A] text-white hover:bg-[#0A3629]">Approve</button>
+                      className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)]">Approve</button>
                   )}
                 </td>
               </tr>
             ))}
-            {items.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-[#8A9C93]">No deposits.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-[color:var(--text-tertiary)]">No deposits.</td></tr>}
           </tbody>
         </table>
       </div>

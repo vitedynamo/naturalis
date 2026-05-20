@@ -29,6 +29,11 @@ class User(BaseModel):
     account_name: Optional[str] = None
     is_admin: bool = False
     is_blocked: bool = False
+    # Security questions (for self-service password recovery)
+    security_question_1: Optional[str] = None
+    security_answer_hash_1: Optional[str] = None
+    security_question_2: Optional[str] = None
+    security_answer_hash_2: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
 
 
@@ -53,6 +58,17 @@ class RegisterRequest(BaseModel):
     name: str
     password: str
     referral_code: Optional[str] = None
+    security_question_1: Optional[str] = None
+    security_answer_1: Optional[str] = None
+    security_question_2: Optional[str] = None
+    security_answer_2: Optional[str] = None
+
+
+class ResetWithQuestionsRequest(BaseModel):
+    phone: str
+    answer_1: str
+    answer_2: str
+    new_password: str
 
 
 class LoginRequest(BaseModel):

@@ -36,7 +36,7 @@ export default function AdminUsers() {
     <AdminLayout title="Users">
       <div className="card-soft overflow-hidden">
         <table className="w-full text-sm" data-testid="admin-users-table">
-          <thead className="bg-[#F3F5F1] text-[#4A5D54]">
+          <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
             <tr>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Name</th>
               <th className="text-left p-3 text-xs uppercase tracking-wider">Phone</th>
@@ -50,13 +50,13 @@ export default function AdminUsers() {
           </thead>
           <tbody>
             {users.map(u => (
-              <tr key={u.id} className="border-t border-[#E5E9E4]">
+              <tr key={u.id} className="border-t border-[color:var(--border-default)]">
                 <td className="p-3 font-medium">{u.name}{u.is_admin && <span className="ml-2 pill pill-warn">admin</span>}</td>
                 <td className="p-3 font-mono text-xs">{u.phone}</td>
-                <td className="p-3 font-mono text-xs text-[#0F4C3A]">{u.referral_code}</td>
+                <td className="p-3 font-mono text-xs text-[color:var(--brand)]">{u.referral_code}</td>
                 <td className="p-3 text-right font-semibold">{formatNaira(u.wallet_balance)}</td>
                 <td className="p-3 text-right">{formatNaira(u.total_earnings)}</td>
-                <td className="p-3 text-[#4A5D54]">{formatDate(u.created_at)}</td>
+                <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(u.created_at)}</td>
                 <td className="p-3">
                   {u.is_blocked ? <span className="pill pill-error">blocked</span> : <span className="pill pill-success">active</span>}
                 </td>
@@ -65,12 +65,12 @@ export default function AdminUsers() {
                     <>
                       <button onClick={() => { setEditing(u); setAdjust({ amount: "", note: "" }); }}
                         data-testid={`adjust-${u.id}`}
-                        className="px-3 py-1.5 rounded-md text-xs bg-[#0F4C3A] text-white hover:bg-[#0A3629]">
+                        className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)]">
                         Adjust ₦
                       </button>
                       <button onClick={() => toggle(u)}
                         data-testid={`toggle-${u.id}`}
-                        className={`px-3 py-1.5 rounded-md text-xs ${u.is_blocked ? "bg-[#00D084] text-[#0A1C16]" : "bg-rose-50 text-[#9c1239]"}`}>
+                        className={`px-3 py-1.5 rounded-md text-xs ${u.is_blocked ? "bg-[color:var(--accent-main)] text-[color:var(--text-primary)]" : "bg-[color:var(--error-soft)] text-[color:var(--error)]"}`}>
                         {u.is_blocked ? "Unblock" : "Block"}
                       </button>
                     </>
@@ -78,7 +78,7 @@ export default function AdminUsers() {
                 </td>
               </tr>
             ))}
-            {users.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-[#8A9C93]">No users.</td></tr>}
+            {users.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-[color:var(--text-tertiary)]">No users.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -89,18 +89,18 @@ export default function AdminUsers() {
             <DialogTitle>Adjust wallet — {editing?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#4A5D54]">Amount (₦) — negative to debit</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦) — negative to debit</label>
             <input type="number" value={adjust.amount} onChange={(e)=>setAdjust({...adjust, amount: e.target.value})}
               data-testid="adjust-amount-input"
-              className="w-full px-3 py-2.5 bg-white border border-[#E5E9E4] rounded-lg" />
+              className="w-full px-3 py-2.5 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg" />
             <input value={adjust.note} onChange={(e)=>setAdjust({...adjust, note: e.target.value})}
               data-testid="adjust-note-input"
               placeholder="Note (visible in user transaction history)"
-              className="w-full px-3 py-2.5 bg-white border border-[#E5E9E4] rounded-lg" />
+              className="w-full px-3 py-2.5 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg" />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={doAdjust} data-testid="adjust-submit" className="bg-[#0F4C3A] hover:bg-[#0A3629]">Apply</Button>
+            <Button onClick={doAdjust} data-testid="adjust-submit" className="bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)]">Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

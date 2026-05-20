@@ -7,7 +7,7 @@ export function Protected({ children, admin = false }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-[#4A5D54] text-sm">Loading…</div>
+        <div className="text-[color:var(--text-secondary)] text-sm">Loading…</div>
       </div>
     );
   }

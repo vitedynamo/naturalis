@@ -29,7 +29,7 @@ export default function AdminSettings() {
     } catch (e) { toast.error("Failed"); }
   };
 
-  if (!s) return <AdminLayout title="Settings"><div className="text-[#4A5D54]">Loading…</div></AdminLayout>;
+  if (!s) return <AdminLayout title="Settings"><div className="text-[color:var(--text-secondary)]">Loading…</div></AdminLayout>;
 
   return (
     <AdminLayout title="Settings">
@@ -45,7 +45,7 @@ export default function AdminSettings() {
 
         <div className="card-soft p-6">
           <div className="text-label">Referral commission percentages</div>
-          <p className="text-xs text-[#4A5D54] mt-1">Applied to each daily profit payout your referrals receive.</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Applied to each daily profit payout your referrals receive.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
             <Field label="Generation 1 (%)" value={s.gen1_percent} step="0.1" onChange={(v)=>setS({...s, gen1_percent: v})} testid="gen1" />
             <Field label="Generation 2 (%)" value={s.gen2_percent} step="0.1" onChange={(v)=>setS({...s, gen2_percent: v})} testid="gen2" />
@@ -55,13 +55,13 @@ export default function AdminSettings() {
 
         <div className="card-soft p-6">
           <div className="text-label">Paystack</div>
-          <p className="text-xs text-[#4A5D54] mt-1">Set mode to <code>live</code> after entering real Paystack keys. In <code>mock</code> mode deposits auto-succeed for testing.</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Set mode to <code>live</code> after entering real Paystack keys. In <code>mock</code> mode deposits auto-succeed for testing.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <label className="text-xs">
               <span>Payment mode</span>
               <select value={s.payment_mode} onChange={(e)=>setS({...s, payment_mode: e.target.value})}
                 data-testid="payment-mode-select"
-                className="w-full mt-1 px-3 py-2.5 border border-[#E5E9E4] rounded-lg bg-white">
+                className="w-full mt-1 px-3 py-2.5 border border-[color:var(--border-default)] rounded-lg bg-[color:var(--surface)]">
                 <option value="mock">Mock (testing)</option>
                 <option value="live">Live (Paystack)</option>
               </select>
@@ -71,12 +71,12 @@ export default function AdminSettings() {
               <span>Secret key</span>
               <input type="password" value={s.paystack_secret_key || ""} onChange={(e)=>setS({...s, paystack_secret_key: e.target.value})}
                 data-testid="sk-key-input"
-                className="w-full mt-1 px-3 py-2.5 border border-[#E5E9E4] rounded-lg font-mono text-sm" />
+                className="w-full mt-1 px-3 py-2.5 border border-[color:var(--border-default)] rounded-lg font-mono text-sm" />
             </label>
           </div>
         </div>
 
-        <button data-testid="save-settings-btn" className="flex items-center gap-2 bg-[#0F4C3A] hover:bg-[#0A3629] text-white px-5 py-2.5 rounded-lg font-semibold">
+        <button data-testid="save-settings-btn" className="flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white px-5 py-2.5 rounded-lg font-semibold">
           <Save className="w-4 h-4" /> Save settings
         </button>
       </form>
@@ -92,7 +92,7 @@ function Field({ label, value, onChange, step = "1", text = false, testid }) {
         type={text ? "text" : "number"} step={step} value={value ?? ""}
         onChange={(e)=>onChange(e.target.value)}
         data-testid={`${testid}-input`}
-        className="w-full mt-1 px-3 py-2.5 border border-[#E5E9E4] rounded-lg" />
+        className="w-full mt-1 px-3 py-2.5 border border-[color:var(--border-default)] rounded-lg" />
     </label>
   );
 }

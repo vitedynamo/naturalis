@@ -1,16 +1,52 @@
+import os
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest
+from storage import put_object, get_object
 
 router = APIRouter()
 
 
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+APP_NAME = os.environ.get("APP_NAME", "naija-invest")
+
+
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+# ===== Image upload =====
+@router.post("/admin/upload-image")
+async def upload_image(request: Request, file: UploadFile = File(...), _admin=Depends(get_current_admin)):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, "Only JPG, PNG or WebP images are allowed")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Image must be ≤ 5MB")
+    ext = (file.filename or "image").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "bin"
+    path = f"{APP_NAME}/products/{uuid.uuid4().hex}.{ext}"
+    try:
+        result = put_object(path, data, file.content_type or "application/octet-stream")
+    except Exception as e:
+        raise HTTPException(502, f"Storage upload failed: {e}")
+    db = request.app.state.db
+    await db.files.insert_one({
+        "id": gen_reference("f"),
+        "storage_path": result["path"],
+        "original_filename": file.filename,
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "created_at": _now_iso(),
+    })
+    # Build a relative URL that the frontend will resolve via REACT_APP_BACKEND_URL
+    return {"path": result["path"], "url": f"/api/files/{result['path']}", "size": result.get("size", len(data))}
 
 
 # ===== Dashboard stats =====

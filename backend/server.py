@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 from auth import hash_password, gen_referral_code
 from routes_user import router as user_router
 from routes_admin import router as admin_router
+from storage import init_storage, get_object
 
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / '.env', override=True)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -33,6 +34,17 @@ async def root():
 @api_router.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# Public file serving for product images (no auth — product images are public).
+@api_router.get("/files/{path:path}")
+async def serve_file(path: str):
+    from fastapi.responses import Response as FResponse
+    try:
+        data, content_type = get_object(path)
+    except Exception:
+        raise HTTPException(status_code=404, detail="File not found")
+    return FResponse(content=data, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
 
 
 api_router.include_router(user_router)
@@ -58,6 +70,12 @@ def _now_iso():
 
 @app.on_event("startup")
 async def on_startup():
+    # Initialise object storage (non-fatal if it fails — uploads will error later)
+    try:
+        init_storage()
+    except Exception as e:
+        logger.warning(f"Object storage init failed at startup: {e}")
+
     # Seed global settings
     existing = await db.settings.find_one({"id": "global"})
     if not existing:

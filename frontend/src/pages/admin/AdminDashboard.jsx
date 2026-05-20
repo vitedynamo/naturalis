@@ -27,17 +27,17 @@ export default function AdminDashboard() {
   return (
     <AdminLayout title="Overview">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Stat icon={Users} label="Total Users" value={stats.users || 0} accent="bg-[#E6FBF3] text-[#007a4d]" />
-        <Stat icon={TrendingUp} label="Active Investments" value={stats.active_investments || 0} accent="bg-[#EEF2FF] text-[#3B82F6]" />
-        <Stat icon={Wallet} label="Total Invested" value={formatNaira(stats.total_invested)} accent="bg-[#FFF5E6] text-[#D97736]" />
-        <Stat icon={ArrowDownToLine} label="Total Deposits" value={formatNaira(stats.total_deposits)} accent="bg-[#E6FBF3] text-[#007a4d]" />
-        <Stat icon={ArrowUpFromLine} label="Total Withdrawn" value={formatNaira(stats.total_withdrawn)} accent="bg-[#FEF2F2] text-[#9c1239]" />
-        <Stat icon={Clock} label="Pending Withdrawals" value={stats.pending_withdrawals || 0} accent="bg-[#FFFAEB] text-[#a14d12]" />
+        <Stat icon={Users} label="Total Users" value={stats.users || 0} accent="bg-[color:var(--success-soft)] text-[color:var(--success)]" />
+        <Stat icon={TrendingUp} label="Active Investments" value={stats.active_investments || 0} accent="bg-[color:var(--brand-soft)] text-[color:var(--brand)]" />
+        <Stat icon={Wallet} label="Total Invested" value={formatNaira(stats.total_invested)} accent="bg-[color:var(--gold-soft)] text-[color:var(--warning)]" />
+        <Stat icon={ArrowDownToLine} label="Total Deposits" value={formatNaira(stats.total_deposits)} accent="bg-[color:var(--success-soft)] text-[color:var(--success)]" />
+        <Stat icon={ArrowUpFromLine} label="Total Withdrawn" value={formatNaira(stats.total_withdrawn)} accent="bg-[color:var(--error-soft)] text-[color:var(--error)]" />
+        <Stat icon={Clock} label="Pending Withdrawals" value={stats.pending_withdrawals || 0} accent="bg-[color:var(--gold-soft)] text-[color:var(--warning)]" />
       </div>
 
       <div className="mt-8 card-soft p-6">
         <div className="text-label">Admin Notes</div>
-        <ul className="mt-3 text-sm text-[#4A5D54] space-y-2">
+        <ul className="mt-3 text-sm text-[color:var(--text-secondary)] space-y-2">
           <li>• Use <strong>Settings</strong> to switch payment mode to <code>live</code> after adding Paystack keys.</li>
           <li>• Approve manual withdrawals from the Withdrawals page after paying users.</li>
           <li>• Investment payouts run automatically every time a user opens the app or fetches their data.</li>

@@ -25,6 +25,7 @@ from models import (
     WithdrawRequest,
     CouponRedeemRequest,
     ForgotPasswordRequest,
+    ResetWithQuestionsRequest,
 )
 from payouts import process_investment_payouts
 
@@ -110,6 +111,10 @@ async def register(data: RegisterRequest, request: Request):
         "account_name": None,
         "is_admin": False,
         "is_blocked": False,
+        "security_question_1": (data.security_question_1 or "").strip() or None,
+        "security_answer_hash_1": hash_password(data.security_answer_1.strip().lower()) if data.security_answer_1 else None,
+        "security_question_2": (data.security_question_2 or "").strip() or None,
+        "security_answer_hash_2": hash_password(data.security_answer_2.strip().lower()) if data.security_answer_2 else None,
         "created_at": _now_iso(),
     }
     await db.users.insert_one(user)
@@ -201,6 +206,42 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
 
 
 # =========== FORGOT PASSWORD ===========
+@router.get("/auth/security-questions/{phone}")
+async def get_security_questions(phone: str, request: Request):
+    db = request.app.state.db
+    phone = _validate_phone(phone)
+    user = await db.users.find_one({"phone": phone}, {"_id": 0, "security_question_1": 1, "security_question_2": 1})
+    if not user:
+        raise HTTPException(404, "No account found for that phone number")
+    q1 = user.get("security_question_1")
+    q2 = user.get("security_question_2")
+    if not q1 or not q2:
+        raise HTTPException(404, "This account does not have security questions set. Use admin recovery instead.")
+    return {"phone": phone, "question_1": q1, "question_2": q2}
+
+
+@router.post("/auth/reset-with-questions")
+async def reset_with_questions(data: ResetWithQuestionsRequest, request: Request):
+    db = request.app.state.db
+    phone = _validate_phone(data.phone)
+    if len(data.new_password) < 4:
+        raise HTTPException(400, "New password too short")
+    user = await db.users.find_one({"phone": phone}, {"_id": 0})
+    if not user:
+        raise HTTPException(404, "No account found")
+    h1 = user.get("security_answer_hash_1")
+    h2 = user.get("security_answer_hash_2")
+    if not h1 or not h2:
+        raise HTTPException(400, "Security questions not set for this account")
+    if not (verify_password(data.answer_1.strip().lower(), h1) and verify_password(data.answer_2.strip().lower(), h2)):
+        raise HTTPException(400, "One or more answers are incorrect")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(data.new_password)}},
+    )
+    return {"status": "ok", "message": "Password reset successful. You can now log in."}
+
+
 @router.post("/auth/forgot-password")
 async def forgot_password(data: ForgotPasswordRequest, request: Request):
     """User submits phone + new password + reason. An admin must approve before it takes effect."""
