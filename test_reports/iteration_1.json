@@ -1,0 +1,46 @@
+{
+  "summary": "End-to-end backend (pytest, 38 tests) + frontend (Playwright) testing of Naija Invest MVP. Initial run found multiple 500s caused by MongoDB ObjectId in API responses on POST endpoints (insert_one mutates dict in-place adding _id). Fixed by popping _id after insert in /invest, /withdrawal/request, /admin/products, /admin/coupons. All 38 backend tests pass including 24h payout simulation + 3-gen referral commission cascade. Frontend flows verified: admin login (08123456789/personally), user register w/ ₦750 welcome bonus, dashboard, invest, deposit (mock), withdraw, referrals, admin products CRUD UI.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Multiple POST endpoints (originally)", "issue": "FIXED by testing agent — POST /invest, /withdrawal/request, /admin/products, /admin/coupons returned 500 due to MongoDB _id leaking into response after insert_one mutated the doc. Patched with doc.pop('_id', None) after insert."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Overview (/admin)", "issues": ["Stat card labels (TOTAL USERS, ACTIVE INVESTMENTS, TOTAL INVESTED, TOTAL DEPOSITS, TOTAL WITHDRAWN, PENDING WITHDRAWALS) appear very faint — extremely low contrast against the white card background; numbers/headings are readable but labels are barely legible."]},
+      {"screen": "Admin Products card (when image_url empty)", "issues": ["Card image area is blank/empty grey — consider rendering a 'No image' placeholder like the Invest page does."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Increase contrast of admin stat-card labels for readability.",
+    "Optional: add a placeholder image/style for product cards with empty image_url in the admin Products grid.",
+    "Optional cleanup: residual TEST_PROD product from earlier failed test run is visible in admin Products; main agent may delete or re-seed the products collection.",
+    "Consider repeating the doc.pop('_id', None) pattern (or a small helper) across any future insert+return endpoints to prevent regression."
+  ],
+  "critical_code_review_comments": [
+    "All POST endpoints that insert a Mongo doc and return it must strip _id before returning (root cause of the 500s). Fix applied to 4 endpoints, but worth standardising via a helper.",
+    "/api/auth/me triggers process_investment_payouts on every call — fine for MVP but will become a hot path; consider moving to a background scheduler.",
+    "JWT_SECRET falls back to a hardcoded dev secret if env var missing — set JWT_SECRET in production env.",
+    "/coupons/redeem and /invest do balance reads then $inc — minor race condition risk under concurrent calls; acceptable for MVP.",
+    "Settings PUT returns _id-stripped doc correctly because find_one excludes _id. Good pattern."
+  ],
+  "updated_files": [
+    "/app/backend/routes_user.py",
+    "/app/backend/routes_admin.py",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (38/38)", "frontend": "100% of flows tested"},
+  "test_credentials": "Admin: 08123456789 / personally. Test users created dynamically per run via /api/auth/register (phones prefixed 0807/0808).",
+  "seed_data_creation": "Backend tests create transient TEST_* users, a coupon (deleted at end of suite), and one TEST_PROD product (created, updated, deleted within test). One stray TEST_PROD remains from initial failed run before fix — non-blocking.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend suite at /app/backend/tests/backend_test.py is fully passing and reusable. It covers auth, products, deposits (mock), invest, withdrawals, coupons, referrals, transactions, admin CRUD, and a 24h payout + 3-gen cascade simulation via direct motor write to last_payout_at. Re-run with: pytest /app/backend/tests/backend_test.py -v.",
+  "rca_of_the_issue": "Initial 500s on POST /invest, /withdrawal/request, /admin/products, /admin/coupons: motor's insert_one mutates the passed dict, adding a BSON ObjectId at key '_id'. The handlers then returned that same dict directly; FastAPI's jsonable_encoder failed to serialise ObjectId, raising ValueError and producing 500. Fix: call doc.pop('_id', None) immediately after insert_one before returning."
+}
