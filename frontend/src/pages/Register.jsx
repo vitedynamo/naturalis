@@ -23,6 +23,10 @@ export default function Register() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!/^\d{11}$/.test(phone)) {
+      toast.error("Phone number must be exactly 11 digits");
+      return;
+    }
     setLoading(true);
     try {
       const payload = { phone, name, password, referral_code: referralCode || null };
@@ -65,12 +69,15 @@ export default function Register() {
               className="w-full pl-10 pr-3 py-3 bg-white border border-[#E5E9E4] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C3A]" />
           </div>
 
-          <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[#4A5D54]">Phone number</label>
+          <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[#4A5D54]">Phone number (11 digits)</label>
           <div className="relative mt-2">
             <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9C93]" />
-            <input type="tel" required value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="0801 234 5678"
+            <input
+              type="tel" required inputMode="numeric" pattern="\d{11}" maxLength={11}
+              value={phone} onChange={(e)=>setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+              placeholder="08012345678"
               data-testid="register-phone-input"
-              className="w-full pl-10 pr-3 py-3 bg-white border border-[#E5E9E4] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C3A]" />
+              className="w-full pl-10 pr-3 py-3 bg-white border border-[#E5E9E4] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F4C3A] font-mono" />
           </div>
 
           <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[#4A5D54]">Password</label>

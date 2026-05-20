@@ -17,6 +17,7 @@ import Coupons from "@/pages/Coupons";
 import History from "@/pages/History";
 import Profile from "@/pages/Profile";
 import PaymentCallback from "@/pages/PaymentCallback";
+import ForgotPassword from "@/pages/ForgotPassword";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
@@ -27,6 +28,7 @@ import AdminInvestments from "@/pages/admin/AdminInvestments";
 import AdminReferrals from "@/pages/admin/AdminReferrals";
 import AdminCoupons from "@/pages/admin/AdminCoupons";
 import AdminSettings from "@/pages/admin/AdminSettings";
+import AdminPasswordResets from "@/pages/admin/AdminPasswordResets";
 
 function App() {
   return (
@@ -38,6 +40,7 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/payment/callback" element={<PaymentCallback />} />
 
             <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
@@ -57,6 +60,7 @@ function App() {
             <Route path="/admin/investments" element={<Protected admin><AdminInvestments /></Protected>} />
             <Route path="/admin/referrals" element={<Protected admin><AdminReferrals /></Protected>} />
             <Route path="/admin/coupons" element={<Protected admin><AdminCoupons /></Protected>} />
+            <Route path="/admin/password-resets" element={<Protected admin><AdminPasswordResets /></Protected>} />
             <Route path="/admin/settings" element={<Protected admin><AdminSettings /></Protected>} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />

@@ -24,6 +24,7 @@ from models import (
     DepositInitRequest,
     WithdrawRequest,
     CouponRedeemRequest,
+    ForgotPasswordRequest,
 )
 from payouts import process_investment_payouts
 
@@ -60,12 +61,17 @@ async def _log_tx(db, user_id, ttype, amount, description, meta=None):
 
 
 # =========== AUTH ===========
+def _validate_phone(phone: str) -> str:
+    p = (phone or "").strip()
+    if not p.isdigit() or len(p) != 11:
+        raise HTTPException(400, "Phone number must be exactly 11 digits")
+    return p
+
+
 @router.post("/auth/register")
 async def register(data: RegisterRequest, request: Request):
     db = request.app.state.db
-    phone = data.phone.strip()
-    if not phone or len(phone) < 7:
-        raise HTTPException(400, "Invalid phone number")
+    phone = _validate_phone(data.phone)
     if len(data.password) < 4:
         raise HTTPException(400, "Password too short")
 
@@ -151,7 +157,8 @@ async def register(data: RegisterRequest, request: Request):
 @router.post("/auth/login")
 async def login(data: LoginRequest, request: Request):
     db = request.app.state.db
-    user = await db.users.find_one({"phone": data.phone.strip()}, {"_id": 0})
+    phone = _validate_phone(data.phone)
+    user = await db.users.find_one({"phone": phone}, {"_id": 0})
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(401, "Invalid phone or password")
     if user.get("is_blocked"):
@@ -191,6 +198,39 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
         }},
     )
     return await _public_user(db, user["id"])
+
+
+# =========== FORGOT PASSWORD ===========
+@router.post("/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, request: Request):
+    """User submits phone + new password + reason. An admin must approve before it takes effect."""
+    db = request.app.state.db
+    phone = _validate_phone(data.phone)
+    if len(data.new_password) < 4:
+        raise HTTPException(400, "New password too short")
+    user = await db.users.find_one({"phone": phone}, {"_id": 0})
+    if not user:
+        # Don't leak which numbers exist — but app is small, ok to be honest
+        raise HTTPException(404, "No account found for that phone number")
+
+    existing = await db.password_resets.find_one({"user_id": user["id"], "status": "pending"})
+    if existing:
+        raise HTTPException(400, "You already have a pending password reset. Please contact support.")
+
+    doc = {
+        "id": gen_reference("pr"),
+        "user_id": user["id"],
+        "phone": phone,
+        "user_name": user.get("name", ""),
+        "new_password_hash": hash_password(data.new_password),
+        "reason": (data.reason or "").strip()[:300],
+        "status": "pending",
+        "admin_note": None,
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+    }
+    await db.password_resets.insert_one(doc)
+    return {"status": "pending", "message": "Request submitted. An admin will review shortly."}
 
 
 # =========== PRODUCTS ===========

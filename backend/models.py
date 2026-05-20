@@ -222,6 +222,17 @@ class CouponRedemption(BaseModel):
     created_at: datetime = Field(default_factory=_now)
 
 
+# ----- Password reset request -----
+class ForgotPasswordRequest(BaseModel):
+    phone: str
+    new_password: str
+    reason: Optional[str] = None
+
+
+class PasswordResetActionRequest(BaseModel):
+    note: Optional[str] = None
+
+
 # ----- Settings -----
 class Settings(BaseModel):
     model_config = ConfigDict(extra="ignore")

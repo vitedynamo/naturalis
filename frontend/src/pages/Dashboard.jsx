@@ -59,19 +59,36 @@ export default function Dashboard() {
             <div className="metric-num text-4xl md:text-5xl mt-2 text-white" data-testid="hero-balance">{formatNaira(user?.wallet_balance)}</div>
             <div className="text-white/70 text-sm mt-1">Available wallet balance</div>
           </div>
-          <div className="flex gap-3">
-            <Link to="/deposit" data-testid="hero-deposit-btn" className="bg-[#00D084] hover:bg-[#00B372] text-[#0A1C16] font-semibold rounded-lg px-5 py-3 inline-flex items-center gap-2">
+          <div className="flex gap-3 w-full md:w-auto">
+            <Link to="/deposit" data-testid="hero-deposit-btn" className="flex-1 md:flex-none bg-[#00D084] hover:bg-[#00B372] text-[#0A1C16] font-semibold rounded-xl px-5 py-3.5 inline-flex items-center justify-center gap-2">
               <ArrowDownToLine className="w-4 h-4" /> Deposit
             </Link>
-            <Link to="/withdraw" data-testid="hero-withdraw-btn" className="bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-lg px-5 py-3 inline-flex items-center gap-2">
+            <Link to="/withdraw" data-testid="hero-withdraw-btn" className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl px-5 py-3.5 inline-flex items-center justify-center gap-2">
               <ArrowUpFromLine className="w-4 h-4" /> Withdraw
             </Link>
           </div>
         </div>
       </div>
 
+      {/* Quick actions */}
+      <div className="mt-5 grid grid-cols-4 gap-3" data-testid="quick-actions">
+        {[
+          { to: "/invest", icon: TrendingUp, label: "Invest", color: "bg-[#0F4C3A] text-white" },
+          { to: "/referrals", icon: Users, label: "Refer", color: "bg-[#E6FBF3] text-[#007a4d]" },
+          { to: "/coupons", icon: Sparkles, label: "Coupon", color: "bg-[#FFF5E6] text-[#D97736]" },
+          { to: "/history", icon: Wallet, label: "History", color: "bg-[#EEF2FF] text-[#3B82F6]" },
+        ].map((q) => (
+          <Link key={q.to} to={q.to} data-testid={`quick-${q.label.toLowerCase()}`} className="card-soft p-3 flex flex-col items-center gap-2 text-center hover:-translate-y-0.5 transition-transform">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${q.color}`}>
+              <q.icon className="w-5 h-5" />
+            </div>
+            <div className="text-xs font-semibold text-[#0A1C16]">{q.label}</div>
+          </Link>
+        ))}
+      </div>
+
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
         <StatCard icon={TrendingUp} label="Total Earnings" value={formatNaira(user?.total_earnings)} />
         <StatCard icon={Sparkles} label="Daily Expected" value={formatNaira(dailyExpected)} accent="bg-[#FFF5E6] text-[#D97736]" />
         <StatCard icon={Users} label="Referral Earnings" value={formatNaira(user?.referral_earnings)} accent="bg-[#E6FBF3] text-[#007a4d]" />

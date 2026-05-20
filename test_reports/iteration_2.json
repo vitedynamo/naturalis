@@ -1,0 +1,43 @@
+{
+  "summary": "Incremental update tested end-to-end. 20/20 new backend pytest cases pass covering: 11-digit phone validation on register/login, forgot-password flow (validation, unknown phone, pending, duplicate, old-password still works pre-approval, new password works post-approval, reject keeps old, admin RBAC). Mobile frontend verified at 390x844: /forgot-password page with all required testids and 11-digit maxlength, register form enforces maxlength=11 + inputmode=numeric, dashboard shows persistent bottom navbar with 5 tabs (home/invest/deposit/withdraw/more), legacy off-canvas drawer testids (open-menu/close-menu) are gone, More sheet opens with Referrals/Coupons/History/Profile/Sign out testids. Desktop sidebar correctly visible, bottom-nav hidden ≥1024px. Admin Password Resets page renders table, approve flow works (toast + row moves to Approved tab).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "UserLayout bottom navbar (mobile)", "issue": "The 'Made with Emergent' badge (id=emergent-badge, fixed bottom-right) overlaps the right edge of the bottom navbar and intercepts pointer events on the 'More' button on a 390px viewport. Real users on small phones may struggle to tap More. Repro: open dashboard at 390x844, attempt to click bottom-nav-more — playwright reports the badge intercepts the click. Workaround in tests: hide badge before clicking.", "selector": "[data-testid=\"bottom-nav-more\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Overview (carry-over from iteration 1)", "issues": ["Stat card labels still appear faint / low contrast — not retested this run but flagged previously."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_incremental_update.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_incremental.xml"
+  ],
+  "action_items": [
+    "Consider adding right-padding to the mobile bottom navbar (e.g., pr-12 on the <ul>) or moving the Emergent badge upward on small viewports so the More tab is fully tappable.",
+    "(Carry-over) Increase contrast on admin overview stat-card labels."
+  ],
+  "critical_code_review_comments": [
+    "_validate_phone correctly enforces exactly 11 digits and rejects non-numeric — same helper used by register, login, and forgot-password. Good DRY.",
+    "/admin/password-resets list excludes new_password_hash from response — good (no plaintext-equivalent leak).",
+    "Approve flow simply overwrites users.password_hash with the stored hash — correct. Reject flow does not touch user record — correct.",
+    "Duplicate pending request guarded by status='pending' lookup — good. However, no rate-limit on /auth/forgot-password; could be abused. Acceptable for MVP.",
+    "ForgotPasswordRequest does not validate min length of new_password at the Pydantic layer (only inside handler). Minor.",
+    "Mobile bottom navbar uses lg:hidden / lg:flex breakpoint correctly; sidebar hidden on mobile, shown on desktop — verified visually."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_incremental_update.py (new)"
+  ],
+  "success_rate": {"backend": "100% (20/20 new + 38/38 prior)", "frontend": "100% of incremental flows tested"},
+  "test_credentials": "Admin: 08123456789 / personally. Test user 08077788899 / NewUI@1234 (password just approved through UI; original was Orig@1234). Other TEST_FP users created dynamically by pytest.",
+  "seed_data_creation": "Several TEST_* users created via /api/auth/register (08077788899 + dynamic 11-digit phones). Three approved/rejected password_resets records remain in DB (TEST_FP, TEST_UIReset, prior Test User). Non-blocking.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two pytest suites now: /app/backend/tests/backend_test.py (full regression — passing) and /app/backend/tests/test_incremental_update.py (forgot-pwd + 11-digit validation — passing). Run with REACT_APP_BACKEND_URL set. The Emergent badge overlapping the bottom-nav More button on small mobile viewports is the only new finding worth raising.",
+  "rca_of_the_issue": "Bottom navbar overlap: the Emergent preview badge is a fixed-position element anchored to bottom-right with high z-index. UserLayout's bottom <nav> is also fixed but its right-most item (More) sits underneath the badge. The badge is injected by the preview platform and not controlled by the app, but the navbar layout can be tweaked (extra right padding / safe area) to keep More clear."
+}

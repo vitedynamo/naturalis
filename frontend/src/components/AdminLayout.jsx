@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Gauge, Users, Package, ArrowDownToLine, ArrowUpFromLine,
-  TrendingUp, Share2, Ticket, Settings as SettingsIcon, LogOut, Menu, X,
+  TrendingUp, Share2, Ticket, Settings as SettingsIcon, KeyRound, LogOut, Menu, X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -15,6 +15,7 @@ const items = [
   { to: "/admin/investments", icon: TrendingUp, label: "Investments" },
   { to: "/admin/referrals", icon: Share2, label: "Referrals" },
   { to: "/admin/coupons", icon: Ticket, label: "Coupons" },
+  { to: "/admin/password-resets", icon: KeyRound, label: "Password Resets" },
   { to: "/admin/settings", icon: SettingsIcon, label: "Settings" },
 ];
 
