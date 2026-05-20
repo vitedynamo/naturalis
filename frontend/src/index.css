@@ -73,11 +73,11 @@
   .font-mono { font-family: 'JetBrains Mono', monospace; }
   .text-label {
     font-family: 'Outfit', sans-serif;
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     font-weight: 700;
-    color: var(--text-secondary);
+    color: #2C3D33;
   }
 }
 

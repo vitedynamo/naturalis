@@ -67,8 +67,12 @@ export default function AdminProducts() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map(p => (
           <div key={p.id} className="card-soft overflow-hidden" data-testid={`admin-product-${p.id}`}>
-            <div className="aspect-video bg-[#F3F5F1]">
-              {p.image_url ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" /> : null}
+            <div className="aspect-video bg-[#F3F5F1] flex items-center justify-center">
+              {p.image_url ? (
+                <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-[#8A9C93] text-sm font-display">No image</div>
+              )}
             </div>
             <div className="p-4">
               <div className="flex items-center justify-between">
