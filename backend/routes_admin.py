@@ -1,13 +1,15 @@
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
-from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest
+from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
 from storage import put_object, get_object
 
 router = APIRouter()
@@ -16,9 +18,141 @@ router = APIRouter()
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 APP_NAME = os.environ.get("APP_NAME", "naija-invest")
 
+# Banks cache (Paystack /bank)
+_banks_cache: dict = {"at": 0, "items": []}
+
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+async def _get_secret_key(db) -> tuple[str, str]:
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    return (
+        s.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", ""),
+        s.get("payment_mode", "mock"),
+    )
+
+
+# Static fallback list of major Nigerian banks (used when Paystack is in mock mode or unreachable)
+_NG_BANKS_FALLBACK = [
+    {"name": "Access Bank", "code": "044"},
+    {"name": "Ecobank Nigeria", "code": "050"},
+    {"name": "Fidelity Bank", "code": "070"},
+    {"name": "First Bank of Nigeria", "code": "011"},
+    {"name": "First City Monument Bank", "code": "214"},
+    {"name": "Guaranty Trust Bank", "code": "058"},
+    {"name": "Keystone Bank", "code": "082"},
+    {"name": "Kuda Microfinance Bank", "code": "50211"},
+    {"name": "Opay", "code": "999992"},
+    {"name": "Palmpay", "code": "999991"},
+    {"name": "Polaris Bank", "code": "076"},
+    {"name": "Providus Bank", "code": "101"},
+    {"name": "Stanbic IBTC Bank", "code": "221"},
+    {"name": "Standard Chartered", "code": "068"},
+    {"name": "Sterling Bank", "code": "232"},
+    {"name": "Union Bank of Nigeria", "code": "032"},
+    {"name": "United Bank For Africa", "code": "033"},
+    {"name": "Unity Bank", "code": "215"},
+    {"name": "Wema Bank", "code": "035"},
+    {"name": "Zenith Bank", "code": "057"},
+]
+
+
+@router.get("/admin/banks")
+async def list_banks(request: Request, _admin=Depends(get_current_admin)):
+    """List Nigerian banks. Uses Paystack /bank when live mode has a key, else fallback list."""
+    db = request.app.state.db
+    now = time.time()
+    if _banks_cache["items"] and (now - _banks_cache["at"]) < 3600:
+        return _banks_cache["items"]
+    secret, mode = await _get_secret_key(db)
+    if mode == "live" and secret:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://api.paystack.co/bank",
+                    params={"country": "nigeria"},
+                    headers={"Authorization": f"Bearer {secret}"},
+                )
+                data = resp.json()
+            if data.get("status"):
+                items = [{"name": b["name"], "code": b["code"]} for b in data["data"]]
+                _banks_cache["items"] = items
+                _banks_cache["at"] = now
+                return items
+        except httpx.HTTPError:
+            pass
+    return _NG_BANKS_FALLBACK
+
+
+@router.post("/admin/withdrawals/{wid}/pay-paystack")
+async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, request: Request, _admin=Depends(get_current_admin)):
+    """Approve a pending withdrawal via Paystack transfer (or mock if no live key)."""
+    db = request.app.state.db
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    if not w:
+        raise HTTPException(404, "Withdrawal not found")
+    if w["status"] != "pending":
+        raise HTTPException(400, f"Already {w['status']}")
+
+    secret, mode = await _get_secret_key(db)
+    transfer_ref = gen_reference("ptr")
+    transfer_code = None
+
+    if mode == "live" and secret:
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                # 1. Create transfer recipient
+                rec_resp = await client.post(
+                    "https://api.paystack.co/transferrecipient",
+                    headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
+                    json={
+                        "type": "nuban",
+                        "name": w["account_name"],
+                        "account_number": w["account_number"],
+                        "bank_code": payload.bank_code,
+                        "currency": "NGN",
+                    },
+                )
+                rec_data = rec_resp.json()
+            if not rec_data.get("status"):
+                raise HTTPException(502, f"Paystack recipient error: {rec_data.get('message')}")
+            recipient_code = rec_data["data"]["recipient_code"]
+
+            async with httpx.AsyncClient(timeout=20) as client:
+                # 2. Initiate transfer
+                tr_resp = await client.post(
+                    "https://api.paystack.co/transfer",
+                    headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
+                    json={
+                        "source": "balance",
+                        "reason": payload.reason or f"Withdrawal {wid}",
+                        "amount": int(float(w["amount"]) * 100),  # kobo
+                        "recipient": recipient_code,
+                        "reference": transfer_ref,
+                    },
+                )
+                tr_data = tr_resp.json()
+            if not tr_data.get("status"):
+                raise HTTPException(502, f"Paystack transfer error: {tr_data.get('message')}")
+            transfer_code = tr_data["data"].get("transfer_code")
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"Paystack request failed: {e}")
+
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {
+            "status": "paid",
+            "method": "auto",
+            "admin_note": f"Paystack transfer · ref {transfer_ref}" + (" · live" if mode == 'live' and secret else " · mock"),
+            "paystack_transfer_ref": transfer_ref,
+            "paystack_transfer_code": transfer_code,
+            "bank_code": payload.bank_code,
+            "updated_at": _now_iso(),
+        }},
+    )
+    return {"status": "ok", "reference": transfer_ref, "mode": mode if (mode == "live" and secret) else "mock"}
 
 
 # ===== Image upload =====

@@ -3,11 +3,57 @@ import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Banknote, Send } from "lucide-react";
 
 export default function AdminWithdrawals() {
   const [items, setItems] = useState([]);
+  const [banks, setBanks] = useState([]);
+  const [paystackTarget, setPaystackTarget] = useState(null);
+  const [bankCode, setBankCode] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
   useEffect(() => { load(); }, []);
+
+  const ensureBanks = async () => {
+    if (banks.length) return banks;
+    const { data } = await api.get("/admin/banks");
+    setBanks(data);
+    return data;
+  };
+
+  const openPaystack = async (w) => {
+    setPaystackTarget(w);
+    setReason(`Withdrawal payout to ${w.account_name}`);
+    const list = await ensureBanks();
+    // Try to auto-match by bank name
+    const match = list.find((b) => b.name.toLowerCase() === (w.bank_name || "").toLowerCase().trim());
+    setBankCode(match?.code || "");
+  };
+
+  const submitPaystack = async () => {
+    if (!bankCode) {
+      toast.error("Pick the bank for this account first");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/admin/withdrawals/${paystackTarget.id}/pay-paystack`, {
+        bank_code: bankCode,
+        reason,
+      });
+      toast.success(`Paid via Paystack (${data.mode})`);
+      setPaystackTarget(null);
+      setBankCode("");
+      setReason("");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Paystack payment failed");
+    } finally { setBusy(false); }
+  };
 
   const act = async (w, action) => {
     const note = window.prompt(action === "approve" ? "Optional note (e.g. transfer ref)" : "Reason for rejecting?", "");
@@ -22,51 +68,93 @@ export default function AdminWithdrawals() {
   return (
     <AdminLayout title="Withdrawals">
       <div className="card-soft overflow-hidden">
-        <table className="w-full text-sm" data-testid="admin-withdrawals-table">
-          <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
-            <tr>
-              <th className="text-left p-3 text-xs uppercase tracking-wider">User</th>
-              <th className="text-right p-3 text-xs uppercase tracking-wider">Amount</th>
-              <th className="text-left p-3 text-xs uppercase tracking-wider">Bank</th>
-              <th className="text-left p-3 text-xs uppercase tracking-wider">Method</th>
-              <th className="text-left p-3 text-xs uppercase tracking-wider">Status</th>
-              <th className="text-left p-3 text-xs uppercase tracking-wider">Date</th>
-              <th className="text-right p-3 text-xs uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(w => (
-              <tr key={w.id} className="border-t border-[color:var(--border-default)]">
-                <td className="p-3">
-                  <div className="font-medium">{w.user_name}</div>
-                  <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{w.user_phone}</div>
-                </td>
-                <td className="p-3 text-right font-semibold">{formatNaira(w.amount)}</td>
-                <td className="p-3">
-                  <div>{w.bank_name}</div>
-                  <div className="font-mono text-xs">{w.account_number}</div>
-                  <div className="text-xs text-[color:var(--text-tertiary)]">{w.account_name}</div>
-                </td>
-                <td className="p-3 capitalize">{w.method}</td>
-                <td className="p-3"><span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span></td>
-                <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(w.created_at)}</td>
-                <td className="p-3 text-right space-x-2">
-                  {w.status === "pending" && (
-                    <>
-                      <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
-                        className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)]">Mark paid</button>
-                      <button onClick={() => act(w, "reject")} data-testid={`reject-${w.id}`}
-                        className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--error-soft)] text-[color:var(--error)]">Reject</button>
-                    </>
-                  )}
-                  {w.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic">{w.admin_note}</div>}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[850px]" data-testid="admin-withdrawals-table">
+            <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
+              <tr>
+                <th className="text-left p-3 text-xs uppercase tracking-wider">User</th>
+                <th className="text-right p-3 text-xs uppercase tracking-wider">Amount</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider">Bank</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider">Status</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider">Date</th>
+                <th className="text-right p-3 text-xs uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-            {items.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-[color:var(--text-tertiary)]">No withdrawals.</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map(w => (
+                <tr key={w.id} className="border-t border-[color:var(--border-default)]">
+                  <td className="p-3">
+                    <div className="font-medium text-[color:var(--text-primary)]">{w.user_name}</div>
+                    <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{w.user_phone}</div>
+                  </td>
+                  <td className="p-3 text-right font-semibold text-[color:var(--text-primary)]">{formatNaira(w.amount)}</td>
+                  <td className="p-3">
+                    <div className="text-[color:var(--text-primary)]">{w.bank_name}</div>
+                    <div className="font-mono text-xs text-[color:var(--text-primary)]">{w.account_number}</div>
+                    <div className="text-xs text-[color:var(--text-tertiary)]">{w.account_name}</div>
+                  </td>
+                  <td className="p-3"><span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span></td>
+                  <td className="p-3 text-[color:var(--text-secondary)] whitespace-nowrap">{formatDate(w.created_at)}</td>
+                  <td className="p-3 text-right">
+                    {w.status === "pending" && (
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        <button onClick={() => openPaystack(w)} data-testid={`pay-paystack-${w.id}`}
+                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] inline-flex items-center gap-1.5">
+                          <Send className="w-3 h-3" /> Pay via Paystack
+                        </button>
+                        <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
+                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] inline-flex items-center gap-1.5">
+                          <Banknote className="w-3 h-3" /> Mark paid manually
+                        </button>
+                        <button onClick={() => act(w, "reject")} data-testid={`reject-${w.id}`}
+                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--error-soft)] text-[color:var(--error)]">Reject</button>
+                      </div>
+                    )}
+                    {w.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic">{w.admin_note}</div>}
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-[color:var(--text-tertiary)]">No withdrawals.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <Dialog open={!!paystackTarget} onOpenChange={(o) => !o && setPaystackTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pay via Paystack Transfer</DialogTitle>
+          </DialogHeader>
+          {paystackTarget && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg bg-[color:var(--surface-alt)] p-3">
+                <div className="text-[color:var(--text-primary)] font-semibold">{paystackTarget.user_name} · {formatNaira(paystackTarget.amount)}</div>
+                <div className="font-mono text-xs text-[color:var(--text-primary)]">{paystackTarget.account_number}</div>
+                <div className="text-xs text-[color:var(--text-secondary)]">{paystackTarget.bank_name} · {paystackTarget.account_name}</div>
+              </div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Bank</label>
+              <select value={bankCode} onChange={(e) => setBankCode(e.target.value)}
+                data-testid="paystack-bank-select"
+                className="w-full input-base">
+                <option value="">— select bank —</option>
+                {banks.map((b) => (
+                  <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                ))}
+              </select>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Reason / narration</label>
+              <input value={reason} onChange={(e) => setReason(e.target.value)}
+                data-testid="paystack-reason-input"
+                className="w-full input-base" />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaystackTarget(null)}>Cancel</Button>
+            <Button onClick={submitPaystack} disabled={busy} data-testid="paystack-confirm-btn" className="bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)]">
+              {busy ? "Processing…" : "Confirm transfer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

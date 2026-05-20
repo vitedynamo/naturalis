@@ -76,6 +76,14 @@ async def register(data: RegisterRequest, request: Request):
     if len(data.password) < 4:
         raise HTTPException(400, "Password too short")
 
+    # Enforce all-or-none on the 4 security-question fields
+    sec_fields = [data.security_question_1, data.security_answer_1, data.security_question_2, data.security_answer_2]
+    sec_set = [bool(v and str(v).strip()) for v in sec_fields]
+    if any(sec_set) and not all(sec_set):
+        raise HTTPException(400, "Please provide both security questions and both answers")
+    if all(sec_set) and data.security_question_1.strip() == data.security_question_2.strip():
+        raise HTTPException(400, "Please choose two different security questions")
+
     existing = await db.users.find_one({"phone": phone})
     if existing:
         raise HTTPException(400, "Phone number already registered")
@@ -676,4 +684,7 @@ async def public_settings(request: Request):
         "gen1_percent": s.get("gen1_percent", 10),
         "gen2_percent": s.get("gen2_percent", 5),
         "gen3_percent": s.get("gen3_percent", 2),
+        "featured_product_id": s.get("featured_product_id"),
+        "home_announcement": s.get("home_announcement", ""),
+        "home_announcement_active": s.get("home_announcement_active", False),
     }

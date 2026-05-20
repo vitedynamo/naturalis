@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 4 end-to-end test. Backend: created /app/backend/tests/test_iter4.py — 16/16 pass after fixing one TypeError in /app/backend/routes_admin.py (set-literal vs ternary). Covered: register all-or-none security questions + same-question rejection (5 tests), /admin/banks (admin OK + 401 + 403), /admin/settings + /settings/public exposure of featured_product_id/home_announcement/home_announcement_active (2 tests), /admin/withdrawals/{id}/pay-paystack mock-mode happy-path + already-paid 400 + missing-id 404 + missing bank_code 422 (4 tests), and a smoke suite for /products + /invest + /deposit init+verify + /withdrawal/request. Frontend (mobile 390x844 + admin desktop 1920x1080): User dashboard correctly removes 'Recommended for you' grid; featured-plan card renders; announcement banner appears on user dashboard when admin toggles announcement-active-checkbox + home-announcement-input + Save; admin Settings page exposes featured-product-select; Admin Withdrawals page renders pay-paystack-{wid} button for every pending withdrawal; Withdraw page (no-bank user 08099887766) shows warning AT TOP with 'Add bank' BELOW warning text, no method selector, no bank-on-file card; mobile bottom nav shows exactly 5 visible tabs (Home/Invest/Packages/Team/More) with px-3 lateral padding (no right gap). TWO real frontend regressions found: (1) /history page on mobile renders a desktop table — horizontal overflow (scrollWidth=806 vs clientWidth=390); the redesign brief said mobile should be a card list, not a table. (2) Emergent badge inline 'display: inline-flex !important' overrides the head stylesheet's 'display:none !important' — computed display === 'flex'. The badge is visually invisible (visibility:hidden + opacity:0 + 0x0 from the head CSS) but the literal test criterion (display === 'none') fails.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/settings", "issue": "Filter `{k: v for k,v in data.dict().items() if v is not None}` prevents clearing featured_product_id by sending null. To clear, admin would need to send another sentinel (frontend currently sends \"\" which is filtered too since after .dict() comparison the empty string passes — only None is filtered, but featured_product_id is Optional[str] so empty string sticks and points to a non-existent product). Low priority."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "History page (/history) mobile layout", "issue": "On 390x844 the page renders the desktop table (scrollWidth 806 vs clientWidth 390) → horizontal overflow. The iter4 brief says 'mobile shows card list (no overflow)'. Need conditional rendering: <table> on md+ inside an overflow-x-auto wrapper, and a card list on smaller screens. data-testid for tx cards (e.g. tx-card-list, tx-card-{id}) is also missing.", "selector": "/history table", "priority": "HIGH"},
+      {"component": "Emergent badge (#emergent-badge in public/index.html)", "issue": "The badge anchor has inline `display: inline-flex !important;` which beats the head <style> rule `display:none !important;`. Computed display is 'flex' on every page. Other declarations (visibility:hidden, opacity:0, 0x0 size, pointer-events:none) DO win and hide it visually, but the literal acceptance criterion `getComputedStyle(badge).display === 'none'` fails. Fix: remove the inline style attribute from the <a id=\"emergent-badge\"> element in /app/frontend/public/index.html (or replace the inline display with display:none and rely on the head <style> for the rest), or add a small inline <script> in <head> that removes the badge element on DOMContentLoaded.", "selector": "#emergent-badge", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Withdraw page (no-bank state)", "issues": ["The amount form + 'Submit request' button remain visible even when the user has no bank set; submitting would 400 server-side. Consider hiding the form until a bank is added (or disabling the submit button) for a cleaner UX. Not a hard requirement violation."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [
+    "(P1) /history mobile: replace single <table> with conditional card list on <md screens; add data-testid tx-card-list + per-row testids. Wrap desktop <table> in overflow-x-auto.",
+    "(P2) Emergent badge: remove inline style attribute on <a id=\"emergent-badge\"> in /app/frontend/public/index.html (or remove the element entirely / add a <script>document.getElementById('emergent-badge')?.remove()</script> at end of <body>). The current CSS in <head>/index.css cannot win against inline `!important`.",
+    "(Backend bug FIXED by testing agent) /admin/withdrawals/{id}/pay-paystack returned 500 due to `({\" · live\" if ... else \" · mock\"})` being interpreted as a one-element set literal. Replaced the surrounding `({...})` with plain parens `(...)` in /app/backend/routes_admin.py line 148.",
+    "(Optional UX) Hide/disable the Withdraw amount form when no bank is set."
+  ],
+  "critical_code_review_comments": [
+    "routes_admin.py pay-paystack endpoint previously contained a set-literal bug — `({\" · live\" if cond else \" · mock\"})` → set, not str. Fixed by removing the braces. Recommend adding a pytest line-level smoke test for any admin endpoint that constructs strings via ternaries.",
+    "routes_admin.py /admin/banks caches the fallback list under the same _banks_cache as live results — fine in mock mode but if mode flips to 'live' the cached fallback would persist for up to 1h. Consider keying cache by mode or invalidating it when settings.payment_mode changes.",
+    "Settings model defines featured_product_id as Optional[str] but the update path filters out None — there is no way for an admin to switch back to 'Auto' (null) once a product is set. The frontend probably needs to send a sentinel or a separate DELETE endpoint.",
+    "index.html badge has inline `display: inline-flex !important` baked into the source — head <style> with `display:none !important` cannot win over inline !important. This is a CSS cascade gotcha; the only fix is to remove the inline declaration or remove the element entirely."
+  ],
+  "updated_files": [
+    "/app/backend/routes_admin.py (fixed set-literal TypeError on pay-paystack line 148)",
+    "/app/backend/tests/test_iter4.py (new — 16 pytest tests)"
+  ],
+  "success_rate": {"backend": "100% (16/16) after one fix", "frontend": "85% — 2 regressions: /history mobile overflow + Emergent badge inline-style override"},
+  "test_credentials": "Admin: 08123456789 / personally · User w/ security questions: 08099887766 / newpwd (mother=smith, pet=rex)",
+  "seed_data_creation": "≈8 TEST_* users created during pytest (TEST_OnlyQ1, TEST_OnlyQ2, TEST_SameQ rejected; TEST_NoSQ, TEST_AllSQ, TEST_RegU, ~3 TEST_Pay users for withdrawal flow). Multiple pending→paid withdrawal records left in /admin/withdrawals (status='paid', method='auto', paystack_transfer_ref starts with ptr_). Featured product temporarily set to first product in catalog and home_announcement turned ON during UI test then turned OFF at teardown.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter4.py is independent and runs in ~8s. The pay-paystack endpoint bug is already fixed. To re-test the History mobile card layout, set viewport 390x844, navigate to /history, and assert document.body.scrollWidth <= document.body.clientWidth + 5 AND look for testid tx-card-list or [data-testid^=tx-card-]. To re-test Emergent badge, just assert getComputedStyle(document.getElementById('emergent-badge')).display === 'none' on /login (no auth needed).",
+  "rca_of_the_issue": "Bug 1 (FIXED): pay-paystack 500 — `({ x if cond else y })` is a Python set literal containing one string, and `str + set` raises TypeError. Replaced with `(x if cond else y)`. Bug 2 (open, frontend): /history mobile uses single <table> instead of responsive card list — the page needs a `hidden md:block` table + `md:hidden` card list. Bug 3 (open, frontend): #emergent-badge has inline `style=\"display: inline-flex !important; ...\"` in public/index.html that beats the head <style> `#emergent-badge{display:none !important}` per CSS cascade — inline !important wins over author stylesheet !important. Fix is to strip the inline style or remove the element."
+}

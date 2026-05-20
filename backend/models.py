@@ -262,6 +262,9 @@ class Settings(BaseModel):
     paystack_public_key: str = ""
     paystack_secret_key: str = ""
     payment_mode: str = "mock"  # mock | live
+    featured_product_id: Optional[str] = None
+    home_announcement: str = ""
+    home_announcement_active: bool = False
 
 
 class SettingsUpdate(BaseModel):
@@ -274,3 +277,11 @@ class SettingsUpdate(BaseModel):
     paystack_public_key: Optional[str] = None
     paystack_secret_key: Optional[str] = None
     payment_mode: Optional[str] = None
+    featured_product_id: Optional[str] = None
+    home_announcement: Optional[str] = None
+    home_announcement_active: Optional[bool] = None
+
+
+class PaystackPayRequest(BaseModel):
+    bank_code: str
+    reason: Optional[str] = None
