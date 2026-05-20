@@ -1,0 +1,131 @@
+{
+  "theme": "light",
+  "archetype": "1_organic_earthy",
+  "design_philosophy": {
+    "identity": "Nigerian Investment App with premium, trustworthy, organic fintech aesthetic. High contrast for readability, avoiding default Vercel-look.",
+    "emotion": "Prosperity, Trust, Security, Calm",
+    "core_principles": [
+      "Generous spacing to let financial data breathe",
+      "Optical alignment over strict mathematical alignment",
+      "Dense, bento-grid data presentation on dashboard",
+      "No full-screen gradients; focus on texture and solid typography",
+      "High contrast text for accessibility"
+    ]
+  },
+  "typography": {
+    "fonts": {
+      "heading": "'Outfit', sans-serif",
+      "body": "'Manrope', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
+    "scales": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl tracking-tight font-medium",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "label": "text-xs tracking-[0.2em] uppercase font-bold",
+      "metric": "text-3xl sm:text-4xl font-black tracking-tighter text-primary-dark"
+    },
+    "instructions": "Use font-light or font-black for tension. Avoid regular weight for headings. Never use Inter for headings. Import fonts from Google Fonts."
+  },
+  "colors": {
+    "background": {
+      "page": "#F9FAF8",
+      "surface": "#FFFFFF",
+      "surface_alt": "#F3F5F1",
+      "overlay": "rgba(10, 28, 22, 0.4)"
+    },
+    "brand": {
+      "primary": "#0F4C3A",
+      "primary_hover": "#0A3629",
+      "accent": "#00D084",
+      "accent_hover": "#00B372",
+      "terracotta": "#D97736",
+      "gold": "#D4AF37"
+    },
+    "text": {
+      "primary": "#0A1C16",
+      "secondary": "#4A5D54",
+      "tertiary": "#8A9C93",
+      "on_primary": "#FFFFFF",
+      "on_accent": "#0A1C16"
+    },
+    "border": {
+      "default": "#E2E8F0",
+      "light": "#F1F5F9",
+      "focus": "#0F4C3A"
+    },
+    "status": {
+      "success": "#00D084",
+      "warning": "#D97736",
+      "error": "#E11D48",
+      "info": "#3B82F6"
+    }
+  },
+  "surfaces_and_borders": {
+    "cards": "bg-white border border-[#E5E9E4] rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6",
+    "inputs": "bg-white border border-[#E5E9E4] rounded-lg focus:ring-2 focus:ring-[#0F4C3A] focus:border-[#0F4C3A]",
+    "buttons": {
+      "primary": "bg-[#0F4C3A] text-white hover:bg-[#0A3629] rounded-lg font-medium transition-colors",
+      "secondary": "bg-[#F3F5F1] text-[#0A1C16] hover:bg-[#E5E9E4] rounded-lg font-medium transition-colors",
+      "outline": "bg-transparent border border-[#0F4C3A] text-[#0F4C3A] hover:bg-[#0F4C3A] hover:text-white rounded-lg font-medium transition-colors"
+    },
+    "radius": "0.75rem",
+    "spacing_scale": "Tailwind standard (p-4, p-6, p-8, p-12)",
+    "table": "w-full text-left border-collapse",
+    "table_header": "bg-[#F3F5F1] text-[#4A5D54] text-xs uppercase tracking-wider font-semibold p-4",
+    "table_cell": "p-4 border-b border-[#E5E9E4] text-sm text-[#0A1C16]"
+  },
+  "layout_and_grids": {
+    "dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "bento_spans": {
+      "summary": "col-span-1",
+      "main_chart_or_table": "col-span-1 md:col-span-2 lg:col-span-3",
+      "sidebar_feed": "col-span-1 row-span-2"
+    },
+    "admin_panel": "flex h-screen bg-[#F9FAF8]",
+    "admin_sidebar": "w-64 bg-[#0A1C16] text-white flex-shrink-0 hidden md:flex flex-col",
+    "admin_main": "flex-1 overflow-y-auto p-8"
+  },
+  "motion_and_interactions": {
+    "hover": "Subtle lifts (-translate-y-1) and shadow increases on cards. Color darkening on buttons.",
+    "page_transition": "animate-in fade-in slide-in-from-bottom-4 duration-500",
+    "lists": "Staggered fade-in for table rows and list items."
+  },
+  "assets": {
+    "icons": "lucide-react",
+    "image_urls": [
+      {
+        "category": "dashboard_welcome_banner",
+        "url": "https://static.prod-images.emergentagent.com/jobs/e38e69f9-5b98-4414-80dd-511cf8b129a7/images/2aa38017b0e4d0f7ef14a7bc0e3229dc9e52cf76fb08e5062bf25d734c958d17.png",
+        "description": "Abstract deep green and gold waves for the main dashboard welcome widget background"
+      },
+      {
+        "category": "product_agriculture",
+        "url": "https://images.unsplash.com/photo-1673200692829-fcdb7e267fc1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHxhZ3JpY3VsdHVyZSUyMGZhcm0lMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzc5MzEwMjc0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Agriculture investment product thumbnail"
+      },
+      {
+        "category": "product_real_estate",
+        "url": "https://images.pexels.com/photos/27307400/pexels-photo-27307400.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Real Estate investment product thumbnail"
+      },
+      {
+        "category": "product_gold",
+        "url": "https://images.pexels.com/photos/33539242/pexels-photo-33539242.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Gold backed investment product thumbnail"
+      }
+    ]
+  },
+  "specific_instructions_for_main_agent": {
+    "architecture": "Build a hybrid fullstack app using React, React Router, Tailwind, Shadcn UI primitives.",
+    "routing": "Include /login, /register, /dashboard, /dashboard/invest, /dashboard/deposit, /dashboard/withdraw, /dashboard/referrals, /dashboard/profile, /dashboard/history, and /admin/* routes.",
+    "components": "Heavily use Shadcn UI (customize to match colors and border radius). Do not build raw HTML selects/dialogs. Use Recharts for any data visualization if needed. Use lucide-react for icons.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='login-button', data-testid='invest-submit', data-testid='admin-approve-withdrawal-btn').",
+    "nigerian_context": "Format currency in Naira (₦). Use standard Nigerian phone number validation where applicable. Ensure Paystack flow is simulated or visually integrated for deposits.",
+    "referral_system": "Implement 3-tier tree visual (Level 1, Level 2, Level 3) in the referral view. Provide a clear 'copy link' interaction.",
+    "investment_logic": "Show active investments with a visual progress bar or countdown timer (24h) until next payout. Users can invest multiple times in multiple products.",
+    "admin_features": "Admin must have a separate layout (dark sidebar, light content area). Must have views to manage users, approve/reject withdrawals, and edit products (image, name, price, daily profit %, duration). Create global settings for generation bonuses and welcome bonuses."
+  }
+}
