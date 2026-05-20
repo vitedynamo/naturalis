@@ -60,13 +60,40 @@ See `/app/memory/test_credentials.md`.
 - Admin: `08123456789` / `personally`
 - Sample user: `08011112222` / `resetMe` (created in tests; password later reset via forgot-password flow)
 
-## Updates — Feb 2026 (iteration 2)
-- **Phone validation**: register + login + forgot-password now require exactly 11 numeric digits (server + client side `maxLength={11}` + `pattern`).
-- **Forgot password**: new `/forgot-password` page. Users submit phone + new password + optional reason. Request goes into admin queue at `/admin/password-resets` where admin can approve (applies new password) or reject (no change). No SMS dependency.
-- **Bottom navbar (mobile)**: replaced off-canvas hamburger drawer with a persistent 5-tab bottom navbar (Home, Invest, Deposit, Withdraw, More). "More" opens a sheet for Referrals/Coupons/History/Profile/Sign out. Desktop sidebar unchanged.
-- **Modern mobile-first polish**: dashboard hero buttons are full-width on mobile, added a 4-icon quick-actions strip (Invest/Refer/Coupon/History), stat cards now use 2×2 grid on mobile.
-- **Tests**: 20/20 new pytest cases + 38/38 prior regression all pass. Mobile UI verified on 390×844 viewport.
-- Small fix applied post-test: added right padding on bottom navbar so the Emergent preview badge no longer overlaps the "More" tab on small viewports.
+## Updates — Feb 2026 (iteration 3) — Major Redesign
+
+### Added
+- **Object storage for product images**: Emergent storage integration. Admin uploads JPG/PNG/WebP (≤5MB) via `POST /api/admin/upload-image`; files served publicly at `GET /api/files/{path}`.
+- **Dark / light theme toggle**: CSS-variable-based theme system; toggle button on Login, Register, ForgotPassword, UserLayout (top bar mobile + sidebar desktop), AdminLayout sidebar. Theme persists in `localStorage.ni_theme`.
+- **Security questions at signup**: 2 of 8 predefined questions + answers (case-insensitive). Self-service password recovery via `GET /api/auth/security-questions/{phone}` + `POST /api/auth/reset-with-questions`. Admin-mediated reset retained as fallback.
+- **My Packages page** (`/my-packages`): replaces the active investments view that was on Dashboard.
+- **Team page** (`/team`): alias of `/referrals` (3-generation tree).
+
+### Removed from Dashboard
+- The 4 stat cards (Total Earnings, Daily Expected, Referral Earnings, Active Plans).
+- The Active Investments list.
+
+### Replaced with (revenue-driving)
+- Wallet hero + Deposit/Withdraw buttons.
+- **Featured Plan** card showing highest-ROI product with prominent invest CTA.
+- 3 vertical CTA cards (Invite, Coupon, My Packages).
+- **Recommended plans** grid linking to invest.
+
+### Navigation changes
+- Mobile bottom nav primary items: **Home / Invest / My Packages / Team / More**.
+- Deposit and Withdraw moved into the "More" sheet (alongside Coupons, History, Profile, Sign out).
+- Desktop sidebar shows all items.
+
+### Color system
+- New palette replacing green: **Indigo `#4F46E5`** (primary) + **Coral pink `#EC4899`** (accent) + **Gold `#F59E0B`**.
+- Dark mode: deep midnight `#0B0B1F`, surface `#15152A`, brighter indigo `#818CF8` and pink `#F472B6`.
+
+### Tests (iteration 3)
+- 12/12 new redesign-suite pytest cases pass (security questions, image upload, file serving).
+- Frontend verified at 390×844 (mobile) and 1920×1080 (admin desktop).
+- Theme toggle persists; bottom nav has correct 5 items; deposit/withdraw inside More sheet.
+- Admin file upload works (real Emergent object storage round-trip verified).
+- Small post-test fix applied: improved contrast of /team referral-code card (white-on-white CTA replaced with proper indigo-on-white).
 
 ## Tech Notes
 - All backend routes are under `/api/*` (ingress requirement).

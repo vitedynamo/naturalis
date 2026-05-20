@@ -61,23 +61,23 @@ export default function Referrals() {
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">My Team</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Invite friends and earn a percentage of their daily profits — across 3 generations.</p>
 
-      <div className="card-soft p-6 mt-6 bg-gradient-to-br hero-gradient text-white" data-testid="referral-banner">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+      <div className="card-soft p-6 mt-6 hero-gradient text-white relative overflow-hidden" data-testid="referral-banner">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center relative z-10">
           <div>
-            <div className="text-label text-white/70">Your code</div>
-            <div className="metric-num text-4xl font-display tracking-widest text-white mt-1" data-testid="referral-code">{info?.referral_code || "—"}</div>
-            <div className="mt-3 text-white/70 text-sm">Total earned: <span className="text-[color:var(--accent-main)] font-bold">{formatNaira(info?.total_referral_earnings)}</span></div>
+            <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/85">Your code</div>
+            <div className="metric-num text-4xl md:text-5xl font-display tracking-widest text-white mt-2 drop-shadow-sm" data-testid="referral-code">{info?.referral_code || "—"}</div>
+            <div className="mt-3 text-white/85 text-sm">Total earned: <span className="text-white font-bold">{formatNaira(info?.total_referral_earnings)}</span></div>
           </div>
           <div className="space-y-2">
             <button onClick={() => copy(info?.referral_code, "Code copied")} data-testid="copy-code-btn"
-              className="w-full flex items-center justify-center gap-2 bg-[color:var(--surface)]/10 hover:bg-[color:var(--surface)]/20 text-white rounded-lg px-4 py-3 font-semibold">
+              className="w-full flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur border border-white/30 text-white rounded-lg px-4 py-3 font-semibold">
               <Copy className="w-4 h-4" /> Copy code
             </button>
             <button onClick={() => copy(link, "Link copied")} data-testid="copy-link-btn"
-              className="w-full flex items-center justify-center gap-2 bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)] text-[color:var(--text-primary)] rounded-lg px-4 py-3 font-semibold">
+              className="w-full flex items-center justify-center gap-2 bg-white text-[color:var(--brand)] hover:bg-white/90 rounded-lg px-4 py-3 font-semibold shadow-lg shadow-black/10">
               <Share2 className="w-4 h-4" /> Copy invite link
             </button>
-            <div className="font-mono text-xs text-white/60 break-all px-1">{link}</div>
+            <div className="font-mono text-xs text-white/80 break-all px-1">{link}</div>
           </div>
         </div>
       </div>
