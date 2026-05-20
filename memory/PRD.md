@@ -58,7 +58,15 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 ## Test Credentials
 See `/app/memory/test_credentials.md`.
 - Admin: `08123456789` / `personally`
-- Sample user: `08011112222` / `Test@1234` (created during testing)
+- Sample user: `08011112222` / `resetMe` (created in tests; password later reset via forgot-password flow)
+
+## Updates — Feb 2026 (iteration 2)
+- **Phone validation**: register + login + forgot-password now require exactly 11 numeric digits (server + client side `maxLength={11}` + `pattern`).
+- **Forgot password**: new `/forgot-password` page. Users submit phone + new password + optional reason. Request goes into admin queue at `/admin/password-resets` where admin can approve (applies new password) or reject (no change). No SMS dependency.
+- **Bottom navbar (mobile)**: replaced off-canvas hamburger drawer with a persistent 5-tab bottom navbar (Home, Invest, Deposit, Withdraw, More). "More" opens a sheet for Referrals/Coupons/History/Profile/Sign out. Desktop sidebar unchanged.
+- **Modern mobile-first polish**: dashboard hero buttons are full-width on mobile, added a 4-icon quick-actions strip (Invest/Refer/Coupon/History), stat cards now use 2×2 grid on mobile.
+- **Tests**: 20/20 new pytest cases + 38/38 prior regression all pass. Mobile UI verified on 390×844 viewport.
+- Small fix applied post-test: added right padding on bottom navbar so the Emergent preview badge no longer overlaps the "More" tab on small viewports.
 
 ## Tech Notes
 - All backend routes are under `/api/*` (ingress requirement).

@@ -99,7 +99,7 @@ export default function UserLayout({ children }) {
 
       {/* MOBILE BOTTOM NAV */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-[#E5E9E4] px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-[#E5E9E4] pl-2 pr-28 sm:pr-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
         data-testid="mobile-bottom-nav"
         aria-label="Primary"
       >
