@@ -1,0 +1,22 @@
+{
+  "summary": "Iter 4.2 retest after fixes. ALL CHECKS PASS. Mobile /history (390x844) now has body.scrollWidth=390 == clientWidth=390 (no overflow) — confirms UserLayout.jsx <main> min-w-0 overflow-x-hidden fix is effective. Desktop /history (1280x800) shows history-table and hides history-list-mobile. Backend pytest test_iter4_1.py: 6/6 pass — featured_product_id is correctly cleared by BOTH explicit null and empty-string (exclude_unset fix verified, /settings/public reflects null). Badge removed on /login (getElementById === null).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_1.py",
+    "/app/test_reports/pytest/iter4_2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix verified: UserLayout.jsx <main> now uses 'flex-1 min-w-0 overflow-x-hidden' — the canonical Tailwind/flexbox fix for min-width:auto overflow. Correct.",
+    "Fix verified: routes_admin.update_settings now uses data.dict(exclude_unset=True) and special-cases featured_product_id to clear on explicit None or empty string. Semantically correct."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (mobile no-overflow + desktop table + badge removal all pass)"},
+  "test_credentials": "Admin: 08123456789 / personally · User: 08099887766 / newpwd",
+  "seed_data_creation": "test_iter4_1 created small TEST41_* throwaway users (registration validation + 1 paid withdrawal); featured_product_id is cleared after the tests run (final state: null).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 4.2 issues both resolved. test_iter4_1.py is 6/6 stable. Reuse for any future regression on settings/featured_product_id and the iter4 smoke subset.",
+  "rca_of_the_issue": "Both root causes from iteration 5 addressed: (A) added min-w-0 overflow-x-hidden to <main> so flex child cannot expand to filter-row content width; (B) switched to exclude_unset and special-cased featured_product_id so explicit null and empty-string both clear it."
+}
