@@ -377,6 +377,36 @@ async def admin_stats_extended(request: Request, _admin=Depends(get_current_admi
     }
 
 
+@router.get("/admin/deposits/by-day")
+async def admin_deposits_by_day(date: str, request: Request, _admin=Depends(get_current_admin)):
+    """Return all successful deposits for a given calendar day (UTC-bounded, frontend already labels with Lagos date)."""
+    from datetime import timedelta
+    db = request.app.state.db
+    try:
+        day = datetime.fromisoformat(date).replace(tzinfo=timezone.utc)
+    except Exception:
+        raise HTTPException(400, "Invalid date — expected YYYY-MM-DD")
+    start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+
+    deposits = await db.deposits.find(
+        {"status": "success", "updated_at": {"$gte": start.isoformat(), "$lt": end.isoformat()}},
+        {"_id": 0},
+    ).sort("updated_at", -1).to_list(2000)
+
+    # Attach user info
+    user_ids = list({d["user_id"] for d in deposits})
+    users = await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1}).to_list(2000)
+    umap = {u["id"]: u for u in users}
+    for d in deposits:
+        u = umap.get(d["user_id"], {})
+        d["user_name"] = u.get("name", "—")
+        d["user_phone"] = u.get("phone", "")
+
+    total = sum(float(d["amount"]) for d in deposits)
+    return {"date": date, "total": round(total, 2), "count": len(deposits), "deposits": deposits}
+
+
 @router.get("/admin/stats/inflow")
 async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Optional[str] = None, _admin=Depends(get_current_admin)):
     """Inflow breakdown for the dashboard chart between two ISO date strings (yyyy-mm-dd)."""

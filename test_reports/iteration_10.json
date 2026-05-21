@@ -1,0 +1,34 @@
+{
+  "summary": "Iter11 verified end-to-end. Backend: 12/12 pytest pass — GET /api/admin/deposits/by-day works for valid date (returns date/total/count/deposits[] with user_name+user_phone enrichment), returns 400 on invalid date, returns count=0/deposits=[]/total=0 for empty days (1999-01-01), auth-gated (401 without token). Regression: /admin/stats/extended, /admin/stats/inflow, /admin/transactions, /admin/withdrawals, /admin/deposits, /admin/users all 200. /admin/withdrawals/{wid}/pay-nomba still mounted (404 for non-existent wid). Bonus: /admin/stats/inflow series is now zero-filled (7 entries for default 7-day window). Frontend: Admin login OK. /admin renders dashboard. Clicked bar-2026-05-21 (peak) → drill-dialog opens, header 'Deposits on 2026-05-21', summary '₦273,000.00 across 11 deposits', drill-list shows 11 drill-row-* entries each with user name (King/Johnny/Sec Test/TEST...), 11-digit phone, ₦amount, reference (dep_*), gateway badge (MOCK), and timestamp (21 May 2026, HH:MM). Empty bar bar-2026-05-15 confirmed disabled=true and class contains cursor-not-allowed. Dark mode: --text-primary=#F1F2F8, --text-secondary=#CACEDB, --text-tertiary=#98A0B8 (matches bump from #7E83A0). Computed contrast of stat-total-users sub (rgb(152,160,184) on rgb(21,21,42)) ≈ 6.7:1, exceeds 4.5:1 WCAG. Tablet 768x1024: no page-level horizontal scrollbar. Wide 1920x1080: .max-w-7xl content has left=448 right=192 width=1280 — properly mx-auto centered with comfortable side margins. Long-range chart (30d, From=today-30d): 31 bars rendered, .overflow-x-auto container scrollWidth=1140 > clientWidth=918 → horizontal scrollbar present, bars not squashed. No console errors in light or dark mode.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Drill-dialog content has a brief loading window (~1-2s) before drill-list appears — initial visibility check with no wait can give a false 'empty' read. Not a bug, but a loading skeleton/spinner inside the dialog would improve perceived UX.",
+    "/admin/deposits/by-day uses datetime.fromisoformat which accepts both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:MM:SS' — current 400 path catches all parse exceptions correctly. Frontend always passes plain YYYY-MM-DD so this is fine.",
+    "deposits/by-day enriches each deposit with a separate users find — but uses a single bulk query (find with $in user_ids) which is efficient. Good.",
+    "AdminDashboard.jsx is now 388 LOC — still under the 700 limit but creeping up; consider extracting the drill-down Dialog into a sibling component if more cells become clickable.",
+    "Open prior bug from iter10 (Protected.jsx 'View as user' redirect bouncing admins back to /admin) is NOT part of iter11 scope — not retested here. Iter10 report flagged it; still pending depending on whether the user wants admins to preview the user side."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12 pytest)", "frontend": "100% — all 8 iter11 acceptance criteria pass"},
+  "test_credentials": "Admin: 08123456789 / personally",
+  "seed_data_creation": "None — read-only testing.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter11.py is the iter11 regression baseline. The drill-dialog Dialog component import from @/components/ui/dialog works correctly — verified by network log showing /api/admin/deposits/by-day?date=2026-05-21 → 200 and 11 rendered drill-row-* entries. When testing drill flow, give the dialog ~2s to fetch after clicking a bar before asserting drill-list visibility (initial render is loading state). The iter10 'View as user' bug in Protected.jsx is still open per iter9.json — out of scope for iter11 but worth knowing.",
+  "rca of the issue": "No iter11 bugs found. Initial false-negative on drill-list visibility was a test-script race condition (no wait between clicking the bar and asserting list visible); the dialog fetches /api/admin/deposits/by-day asynchronously and renders the list once data arrives. A 2s wait_for_timeout after the dialog opens cleanly resolved the check — confirmed list visible and 11 rows rendered with correct data."
+}

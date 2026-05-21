@@ -128,7 +128,7 @@ export default function AdminLayout({ children, title }) {
             <span className="hidden md:inline-flex pill pill-success" data-testid="admin-online">Online</span>
           </div>
         </header>
-        <div className="p-5 md:p-8 max-w-7xl">{children}</div>
+        <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">{children}</div>
       </main>
     </div>
   );

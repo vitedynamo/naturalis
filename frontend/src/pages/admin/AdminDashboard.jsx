@@ -2,12 +2,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
-import { formatNaira } from "@/lib/format";
+import { formatNaira, formatDate } from "@/lib/format";
 import {
   Users, TrendingUp, ArrowDownToLine, ArrowUpFromLine, Clock, DollarSign,
   CircleCheck, CircleAlert, ShieldAlert, ScanSearch, Banknote, ChevronRight,
-  CalendarRange, ArrowUpRight,
+  CalendarRange, ArrowUpRight, X,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 function StatCard({ icon: Icon, label, value, sub, tone = "brand", testid }) {
   const tones = {
@@ -87,6 +88,9 @@ export default function AdminDashboard() {
   const [inflow, setInflow] = useState(null);
   const [customFrm, setCustomFrm] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [drillDate, setDrillDate] = useState(null);
+  const [drillData, setDrillData] = useState(null);
+  const [drillLoading, setDrillLoading] = useState(false);
 
   useEffect(() => {
     api.get("/admin/stats/extended").then(({ data }) => setS(data));
@@ -106,6 +110,18 @@ export default function AdminDashboard() {
 
   const applyCustom = () => {
     if (customFrm && customTo) loadInflow(customFrm, customTo);
+  };
+
+  const openDrill = async (date) => {
+    setDrillDate(date);
+    setDrillData(null);
+    setDrillLoading(true);
+    try {
+      const { data } = await api.get("/admin/deposits/by-day", { params: { date } });
+      setDrillData(data);
+    } finally {
+      setDrillLoading(false);
+    }
   };
 
   const maxSeries = inflow ? Math.max(1, ...inflow.series.map((p) => p.total)) : 1;
@@ -148,7 +164,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
         <StatCard testid="stat-total-users" icon={Users} label="Total users" value={s?.users ?? 0} sub={`${s?.online ?? 0} online`} tone="success" />
         <StatCard testid="stat-total-deposits" icon={DollarSign} label="Total deposits" value={formatNaira(s?.total_deposits ?? 0)} tone="accent" />
         <StatCard testid="stat-active-investments" icon={TrendingUp} label="Active investments" value={s?.active_investments ?? 0} tone="brand" />
@@ -157,7 +173,7 @@ export default function AdminDashboard() {
 
       {/* Today (Lagos) */}
       <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mt-8 mb-2">Today (Lagos)</div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 sm:gap-4 gap-3">
         <StatCard testid="today-deposits" icon={ArrowDownToLine} label="Deposits today" value={formatNaira(s?.today?.deposits ?? 0)} sub={`${s?.today?.deposits_count ?? 0} successful`} tone="success" />
         <StatCard testid="today-paid" icon={ArrowUpFromLine} label="Paid out today" value={formatNaira(s?.today?.paid_out ?? 0)} sub={`${s?.today?.paid_out_count ?? 0} payouts`} tone="error" />
         <StatCard testid="today-net" icon={DollarSign} label="Net inflow today" value={formatNaira(s?.today?.net_inflow ?? 0)} sub={(s?.today?.net_inflow ?? 0) >= 0 ? "Inflow positive" : "Withdrawals exceed deposits"} tone="accent" />
@@ -192,7 +208,7 @@ export default function AdminDashboard() {
 
         {inflow && (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 sm:gap-4 gap-3 mt-5">
               <div className="rounded-2xl p-4 bg-[color:var(--success-soft)]">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--success)]">Total inflow</div>
                 <div className="font-display font-extrabold text-2xl mt-1 text-[color:var(--text-primary)]" data-testid="inflow-total">{formatNaira(inflow.total)}</div>
@@ -215,21 +231,39 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Mini bar chart */}
+            {/* Mini bar chart — clickable bars open day drill-down */}
             <div className="mt-6">
-              <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] mb-2">{inflow.from} → {inflow.to}</div>
-              <div className="flex items-end gap-1 h-32 px-1 bg-[color:var(--surface-alt)] rounded-xl p-3">
-                {inflow.series.length === 0 ? (
-                  <div className="w-full text-center text-xs text-[color:var(--text-tertiary)] self-center">No deposits in this range.</div>
-                ) : (
-                  inflow.series.map((p) => (
-                    <div key={p.date} className="flex-1 flex flex-col items-center justify-end h-full" title={`${p.date}: ${formatNaira(p.total)}`}>
-                      <div className="w-full max-w-[24px] rounded-t-md bg-gradient-to-t from-[color:var(--brand)] to-[color:var(--accent-main)] transition-all"
-                           style={{ height: `${(p.total / maxSeries) * 100}%`, minHeight: p.total > 0 ? "4px" : "0px" }} />
-                      <div className="text-[9px] text-[color:var(--text-tertiary)] mt-1 truncate w-full text-center">{p.date.slice(5)}</div>
-                    </div>
-                  ))
-                )}
+              <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] mb-2 flex items-center justify-between">
+                <span>{inflow.from} → {inflow.to}</span>
+                <span className="hidden sm:inline">tap a bar to view deposits</span>
+              </div>
+              <div className="bg-[color:var(--surface-alt)] rounded-xl p-3 overflow-x-auto">
+                <div className="flex items-end gap-1 h-32 min-w-full" style={{ minWidth: `${Math.max(inflow.series.length * 36, 100)}px` }}>
+                  {inflow.series.length === 0 ? (
+                    <div className="w-full text-center text-xs text-[color:var(--text-tertiary)] self-center">No deposits in this range.</div>
+                  ) : (
+                    inflow.series.map((p) => {
+                      const empty = p.total <= 0;
+                      return (
+                        <button
+                          key={p.date}
+                          type="button"
+                          onClick={() => openDrill(p.date)}
+                          disabled={empty}
+                          data-testid={`bar-${p.date}`}
+                          title={`${p.date}: ${formatNaira(p.total)} — click to view deposits`}
+                          className={`flex-1 flex flex-col items-center justify-end h-full group ${empty ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                        >
+                          <div
+                            className={`w-full max-w-[28px] rounded-t-md bg-gradient-to-t from-[color:var(--brand)] to-[color:var(--accent-main)] transition-all ${empty ? "" : "group-hover:from-[color:var(--brand-hover)] group-hover:to-[color:var(--accent-hover)] group-hover:scale-105"}`}
+                            style={{ height: `${(p.total / maxSeries) * 100}%`, minHeight: empty ? "2px" : "6px" }}
+                          />
+                          <div className="text-[9px] text-[color:var(--text-secondary)] mt-1 truncate w-full text-center">{p.date.slice(5)}</div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
 
@@ -249,7 +283,7 @@ export default function AdminDashboard() {
 
       {/* All time */}
       <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mt-8 mb-2">All time</div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 sm:gap-4 gap-3">
         <StatCard testid="all-paid" icon={ArrowUpFromLine} label="Total paid out" value={formatNaira(s?.all_time?.total_paid_out ?? 0)} sub={`${s?.all_time?.paid_withdrawals_count ?? 0} settled withdrawals`} tone="brand" />
         <StatCard testid="all-fees" icon={DollarSign} label="Total fees charged" value={formatNaira(s?.all_time?.total_fees ?? 0)} sub="From all withdrawals" tone="success" />
         <StatCard testid="all-await" icon={ScanSearch} label="Awaiting verification" value={s?.all_time?.awaiting_verification ?? 0} tone="error" />
@@ -287,7 +321,7 @@ export default function AdminDashboard() {
 
       {/* Quick actions */}
       <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mt-8 mb-2">Quick actions</div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 sm:gap-4 gap-3">
         {[
           { to: "/admin/users", icon: Users, label: "Manage Users", tone: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]" },
           { to: "/admin/products", icon: TrendingUp, label: "Products", tone: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]" },
@@ -306,6 +340,48 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {/* Day drill-down */}
+      <Dialog open={!!drillDate} onOpenChange={(o) => { if (!o) { setDrillDate(null); setDrillData(null); } }}>
+        <DialogContent data-testid="drill-dialog" className="max-w-2xl w-[calc(100vw-2rem)] rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-[color:var(--border-default)]">
+            <DialogTitle className="font-display text-xl text-[color:var(--text-primary)]">
+              Deposits on {drillDate}
+            </DialogTitle>
+            {drillData && (
+              <div className="text-sm text-[color:var(--text-secondary)] mt-1">
+                <span className="font-bold text-[color:var(--text-primary)]">{formatNaira(drillData.total)}</span> across <span className="font-bold text-[color:var(--text-primary)]">{drillData.count}</span> deposit{drillData.count === 1 ? "" : "s"}
+              </div>
+            )}
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {drillLoading && <div className="p-8 text-center text-sm text-[color:var(--text-secondary)]">Loading…</div>}
+            {!drillLoading && drillData && drillData.deposits.length === 0 && (
+              <div className="p-10 text-center text-sm text-[color:var(--text-tertiary)]">No deposits on this day.</div>
+            )}
+            {!drillLoading && drillData && drillData.deposits.length > 0 && (
+              <div className="divide-y divide-[color:var(--border-light)]" data-testid="drill-list">
+                {drillData.deposits.map((d) => (
+                  <div key={d.id} className="p-4 flex items-center justify-between gap-3" data-testid={`drill-row-${d.id}`}>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[color:var(--text-primary)] truncate">{d.user_name}</div>
+                      <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{d.user_phone}</div>
+                      <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] mt-1 truncate">{d.reference}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-display font-extrabold text-base text-[color:var(--text-primary)]">{formatNaira(d.amount)}</div>
+                      <div className="inline-flex items-center gap-1 mt-1">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">{d.method || "paystack"}</span>
+                      </div>
+                      <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5">{formatDate(d.updated_at || d.created_at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
