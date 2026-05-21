@@ -28,6 +28,7 @@ from models import (
     ResetWithQuestionsRequest,
 )
 from payouts import process_investment_payouts
+from notifications import notify
 
 router = APIRouter()
 
@@ -467,6 +468,10 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
             "meta": {"reference": reference},
             "created_at": _now_iso(),
         })
+        await notify(db, user["id"], ntype="success",
+                     title="Deposit successful",
+                     message=f"₦{deposit['amount']:,.2f} credited to your wallet.",
+                     meta={"reference": reference})
         deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
         return {"status": "success", "deposit": deposit, "wallet_balance": new_user["wallet_balance"]}
     else:
@@ -670,6 +675,60 @@ async def my_transactions(request: Request, ttype: Optional[str] = None, user=De
     return items
 
 
+# =========== NOTIFICATIONS ===========
+@router.get("/notifications")
+async def list_notifications(request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    items = await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    unread = sum(1 for n in items if not n.get("read"))
+    return {"items": items, "unread": unread}
+
+
+@router.post("/notifications/mark-all-read")
+async def mark_all_read(request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
+    return {"status": "ok"}
+
+
+@router.post("/notifications/{nid}/read")
+async def mark_read(nid: str, request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    await db.notifications.update_one({"id": nid, "user_id": user["id"]}, {"$set": {"read": True}})
+    return {"status": "ok"}
+
+
+# =========== TEAM DETAIL ===========
+@router.get("/referrals/{generation}/details")
+async def gen_details(generation: int, request: Request, user=Depends(get_current_user)):
+    """Per-generation member detail: who they are + how much they have invested + when they invested."""
+    if generation not in (1, 2, 3):
+        raise HTTPException(400, "Generation must be 1, 2 or 3")
+    db = request.app.state.db
+    refs = await db.referrals.find({"referrer_id": user["id"], "generation": generation}, {"_id": 0}).to_list(2000)
+    out = []
+    for r in refs:
+        u = await db.users.find_one({"id": r["referred_id"]}, {"_id": 0})
+        if not u:
+            continue
+        invs = await db.investments.find({"user_id": u["id"]}, {"_id": 0}).sort("started_at", -1).to_list(50)
+        total_invested = sum(float(i.get("amount", 0)) for i in invs)
+        first = invs[-1] if invs else None  # earliest because sort desc
+        out.append({
+            "id": u["id"],
+            "name": u["name"],
+            "phone": u["phone"],
+            "joined_at": u["created_at"],
+            "total_invested": total_invested,
+            "investments": [
+                {"id": i["id"], "product_name": i["product_name"], "amount": i["amount"], "started_at": i["started_at"]}
+                for i in invs
+            ],
+            "first_invested_at": (first or {}).get("started_at") if first else None,
+        })
+    return {"generation": generation, "users": out}
+
+
 # =========== SETTINGS (PUBLIC SUBSET) ===========
 @router.get("/settings/public")
 async def public_settings(request: Request):
@@ -681,10 +740,13 @@ async def public_settings(request: Request):
         "welcome_bonus": s.get("welcome_bonus", 750),
         "payment_mode": s.get("payment_mode", "mock"),
         "paystack_public_key": s.get("paystack_public_key", ""),
+        "deposit_gateway": s.get("deposit_gateway", "paystack"),
+        "payout_gateway": s.get("payout_gateway", "paystack"),
         "gen1_percent": s.get("gen1_percent", 10),
         "gen2_percent": s.get("gen2_percent", 5),
         "gen3_percent": s.get("gen3_percent", 2),
         "featured_product_id": s.get("featured_product_id"),
         "home_announcement": s.get("home_announcement", ""),
         "home_announcement_active": s.get("home_announcement_active", False),
+        "home_announcement_image_url": s.get("home_announcement_image_url", ""),
     }

@@ -11,6 +11,8 @@ from fastapi.responses import Response
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
 from storage import put_object, get_object
+from notifications import notify
+from nomba import transfer_to_bank as nomba_transfer
 
 router = APIRouter()
 
@@ -359,6 +361,10 @@ async def approve_deposit(deposit_id: str, request: Request, _admin=Depends(get_
         "meta": {"reference": deposit["reference"], "by_admin": True},
         "created_at": _now_iso(),
     })
+    await notify(db, deposit["user_id"], ntype="success",
+                 title="Deposit approved",
+                 message=f"₦{float(deposit['amount']):,.2f} has been credited to your wallet.",
+                 meta={"reference": deposit["reference"]})
     return {"status": "ok"}
 
 
@@ -386,6 +392,10 @@ async def approve_withdrawal(wid: str, payload: AdminWithdrawalAction, request: 
         {"id": wid},
         {"$set": {"status": "paid", "admin_note": payload.note, "updated_at": _now_iso()}},
     )
+    await notify(db, w["user_id"], ntype="success",
+                 title="Withdrawal paid",
+                 message=f"Your withdrawal of ₦{float(w['amount']):,.2f} has been marked paid by admin.",
+                 meta={"withdrawal_id": wid})
     return {"status": "ok"}
 
 
@@ -418,6 +428,10 @@ async def reject_withdrawal(wid: str, payload: AdminWithdrawalAction, request: R
         "meta": {"withdrawal_id": wid},
         "created_at": _now_iso(),
     })
+    await notify(db, w["user_id"], ntype="warn",
+                 title="Withdrawal rejected",
+                 message=f"Your withdrawal of ₦{float(w['amount']):,.2f} was rejected. The amount has been refunded.",
+                 meta={"withdrawal_id": wid, "reason": payload.note})
     return {"status": "ok"}
 
 

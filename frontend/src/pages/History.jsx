@@ -10,11 +10,7 @@ const types = [
   { v: "", label: "All" },
   { v: "deposit", label: "Deposits" },
   { v: "withdrawal", label: "Withdrawals" },
-  { v: "invest", label: "Investments" },
   { v: "profit", label: "Profits" },
-  { v: "referral", label: "Referrals" },
-  { v: "bonus", label: "Bonuses" },
-  { v: "coupon", label: "Coupons" },
 ];
 
 const meta = {
@@ -44,10 +40,10 @@ export default function History() {
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">Transaction History</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Every credit and debit on your wallet, in one place.</p>
 
-      <div className="flex gap-2 mt-5 overflow-x-auto pb-1 -mx-1 px-1" data-testid="history-filters">
+      <div className="flex flex-wrap gap-2 mt-5 pb-1" data-testid="history-filters">
         {types.map(t => (
           <button key={t.v} onClick={() => setFilter(t.v)} data-testid={`filter-${t.v || "all"}`}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               filter === t.v
                 ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]"
                 : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"

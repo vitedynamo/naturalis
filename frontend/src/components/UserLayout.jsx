@@ -46,7 +46,10 @@ export default function UserLayout({ children }) {
             </div>
             <div className="text-label mt-1">Daily Returns Platform</div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <ThemeToggle />
+          </div>
         </div>
         <div className="px-4 py-3">
           <div className="rounded-xl hero-gradient text-white p-4 relative overflow-hidden">
@@ -90,13 +93,14 @@ export default function UserLayout({ children }) {
         <div className="font-display font-extrabold text-lg text-[color:var(--brand)]">
           Naija<span className="text-[color:var(--accent-main)]">Invest</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Wallet</div>
             <div className="font-semibold text-sm text-[color:var(--text-primary)]" data-testid="topbar-balance">
               {formatNaira(user?.wallet_balance)}
             </div>
           </div>
+          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

@@ -269,3 +269,21 @@ a[href*="emergent.sh"][style*="position: fixed"] {
   height: 0 !important;
   width: 0 !important;
 }
+
+/* Keyboard handling — when an input is focused on mobile, push the bottom nav out of the way
+   and add scroll padding so the field stays visible above the keyboard. */
+html {
+  scroll-padding-bottom: 140px;
+}
+@media (max-width: 1023px) {
+  body.kb-open [data-testid="mobile-bottom-nav"] {
+    transform: translateY(150%);
+    transition: transform 200ms ease;
+  }
+  body.kb-open main {
+    padding-bottom: 24px !important;
+  }
+}
+[data-testid="mobile-bottom-nav"] {
+  transition: transform 200ms ease;
+}

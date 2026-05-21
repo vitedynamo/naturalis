@@ -42,6 +42,36 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Mobile keyboard handling — hide bottom nav while an input/textarea is focused
+  useEffect(() => {
+    const isField = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    const onFocus = (e) => {
+      if (isField(e.target)) {
+        document.body.classList.add("kb-open");
+        // Scroll the focused element into view above the (virtual) keyboard
+        setTimeout(() => {
+          try { e.target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+        }, 80);
+      }
+    };
+    const onBlur = (e) => {
+      if (isField(e.target)) {
+        // Slight delay to avoid flicker when tabbing between fields
+        setTimeout(() => {
+          const a = document.activeElement;
+          if (!isField(a)) document.body.classList.remove("kb-open");
+        }, 50);
+      }
+    };
+    document.addEventListener("focusin", onFocus, true);
+    document.addEventListener("focusout", onBlur, true);
+    return () => {
+      document.removeEventListener("focusin", onFocus, true);
+      document.removeEventListener("focusout", onBlur, true);
+      document.body.classList.remove("kb-open");
+    };
+  }, []);
+
   return (
     <AuthContext.Provider value={{ user, loading, setSession, logout, refresh }}>
       {children}

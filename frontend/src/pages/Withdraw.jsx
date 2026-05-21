@@ -64,10 +64,6 @@ export default function Withdraw() {
         />
         <div className="mt-2 text-xs text-[color:var(--text-tertiary)]">Available: {formatNaira(user?.wallet_balance)}</div>
 
-        <div className="mt-5 rounded-lg p-3 bg-[color:var(--brand-soft)] text-xs text-[color:var(--text-primary)]">
-          Once you submit a request, an admin will review and pay it out — either manually or instantly via Paystack. You'll see the status update below.
-        </div>
-
         <button type="submit" disabled={busy || !bankReady}
           data-testid="withdraw-submit-btn"
           className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60">

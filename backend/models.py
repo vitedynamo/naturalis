@@ -261,10 +261,16 @@ class Settings(BaseModel):
     gen3_percent: float = 2.0
     paystack_public_key: str = ""
     paystack_secret_key: str = ""
+    nomba_client_id: str = ""
+    nomba_client_secret: str = ""
+    nomba_account_id: str = ""
+    deposit_gateway: str = "paystack"  # paystack | nomba
+    payout_gateway: str = "paystack"   # paystack | nomba
     payment_mode: str = "mock"  # mock | live
     featured_product_id: Optional[str] = None
     home_announcement: str = ""
     home_announcement_active: bool = False
+    home_announcement_image_url: str = ""
 
 
 class SettingsUpdate(BaseModel):
@@ -276,10 +282,16 @@ class SettingsUpdate(BaseModel):
     gen3_percent: Optional[float] = None
     paystack_public_key: Optional[str] = None
     paystack_secret_key: Optional[str] = None
+    nomba_client_id: Optional[str] = None
+    nomba_client_secret: Optional[str] = None
+    nomba_account_id: Optional[str] = None
+    deposit_gateway: Optional[str] = None
+    payout_gateway: Optional[str] = None
     payment_mode: Optional[str] = None
     featured_product_id: Optional[str] = None
     home_announcement: Optional[str] = None
     home_announcement_active: Optional[bool] = None
+    home_announcement_image_url: Optional[str] = None
 
 
 class PaystackPayRequest(BaseModel):
