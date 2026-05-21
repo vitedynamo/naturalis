@@ -144,7 +144,7 @@ export default function AdminWithdrawals() {
                 className="w-full input-base">
                 <option value="">— select bank —</option>
                 {banks.map((b) => (
-                  <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                  <option key={b.code} value={b.code}>{`${b.name} (${b.code})`}</option>
                 ))}
               </select>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Reason / narration</label>

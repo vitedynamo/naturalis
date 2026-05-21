@@ -95,7 +95,7 @@ export default function AdminSettings() {
           >
             <option value="">— Auto (highest ROI) —</option>
             {products.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} · {p.daily_profit_percent}% × {p.duration_days}d</option>
+              <option key={p.id} value={p.id}>{`${p.name} · ${p.daily_profit_percent}% × ${p.duration_days}d`}</option>
             ))}
           </select>
 
