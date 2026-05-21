@@ -3,7 +3,7 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Lock, Building2, Save, Search, ChevronDown, Check, Loader2, BadgeCheck } from "lucide-react";
+import { Lock, Building2, Save, Search, ChevronDown, Check, Loader2, BadgeCheck, Pencil } from "lucide-react";
 
 function BankPicker({ value, banks, onSelect }) {
   const [open, setOpen] = useState(false);
@@ -99,19 +99,24 @@ function BankPicker({ value, banks, onSelect }) {
 export default function Profile() {
   const { user, refresh } = useAuth();
   const [banks, setBanks] = useState([]);
-  const [bank, setBank] = useState({
-    bank_name: user?.bank_name || "",
-    bank_code: user?.bank_code || "",
-    account_number: user?.account_number || "",
-    account_name: user?.account_name || "",
-  });
+  const hasSavedBank = !!(user?.bank_name && user?.account_number && user?.account_name);
+  const [editing, setEditing] = useState(!hasSavedBank);
+  const [bank, setBank] = useState({ bank_name: "", bank_code: "", account_number: "", account_name: "" });
   const [resolving, setResolving] = useState(false);
-  const [resolved, setResolved] = useState(!!user?.account_name);
+  const [resolved, setResolved] = useState(false);
   const [pwd, setPwd] = useState({ old_password: "", new_password: "" });
 
   useEffect(() => {
     api.get("/banks").then(({ data }) => setBanks(data)).catch(() => setBanks([]));
   }, []);
+
+  // When edit mode toggles on, start with a cleared form
+  useEffect(() => {
+    if (editing) {
+      setBank({ bank_name: "", bank_code: "", account_number: "", account_name: "" });
+      setResolved(false);
+    }
+  }, [editing]);
 
   // Auto-resolve account name when bank + 10-digit number are present
   useEffect(() => {
@@ -150,6 +155,7 @@ export default function Profile() {
       await api.put("/profile/bank", bank);
       toast.success("Bank details updated");
       await refresh();
+      setEditing(false);
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Update failed");
     }
@@ -181,8 +187,50 @@ export default function Profile() {
           </div>
         </div>
 
+        {!editing && hasSavedBank ? (
+          <div className="card-soft p-6 lg:col-span-2 relative overflow-hidden" data-testid="saved-bank-card">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--accent-main)]" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-[color:var(--success-soft)] text-[color:var(--success)] flex items-center justify-center shrink-0">
+                  <BadgeCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-label">Payout bank · verified</div>
+                  <div className="font-display font-bold text-lg text-[color:var(--text-primary)] mt-0.5 truncate">{user.bank_name}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                data-testid="change-bank-btn"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] hover:text-[color:var(--brand)] text-[color:var(--text-secondary)] transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Change
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+              <div className="rounded-xl bg-[color:var(--surface-alt)] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Account number</div>
+                <div className="font-mono font-bold text-[color:var(--text-primary)] mt-1" data-testid="saved-acct-number">{user.account_number}</div>
+              </div>
+              <div className="rounded-xl bg-[color:var(--surface-alt)] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Account name</div>
+                <div className="font-bold uppercase text-[color:var(--text-primary)] mt-1 truncate" data-testid="saved-acct-name">{user.account_name}</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3">All withdrawals will be sent to this account.</p>
+          </div>
+        ) : (
         <form onSubmit={saveBank} className="card-soft p-6 lg:col-span-2" data-testid="bank-form">
-          <div className="flex items-center gap-2 text-label"><Building2 className="w-3.5 h-3.5" /> Payout bank details</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-label"><Building2 className="w-3.5 h-3.5" /> {hasSavedBank ? "Change payout bank" : "Add payout bank"}</div>
+            {hasSavedBank && (
+              <button type="button" onClick={() => setEditing(false)} data-testid="cancel-bank-edit"
+                className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]">Cancel</button>
+            )}
+          </div>
           <p className="text-xs text-[color:var(--text-secondary)] mt-1">Pick your bank then enter your 10-digit account number — we'll auto-verify the account name.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -235,6 +283,7 @@ export default function Profile() {
             <Save className="w-4 h-4" /> Save bank
           </button>
         </form>
+        )}
       </div>
 
       <form onSubmit={changePwd} className="card-soft p-6 mt-6 max-w-xl" data-testid="pwd-form">
