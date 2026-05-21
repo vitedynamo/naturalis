@@ -39,6 +39,23 @@ export default function Withdraw() {
 
   const bankReady = user?.bank_name && user?.account_number && user?.account_name;
 
+  // Compute window state from settings (Lagos time = UTC + 1)
+  const windowState = (() => {
+    if (settings.withdrawals_open === false) return { open: false, reason: "Withdrawals are temporarily closed." };
+    const start = settings.withdrawal_start_time || "00:00";
+    const end = settings.withdrawal_end_time || "23:59";
+    if (start === "00:00" && end === "23:59") return { open: true, start, end };
+    const now = new Date();
+    const lagos = new Date(now.getTime() + (now.getTimezoneOffset() + 60) * 60000);
+    const cur = lagos.getHours() * 60 + lagos.getMinutes();
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const startM = sh * 60 + sm;
+    const endM = eh * 60 + em;
+    const inWindow = startM <= endM ? (cur >= startM && cur <= endM) : (cur >= startM || cur <= endM);
+    return inWindow ? { open: true, start, end } : { open: false, reason: `Withdrawals open between ${start} and ${end} (Lagos).`, start, end };
+  })();
+
   return (
     <UserLayout>
       <div className="text-label">Funds</div>
@@ -55,6 +72,13 @@ export default function Withdraw() {
         </div>
       )}
 
+      {bankReady && !windowState.open && (
+        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="withdrawals-closed-banner">
+          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals closed</div>
+          <div className="text-sm text-[color:var(--text-secondary)] mt-1">{windowState.reason}</div>
+        </div>
+      )}
+
       <form onSubmit={submit} className="card-soft p-6 mt-6" data-testid="withdraw-form">
         <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
         <input
@@ -63,7 +87,7 @@ export default function Withdraw() {
           className="w-full mt-2 px-3 py-3 input-base"
         />
 
-        <button type="submit" disabled={busy || !bankReady}
+        <button type="submit" disabled={busy || !bankReady || !windowState.open}
           data-testid="withdraw-submit-btn"
           className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60">
           <ArrowUpFromLine className="w-4 h-4" /> {busy ? "Processing…" : "Submit request"}

@@ -275,6 +275,10 @@ class Settings(BaseModel):
     welcome_message: str = ""
     welcome_modal_title: str = ""
     welcome_modal_active: bool = True
+    auto_payout_enabled: bool = False
+    withdrawals_open: bool = True
+    withdrawal_start_time: str = "00:00"
+    withdrawal_end_time: str = "23:59"
 
 
 class SettingsUpdate(BaseModel):
@@ -299,6 +303,10 @@ class SettingsUpdate(BaseModel):
     welcome_message: Optional[str] = None
     welcome_modal_title: Optional[str] = None
     welcome_modal_active: Optional[bool] = None
+    auto_payout_enabled: Optional[bool] = None
+    withdrawals_open: Optional[bool] = None
+    withdrawal_start_time: Optional[str] = None
+    withdrawal_end_time: Optional[str] = None
 
 
 class PaystackPayRequest(BaseModel):

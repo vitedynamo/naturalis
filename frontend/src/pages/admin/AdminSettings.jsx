@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Save, Megaphone, Flame, ImagePlus, X, Banknote, MessageCircle } from "lucide-react";
+import { Save, Megaphone, Flame, ImagePlus, X, Banknote, MessageCircle, Clock } from "lucide-react";
 
 function resolveImg(url) {
   if (!url) return "";
@@ -63,6 +63,10 @@ export default function AdminSettings() {
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
+        auto_payout_enabled: !!s.auto_payout_enabled,
+        withdrawals_open: s.withdrawals_open !== false,
+        withdrawal_start_time: s.withdrawal_start_time || "00:00",
+        withdrawal_end_time: s.withdrawal_end_time || "23:59",
         featured_product_id: s.featured_product_id || null,
         home_announcement: s.home_announcement || "",
         home_announcement_active: !!s.home_announcement_active,
@@ -237,6 +241,51 @@ export default function AdminSettings() {
               </select>
             </label>
           </div>
+        </div>
+
+        <div className="card-soft p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-label flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-[color:var(--brand)]" /> Withdrawal automation & hours</div>
+          </div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Auto-payout sends withdrawals to users instantly via the configured payout gateway. If unchecked, withdrawals queue as pending for admin approval.</p>
+
+          <label className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-[color:var(--surface-alt)] cursor-pointer">
+            <input type="checkbox" checked={!!s.auto_payout_enabled}
+              onChange={(e) => setS({ ...s, auto_payout_enabled: e.target.checked })}
+              data-testid="auto-payout-toggle" />
+            <div>
+              <div className="font-semibold text-[color:var(--text-primary)] text-sm">Auto-payout enabled</div>
+              <div className="text-[11px] text-[color:var(--text-secondary)]">When ON, user withdrawals are paid out immediately. Failed transfers fall back to pending.</div>
+            </div>
+          </label>
+
+          <label className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-[color:var(--surface-alt)] cursor-pointer">
+            <input type="checkbox" checked={s.withdrawals_open !== false}
+              onChange={(e) => setS({ ...s, withdrawals_open: e.target.checked })}
+              data-testid="withdrawals-open-toggle" />
+            <div>
+              <div className="font-semibold text-[color:var(--text-primary)] text-sm">Withdrawals open</div>
+              <div className="text-[11px] text-[color:var(--text-secondary)]">Master kill-switch. Untick to temporarily close withdrawals (maintenance, outages).</div>
+            </div>
+          </label>
+
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <label className="text-xs">
+              <span>Open time (Lagos)</span>
+              <input type="time" value={s.withdrawal_start_time || "00:00"}
+                onChange={(e) => setS({ ...s, withdrawal_start_time: e.target.value })}
+                data-testid="withdrawal-start-input"
+                className="w-full mt-1 input-base" />
+            </label>
+            <label className="text-xs">
+              <span>Close time (Lagos)</span>
+              <input type="time" value={s.withdrawal_end_time || "23:59"}
+                onChange={(e) => setS({ ...s, withdrawal_end_time: e.target.value })}
+                data-testid="withdrawal-end-input"
+                className="w-full mt-1 input-base" />
+            </label>
+          </div>
+          <p className="text-[11px] text-[color:var(--text-tertiary)] mt-2">Set to 00:00 → 23:59 for always-on. Overnight windows (e.g. 22:00 → 04:00) supported.</p>
         </div>
 
         <div className="card-soft p-6">

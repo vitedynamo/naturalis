@@ -631,10 +631,41 @@ async def my_deposits(request: Request, user=Depends(get_current_user)):
 
 
 # =========== WITHDRAWAL ===========
+def _lagos_now():
+    from datetime import timedelta
+    return datetime.now(timezone.utc) + timedelta(hours=1)
+
+
+def _is_within_window(start_hhmm: str, end_hhmm: str) -> bool:
+    try:
+        sh, sm = [int(x) for x in start_hhmm.split(":", 1)]
+        eh, em = [int(x) for x in end_hhmm.split(":", 1)]
+    except Exception:
+        return True
+    now = _lagos_now()
+    now_minutes = now.hour * 60 + now.minute
+    start_minutes = sh * 60 + sm
+    end_minutes = eh * 60 + em
+    if start_minutes <= end_minutes:
+        return start_minutes <= now_minutes <= end_minutes
+    # Overnight window e.g. 22:00 → 04:00
+    return now_minutes >= start_minutes or now_minutes <= end_minutes
+
+
 @router.post("/withdrawal/request")
 async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
     settings = await _settings(db)
+
+    # Master kill-switch
+    if not settings.get("withdrawals_open", True):
+        raise HTTPException(400, "Withdrawals are temporarily closed. Please try again later.")
+    # Daily window
+    start = settings.get("withdrawal_start_time") or "00:00"
+    end = settings.get("withdrawal_end_time") or "23:59"
+    if not _is_within_window(start, end):
+        raise HTTPException(400, f"Withdrawals are open between {start} and {end} (Lagos time).")
+
     min_w = settings.get("min_withdrawal", 1000)
     if data.amount < min_w:
         raise HTTPException(400, f"Minimum withdrawal is ₦{min_w:,.2f}")
@@ -643,7 +674,6 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
     if not (user.get("bank_name") and user.get("account_number") and user.get("account_name")):
         raise HTTPException(400, "Please add your bank account details on profile page first")
 
-    # Debit wallet immediately, refund if rejected.
     new_user = await db.users.find_one_and_update(
         {"id": user["id"]},
         {"$inc": {"wallet_balance": -float(data.amount)}},
@@ -651,14 +681,16 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         projection={"_id": 0},
     )
     wid = gen_reference("w")
+    method = data.method if data.method in ("manual", "auto") else "manual"
     doc = {
         "id": wid,
         "user_id": user["id"],
         "amount": float(data.amount),
         "bank_name": user["bank_name"],
+        "bank_code": user.get("bank_code", ""),
         "account_number": user["account_number"],
         "account_name": user["account_name"],
-        "method": data.method if data.method in ("manual", "auto") else "manual",
+        "method": method,
         "status": "pending",
         "admin_note": None,
         "created_at": _now_iso(),
@@ -671,11 +703,62 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         "user_id": user["id"],
         "type": "withdrawal",
         "amount": -float(data.amount),
-        "description": f"Withdrawal request ({doc['method']})",
+        "description": f"Withdrawal request ({method})",
         "balance_after": new_user["wallet_balance"],
         "meta": {"withdrawal_id": wid},
         "created_at": _now_iso(),
     })
+
+    # Try auto-payout if enabled and we have a bank_code
+    auto = bool(settings.get("auto_payout_enabled", False))
+    if auto and user.get("bank_code"):
+        payout_gateway = settings.get("payout_gateway", "paystack")
+        mode = settings.get("payment_mode", "mock")
+        try:
+            if payout_gateway == "nomba" and mode == "live" and settings.get("nomba_client_id"):
+                from nomba import transfer_to_bank as nomba_transfer
+                ref = gen_reference("ntr")
+                await nomba_transfer(
+                    client_id=settings["nomba_client_id"], client_secret=settings["nomba_client_secret"],
+                    account_id=settings.get("nomba_account_id", ""),
+                    amount_naira=float(data.amount), account_number=user["account_number"],
+                    account_name=user["account_name"], bank_code=user["bank_code"],
+                    merchant_tx_ref=ref, narration=f"Auto payout {wid}",
+                )
+                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "paid", "method": "auto", "admin_note": f"Auto Nomba · {ref}", "nomba_transfer_ref": ref, "updated_at": _now_iso()}})
+                doc["status"] = "paid"; doc["method"] = "auto"
+            elif payout_gateway == "paystack" and mode == "live" and settings.get("paystack_secret_key"):
+                # Paystack: recipient + transfer
+                async with httpx.AsyncClient(timeout=20) as client:
+                    r1 = await client.post(
+                        "https://api.paystack.co/transferrecipient",
+                        headers={"Authorization": f"Bearer {settings['paystack_secret_key']}", "Content-Type": "application/json"},
+                        json={"type": "nuban", "name": user["account_name"], "account_number": user["account_number"], "bank_code": user["bank_code"], "currency": "NGN"},
+                    )
+                    rec = r1.json()
+                    if not rec.get("status"):
+                        raise Exception(rec.get("message", "recipient failed"))
+                    recipient_code = rec["data"]["recipient_code"]
+                    ref = gen_reference("ptr")
+                    r2 = await client.post(
+                        "https://api.paystack.co/transfer",
+                        headers={"Authorization": f"Bearer {settings['paystack_secret_key']}", "Content-Type": "application/json"},
+                        json={"source": "balance", "amount": int(float(data.amount) * 100), "recipient": recipient_code, "reason": f"Auto payout {wid}", "reference": ref},
+                    )
+                    tr = r2.json()
+                    if not tr.get("status"):
+                        raise Exception(tr.get("message", "transfer failed"))
+                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "paid", "method": "auto", "admin_note": f"Auto Paystack · {ref}", "paystack_transfer_ref": ref, "updated_at": _now_iso()}})
+                doc["status"] = "paid"; doc["method"] = "auto"
+            else:
+                # Mock auto-payout — simulate instant success
+                ref = gen_reference("mock")
+                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "paid", "method": "auto", "admin_note": f"Auto mock · {ref}", "updated_at": _now_iso()}})
+                doc["status"] = "paid"; doc["method"] = "auto"
+        except Exception as e:
+            # Auto-payout failed — leave pending for admin manual processing
+            await db.withdrawals.update_one({"id": wid}, {"$set": {"admin_note": f"Auto-payout failed: {e}", "updated_at": _now_iso()}})
+
     return doc
 
 
@@ -840,4 +923,8 @@ async def public_settings(request: Request):
         "welcome_message": s.get("welcome_message", ""),
         "welcome_modal_title": s.get("welcome_modal_title", ""),
         "welcome_modal_active": s.get("welcome_modal_active", True),
+        "withdrawals_open": s.get("withdrawals_open", True),
+        "withdrawal_start_time": s.get("withdrawal_start_time", "00:00"),
+        "withdrawal_end_time": s.get("withdrawal_end_time", "23:59"),
+        "auto_payout_enabled": s.get("auto_payout_enabled", False),
     }
