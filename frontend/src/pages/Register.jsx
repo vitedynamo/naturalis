@@ -6,6 +6,7 @@ import { User, Phone, Lock, Gift, ArrowRight, ShieldQuestion } from "lucide-reac
 import { toast } from "sonner";
 import { SECURITY_QUESTIONS } from "@/lib/securityQuestions";
 import ThemeToggle from "@/components/ThemeToggle";
+import { formatNaira } from "@/lib/format";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -21,10 +22,14 @@ export default function Register() {
   const [q2, setQ2] = useState(SECURITY_QUESTIONS[1]);
   const [a2, setA2] = useState("");
   const [loading, setLoading] = useState(false);
+  const [welcomeBonus, setWelcomeBonus] = useState(750);
 
   useEffect(() => {
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref);
+    api.get("/settings/public").then(({ data }) => {
+      if (typeof data?.welcome_bonus === "number") setWelcomeBonus(data.welcome_bonus);
+    }).catch(() => { /* ignore */ });
   }, [sp]);
 
   const submit = async (e) => {
@@ -53,7 +58,7 @@ export default function Register() {
       };
       const { data } = await api.post("/auth/register", payload);
       setSession(data.token, data.user);
-      toast.success("Welcome! ₦750 welcome bonus credited 🎉");
+      toast.success(`Welcome! ${formatNaira(welcomeBonus)} welcome bonus credited`);
       navigate("/dashboard", { replace: true });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Registration failed");
@@ -73,10 +78,10 @@ export default function Register() {
               Earn while<br/>you sleep.
             </h2>
             <p className="mt-4 max-w-md text-white/85 leading-relaxed">
-              Join thousands of Nigerians earning daily passive income. Get a <span className="font-bold">₦750 welcome bonus</span> just for signing up.
+              Join thousands of Nigerians earning daily passive income. Get a <span className="font-bold">{formatNaira(welcomeBonus)} welcome bonus</span> just for signing up.
             </p>
           </div>
-          <div className="text-xs text-white/70">3-Generation Referral · Daily Payouts · Naira-native</div>
+          <div className="text-xs text-white/70">2-Generation Referral · Daily Payouts · Naira-native</div>
         </div>
       </div>
       <div className="w-full lg:w-1/2 flex items-center justify-center px-5 py-8">
