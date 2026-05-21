@@ -282,6 +282,54 @@ async def list_products(request: Request, user=Depends(get_current_user)):
 
 
 # =========== INVEST ===========
+async def _award_invest_commissions(db, investor_id: str, invest_amount: float, source_investment_id: str, product_name: str):
+    """One-time commission paid to up to 2 generations based on the investment amount."""
+    settings = await _settings(db)
+    percents = [
+        float(settings.get("gen1_percent", 10.0)),
+        float(settings.get("gen2_percent", 5.0)),
+    ]
+    current = await db.users.find_one({"id": investor_id}, {"_id": 0})
+    if not current:
+        return
+    investor_name = current.get("name", "a user")
+    for gen in range(2):
+        ref_id = current.get("referred_by")
+        if not ref_id:
+            break
+        referrer = await db.users.find_one({"id": ref_id}, {"_id": 0})
+        if not referrer:
+            break
+        commission = round(float(invest_amount) * (percents[gen] / 100.0), 2)
+        if commission > 0:
+            updated = await db.users.find_one_and_update(
+                {"id": referrer["id"]},
+                {"$inc": {
+                    "wallet_balance": commission,
+                    "total_earnings": commission,
+                    "referral_earnings": commission,
+                }},
+                return_document=True,
+                projection={"_id": 0},
+            )
+            await db.transactions.insert_one({
+                "id": gen_reference("tx"),
+                "user_id": referrer["id"],
+                "type": "referral",
+                "amount": commission,
+                "description": f"Gen-{gen+1} referral bonus from {investor_name} ({product_name})",
+                "balance_after": updated["wallet_balance"],
+                "meta": {
+                    "generation": gen + 1,
+                    "from_user_id": investor_id,
+                    "investment_id": source_investment_id,
+                    "basis": "invest_amount",
+                },
+                "created_at": _now_iso(),
+            })
+        current = referrer
+
+
 @router.post("/invest")
 async def invest(data: InvestRequest, request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
@@ -340,6 +388,10 @@ async def invest(data: InvestRequest, request: Request, user=Depends(get_current
         "created_at": _now_iso(),
     }
     await db.transactions.insert_one(tx)
+
+    # Award referral commissions immediately based on the investment amount (one-time per invest)
+    await _award_invest_commissions(db, user["id"], amount, inv["id"], product["name"])
+
     return {"investment": inv, "wallet_balance": new_user["wallet_balance"]}
 
 

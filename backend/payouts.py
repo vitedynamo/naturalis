@@ -149,6 +149,3 @@ async def process_investment_payouts(db, user_id: Optional[str] = None):
                 }
             },
         )
-
-        # Award referral commissions per payout cycle
-        await _award_referral_commissions(db, inv["user_id"], total_this_run, inv["id"])
