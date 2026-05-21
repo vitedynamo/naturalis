@@ -1,20 +1,82 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Banknote, Send, Smartphone } from "lucide-react";
+import { Banknote, Send, Smartphone, Search, ChevronDown, Check, Loader2, BadgeCheck, AlertTriangle } from "lucide-react";
+
+function AdminBankPicker({ value, banks, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const rootRef = useRef(null);
+  useEffect(() => {
+    const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const selected = useMemo(() => banks.find((b) => b.code === value) || null, [banks, value]);
+  const filtered = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    if (!ql) return banks;
+    return banks.filter((b) => b.name.toLowerCase().includes(ql) || b.code.includes(ql));
+  }, [banks, q]);
+  return (
+    <div ref={rootRef} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        data-testid="payout-bank-trigger"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 input-base text-left">
+        <span className={selected ? "text-[color:var(--text-primary)] font-semibold" : "text-[color:var(--text-tertiary)]"}>
+          {selected ? `${selected.name} (${selected.code})` : "— select bank —"}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-[color:var(--text-tertiary)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 left-0 right-0 mt-2 rounded-2xl bg-[color:var(--surface)] border border-[color:var(--border-default)] shadow-2xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-[color:var(--border-default)] sticky top-0 bg-[color:var(--surface)]">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--text-tertiary)]" />
+              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder="Search banks…"
+                data-testid="payout-bank-search"
+                className="w-full pl-8 pr-3 py-2 text-sm bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]" />
+            </div>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {filtered.length === 0 && <div className="p-6 text-center text-sm text-[color:var(--text-tertiary)]">No bank matches "{q}"</div>}
+            {filtered.map((b) => {
+              const active = selected?.code === b.code;
+              return (
+                <button key={b.code} type="button"
+                  onClick={() => { onSelect(b); setOpen(false); setQ(""); }}
+                  data-testid={`payout-bank-option-${b.code}`}
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-[color:var(--surface-alt)] ${active ? "bg-[color:var(--brand-soft)]" : ""}`}>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[color:var(--text-primary)] truncate">{b.name}</div>
+                    <div className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{b.code}</div>
+                  </div>
+                  {active && <Check className="w-4 h-4 text-[color:var(--brand)] shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminWithdrawals() {
   const [items, setItems] = useState([]);
   const [banks, setBanks] = useState([]);
   const [target, setTarget] = useState(null);
-  const [gateway, setGateway] = useState("paystack"); // paystack | nomba
+  const [gateway, setGateway] = useState("paystack");
   const [bankCode, setBankCode] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [verifiedName, setVerifiedName] = useState("");
 
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
   useEffect(() => { load(); }, []);
@@ -30,27 +92,45 @@ export default function AdminWithdrawals() {
     setTarget(w);
     setGateway(gw);
     setReason(`Withdrawal payout to ${w.account_name}`);
+    setVerifiedName("");
     const list = await ensureBanks();
     const match = list.find((b) => b.name.toLowerCase() === (w.bank_name || "").toLowerCase().trim());
     setBankCode(match?.code || "");
   };
 
-  const submitPay = async () => {
-    if (!bankCode) {
-      toast.error("Pick the bank for this account first");
+  // Auto-resolve account name when both bank + account_number ready
+  useEffect(() => {
+    if (!target || !bankCode || !target.account_number || target.account_number.length !== 10) {
+      setVerifiedName("");
       return;
     }
+    let cancelled = false;
+    setResolving(true);
+    setVerifiedName("");
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.post("/banks/resolve", { account_number: target.account_number, bank_code: bankCode });
+        if (!cancelled) setVerifiedName(data.account_name || "");
+      } catch (e) {
+        if (!cancelled) toast.error(e?.response?.data?.detail || "Could not verify account");
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [bankCode, target]);
+
+  const nameMismatch = verifiedName && target && verifiedName.toUpperCase().trim() !== (target.account_name || "").toUpperCase().trim();
+
+  const submitPay = async () => {
+    if (!bankCode) { toast.error("Pick the bank for this account first"); return; }
+    if (!verifiedName) { toast.error("Wait for account verification to complete"); return; }
     setBusy(true);
     try {
       const endpoint = gateway === "nomba" ? "pay-nomba" : "pay-paystack";
-      const { data } = await api.post(`/admin/withdrawals/${target.id}/${endpoint}`, {
-        bank_code: bankCode,
-        reason,
-      });
+      const { data } = await api.post(`/admin/withdrawals/${target.id}/${endpoint}`, { bank_code: bankCode, reason });
       toast.success(`Paid via ${gateway === "nomba" ? "Nomba" : "Paystack"} (${data.mode})`);
-      setTarget(null);
-      setBankCode("");
-      setReason("");
+      setTarget(null); setBankCode(""); setReason(""); setVerifiedName("");
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Payment failed");
@@ -127,7 +207,7 @@ export default function AdminWithdrawals() {
       </div>
 
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg w-[calc(100vw-2rem)] rounded-2xl">
           <DialogHeader>
             <DialogTitle>Pay via {gateway === "nomba" ? "Nomba" : "Paystack"} Transfer</DialogTitle>
           </DialogHeader>
@@ -136,26 +216,51 @@ export default function AdminWithdrawals() {
               <div className="rounded-lg bg-[color:var(--surface-alt)] p-3">
                 <div className="text-[color:var(--text-primary)] font-semibold">{target.user_name} · {formatNaira(target.amount)}</div>
                 <div className="font-mono text-xs text-[color:var(--text-primary)]">{target.account_number}</div>
-                <div className="text-xs text-[color:var(--text-secondary)]">{target.bank_name} · {target.account_name}</div>
+                <div className="text-xs text-[color:var(--text-secondary)]">User-saved: <span className="font-semibold">{target.bank_name} · {target.account_name}</span></div>
               </div>
+
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Bank</label>
-              <select value={bankCode} onChange={(e) => setBankCode(e.target.value)}
-                data-testid="payout-bank-select"
-                className="w-full input-base">
-                <option value="">— select bank —</option>
-                {banks.map((b) => (
-                  <option key={b.code} value={b.code}>{`${b.name} (${b.code})`}</option>
-                ))}
-              </select>
+              <AdminBankPicker value={bankCode} banks={banks}
+                onSelect={(b) => setBankCode(b.code)} />
+
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Account name (verified by gateway)</label>
+              <div className="relative">
+                <input
+                  value={resolving ? "" : verifiedName}
+                  readOnly
+                  placeholder={resolving ? "Verifying with bank…" : "Pick a bank to auto-verify"}
+                  data-testid="payout-verified-name"
+                  className="w-full input-base pr-10 font-semibold uppercase"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {resolving && <Loader2 className="w-4 h-4 text-[color:var(--brand)] animate-spin" />}
+                  {!resolving && verifiedName && !nameMismatch && (
+                    <BadgeCheck className="w-5 h-5 text-[color:var(--success)]" data-testid="payout-verified-badge" />
+                  )}
+                  {!resolving && verifiedName && nameMismatch && (
+                    <AlertTriangle className="w-5 h-5 text-[color:var(--warning)]" data-testid="payout-mismatch-warn" />
+                  )}
+                </div>
+              </div>
+              {!resolving && verifiedName && nameMismatch && (
+                <div className="rounded-lg bg-[color:var(--gold-soft)] text-[color:var(--warning)] p-3 text-xs flex items-start gap-2" data-testid="mismatch-banner">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-bold">Name mismatch.</div>
+                    User saved <span className="font-mono">"{target.account_name}"</span> but the bank returned <span className="font-mono font-bold">"{verifiedName}"</span>. Verify before paying.
+                  </div>
+                </div>
+              )}
+
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Reason / narration</label>
               <input value={reason} onChange={(e) => setReason(e.target.value)}
                 data-testid="payout-reason-input"
                 className="w-full input-base" />
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-3">
             <Button variant="outline" onClick={() => setTarget(null)}>Cancel</Button>
-            <Button onClick={submitPay} disabled={busy} data-testid="payout-confirm-btn"
+            <Button onClick={submitPay} disabled={busy || resolving || !verifiedName} data-testid="payout-confirm-btn"
               className={gateway === "nomba" ? "bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)]" : "bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)]"}>
               {busy ? "Processing…" : "Confirm transfer"}
             </Button>
