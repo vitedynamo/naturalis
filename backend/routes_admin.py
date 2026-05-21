@@ -62,11 +62,28 @@ _NG_BANKS_FALLBACK = [
 
 @router.get("/admin/banks")
 async def list_banks(request: Request, _admin=Depends(get_current_admin)):
-    """List Nigerian banks. Uses Paystack /bank whenever a secret key is set (read-only call, safe in any mode)."""
+    """List Nigerian banks. Nomba → Paystack → static fallback."""
     db = request.app.state.db
     now = time.time()
     if _banks_cache["items"] and (now - _banks_cache["at"]) < 3600:
         return _banks_cache["items"]
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    # Try Nomba
+    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+        try:
+            from nomba import list_banks as nomba_list
+            items = await nomba_list(
+                client_id=s["nomba_client_id"],
+                client_secret=s["nomba_client_secret"],
+                account_id=s["nomba_account_id"],
+            )
+            if items:
+                _banks_cache["items"] = items
+                _banks_cache["at"] = now
+                return items
+        except Exception:
+            pass
+    # Try Paystack
     secret, _ = await _get_secret_key(db)
     if secret:
         try:
@@ -819,8 +836,8 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             payload[k] = v
     if payload:
         await db.settings.update_one({"id": "global"}, {"$set": payload}, upsert=True)
-    # If the Paystack secret was changed, bust the banks cache so the next /banks call fetches fresh
-    if "paystack_secret_key" in payload:
+    # If Paystack/Nomba creds were changed, bust the banks cache so the next /banks call fetches fresh
+    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload:
         _banks_cache["items"] = []
         _banks_cache["at"] = 0
     return await db.settings.find_one({"id": "global"}, {"_id": 0})

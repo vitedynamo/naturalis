@@ -1,6 +1,7 @@
 import os
 import hmac
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -28,6 +29,8 @@ from models import (
     ResetWithQuestionsRequest,
 )
 from payouts import process_investment_payouts
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -208,9 +211,23 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
 # =========== BANKS (PUBLIC USER ENDPOINTS) ===========
 @router.get("/banks")
 async def banks_for_user(request: Request, user=Depends(get_current_user)):
-    """List of Nigerian banks. Calls Paystack whenever a secret key is set (read-only)."""
+    """List Nigerian banks. Tries Nomba → Paystack → static fallback."""
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    # Try Nomba
+    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+        try:
+            from nomba import list_banks as nomba_list
+            items = await nomba_list(
+                client_id=s["nomba_client_id"],
+                client_secret=s["nomba_client_secret"],
+                account_id=s["nomba_account_id"],
+            )
+            if items:
+                return items
+        except Exception as e:
+            logger.warning(f"Nomba bank list failed: {e}")
+    # Try Paystack
     secret = s.get("paystack_secret_key") or ""
     if secret:
         try:
@@ -231,7 +248,7 @@ async def banks_for_user(request: Request, user=Depends(get_current_user)):
 
 @router.post("/banks/resolve")
 async def resolve_bank_account(payload: dict, request: Request, user=Depends(get_current_user)):
-    """Resolve account_number + bank_code → account_name via Paystack. Calls live whenever secret is set."""
+    """Resolve account name. Tries Nomba → Paystack."""
     account_number = (payload.get("account_number") or "").strip()
     bank_code = (payload.get("bank_code") or "").strip()
     if not account_number or not bank_code:
@@ -241,8 +258,25 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
 
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
-    secret = s.get("paystack_secret_key") or ""
 
+    # Try Nomba
+    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+        try:
+            from nomba import resolve_account as nomba_resolve
+            res = await nomba_resolve(
+                client_id=s["nomba_client_id"],
+                client_secret=s["nomba_client_secret"],
+                account_id=s["nomba_account_id"],
+                account_number=account_number,
+                bank_code=bank_code,
+            )
+            return {**res, "mode": "live", "provider": "nomba"}
+        except Exception as e:
+            logger.warning(f"Nomba resolve failed: {e}")
+            # Fall through to Paystack
+
+    # Try Paystack
+    secret = s.get("paystack_secret_key") or ""
     if secret:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
@@ -257,13 +291,13 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
                     "account_name": data["data"]["account_name"],
                     "account_number": data["data"]["account_number"],
                     "mode": "live",
+                    "provider": "paystack",
                 }
             raise HTTPException(422, data.get("message") or "Could not resolve account")
         except httpx.HTTPError as e:
             raise HTTPException(502, f"Paystack lookup failed: {e}")
 
-    # No secret configured — cannot resolve
-    raise HTTPException(503, "Bank account verification is unavailable. Please ask the admin to configure Paystack credentials.")
+    raise HTTPException(503, "Bank account verification is unavailable. Please ask the admin to configure Nomba or Paystack credentials.")
 
 
 # =========== FORGOT PASSWORD ===========
