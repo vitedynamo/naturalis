@@ -197,11 +197,75 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
         {"id": user["id"]},
         {"$set": {
             "bank_name": data.bank_name.strip(),
+            "bank_code": (data.bank_code or "").strip() if hasattr(data, "bank_code") else "",
             "account_number": data.account_number.strip(),
             "account_name": data.account_name.strip(),
         }},
     )
     return await _public_user(db, user["id"])
+
+
+# =========== BANKS (PUBLIC USER ENDPOINTS) ===========
+@router.get("/banks")
+async def banks_for_user(request: Request, user=Depends(get_current_user)):
+    """List of Nigerian banks for users adding their payout account."""
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    secret = s.get("paystack_secret_key") or ""
+    mode = s.get("payment_mode", "mock")
+    if mode == "live" and secret:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://api.paystack.co/bank",
+                    params={"country": "nigeria"},
+                    headers={"Authorization": f"Bearer {secret}"},
+                )
+                data = resp.json()
+            if data.get("status"):
+                return [{"name": b["name"], "code": b["code"]} for b in data["data"]]
+        except Exception:
+            pass
+    from routes_admin import _NG_BANKS_FALLBACK
+    return _NG_BANKS_FALLBACK
+
+
+@router.post("/banks/resolve")
+async def resolve_bank_account(payload: dict, request: Request, user=Depends(get_current_user)):
+    """Resolve account_number + bank_code → account_name via Paystack."""
+    account_number = (payload.get("account_number") or "").strip()
+    bank_code = (payload.get("bank_code") or "").strip()
+    if not account_number or not bank_code:
+        raise HTTPException(400, "account_number and bank_code required")
+    if not account_number.isdigit() or len(account_number) != 10:
+        raise HTTPException(400, "Account number must be 10 digits")
+
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    secret = s.get("paystack_secret_key") or ""
+    mode = s.get("payment_mode", "mock")
+
+    if mode == "live" and secret:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://api.paystack.co/bank/resolve",
+                    params={"account_number": account_number, "bank_code": bank_code},
+                    headers={"Authorization": f"Bearer {secret}"},
+                )
+                data = resp.json()
+            if data.get("status") and data.get("data"):
+                return {
+                    "account_name": data["data"]["account_name"],
+                    "account_number": data["data"]["account_number"],
+                    "mode": "live",
+                }
+            raise HTTPException(422, data.get("message") or "Could not resolve account")
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"Paystack lookup failed: {e}")
+
+    fake_name = f"{user.get('name','TEST')} VERIFIED"
+    return {"account_name": fake_name.upper(), "account_number": account_number, "mode": "mock"}
 
 
 # =========== FORGOT PASSWORD ===========

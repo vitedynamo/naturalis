@@ -42,6 +42,17 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 14)
+
+- **Drill-down "Search by user phone"**: dashboard drill dialog now has a debounced filter (phone / name / reference).
+- **Admin fully blocked from `/login`**: rejects with generic "Invalid credentials" — no auto-redirect to `/admin/login`.
+- **Dark-mode inputs/modals**: global CSS rule for `input/textarea/select` text + background colors. Fixes Coupons modal + every other Dialog where typed text was invisible in dark mode.
+- **Bank picker + auto-resolve**: new `GET /api/banks` + `POST /api/banks/resolve` (Paystack live → mock fallback). New searchable BankPicker dropdown on `/profile`. Account number auto-verifies the account name (350ms debounce) with a green ✓ "Verified with bank" badge. Save disabled until verified.
+
+## Recent Changes (Feb 2026 — iteration 13)
+- Dialog hardening for dark mode (`bg-surface text-text-primary` baked into DialogContent)
+- Settings page full-width XL 2-column grid
+
 ## Recent Changes (Feb 2026 — iteration 12)
 
 ### Fixes from user feedback

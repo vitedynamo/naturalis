@@ -23,9 +23,8 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", { phone, password });
       if (data.user.is_admin) {
-        toast.error("Please use the admin sign-in page.");
+        toast.error("Invalid credentials");
         setLoading(false);
-        navigate("/admin/login", { replace: true });
         return;
       }
       setSession(data.token, data.user);

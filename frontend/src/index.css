@@ -166,6 +166,15 @@
   .text-fg { color: var(--text-primary); }
   .text-muted { color: var(--text-secondary); }
   .text-faint { color: var(--text-tertiary); }
+  /* Make sure all inputs/textareas/selects always have legible text in both themes */
+  input, textarea, select {
+    color: var(--text-primary);
+    background-color: var(--surface);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-tertiary);
+    opacity: 1;
+  }
   .input-base {
     background: var(--surface);
     border: 1px solid var(--border-default);

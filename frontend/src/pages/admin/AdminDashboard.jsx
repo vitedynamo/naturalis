@@ -6,7 +6,7 @@ import { formatNaira, formatDate } from "@/lib/format";
 import {
   Users, TrendingUp, ArrowDownToLine, ArrowUpFromLine, Clock, DollarSign,
   CircleCheck, CircleAlert, ShieldAlert, ScanSearch, Banknote, ChevronRight,
-  CalendarRange, ArrowUpRight, X,
+  CalendarRange, ArrowUpRight, X, Search,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -91,6 +91,7 @@ export default function AdminDashboard() {
   const [drillDate, setDrillDate] = useState(null);
   const [drillData, setDrillData] = useState(null);
   const [drillLoading, setDrillLoading] = useState(false);
+  const [drillQ, setDrillQ] = useState("");
 
   useEffect(() => {
     api.get("/admin/stats/extended").then(({ data }) => setS(data));
@@ -115,6 +116,7 @@ export default function AdminDashboard() {
   const openDrill = async (date) => {
     setDrillDate(date);
     setDrillData(null);
+    setDrillQ("");
     setDrillLoading(true);
     try {
       const { data } = await api.get("/admin/deposits/by-day", { params: { date } });
@@ -123,6 +125,17 @@ export default function AdminDashboard() {
       setDrillLoading(false);
     }
   };
+
+  const drillFiltered = (() => {
+    if (!drillData) return [];
+    const q = drillQ.trim().toLowerCase();
+    if (!q) return drillData.deposits;
+    return drillData.deposits.filter((d) =>
+      (d.user_phone || "").toLowerCase().includes(q) ||
+      (d.user_name || "").toLowerCase().includes(q) ||
+      (d.reference || "").toLowerCase().includes(q)
+    );
+  })();
 
   const maxSeries = inflow ? Math.max(1, ...inflow.series.map((p) => p.total)) : 1;
 
@@ -347,7 +360,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Day drill-down */}
-      <Dialog open={!!drillDate} onOpenChange={(o) => { if (!o) { setDrillDate(null); setDrillData(null); } }}>
+      <Dialog open={!!drillDate} onOpenChange={(o) => { if (!o) { setDrillDate(null); setDrillData(null); setDrillQ(""); } }}>
         <DialogContent data-testid="drill-dialog" className="max-w-2xl w-[calc(100vw-2rem)] rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-3 border-b border-[color:var(--border-default)]">
             <DialogTitle className="font-display text-xl text-[color:var(--text-primary)]">
@@ -358,15 +371,30 @@ export default function AdminDashboard() {
                 <span className="font-bold text-[color:var(--text-primary)]">{formatNaira(drillData.total)}</span> across <span className="font-bold text-[color:var(--text-primary)]">{drillData.count}</span> deposit{drillData.count === 1 ? "" : "s"}
               </div>
             )}
+            {drillData && drillData.deposits.length > 0 && (
+              <div className="relative mt-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-tertiary)]" />
+                <input
+                  value={drillQ}
+                  onChange={(e) => setDrillQ(e.target.value)}
+                  placeholder="Search by phone, name or reference…"
+                  data-testid="drill-search"
+                  className="w-full pl-10 pr-3 py-2.5 input-base text-sm"
+                />
+              </div>
+            )}
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {drillLoading && <div className="p-8 text-center text-sm text-[color:var(--text-secondary)]">Loading…</div>}
             {!drillLoading && drillData && drillData.deposits.length === 0 && (
               <div className="p-10 text-center text-sm text-[color:var(--text-tertiary)]">No deposits on this day.</div>
             )}
-            {!drillLoading && drillData && drillData.deposits.length > 0 && (
+            {!drillLoading && drillData && drillData.deposits.length > 0 && drillFiltered.length === 0 && (
+              <div className="p-10 text-center text-sm text-[color:var(--text-tertiary)]">No deposits match "<span className="font-mono">{drillQ}</span>".</div>
+            )}
+            {!drillLoading && drillFiltered.length > 0 && (
               <div className="divide-y divide-[color:var(--border-light)]" data-testid="drill-list">
-                {drillData.deposits.map((d) => (
+                {drillFiltered.map((d) => (
                   <div key={d.id} className="p-4 flex items-center justify-between gap-3" data-testid={`drill-row-${d.id}`}>
                     <div className="min-w-0">
                       <div className="font-semibold text-[color:var(--text-primary)] truncate">{d.user_name}</div>

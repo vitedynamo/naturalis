@@ -83,6 +83,7 @@ class ChangePasswordRequest(BaseModel):
 
 class BankUpdateRequest(BaseModel):
     bank_name: str
+    bank_code: Optional[str] = ""
     account_number: str
     account_name: str
 
