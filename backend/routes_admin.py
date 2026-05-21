@@ -836,8 +836,15 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             payload[k] = v
     if payload:
         await db.settings.update_one({"id": "global"}, {"$set": payload}, upsert=True)
-    # If Paystack/Nomba creds were changed, bust the banks cache so the next /banks call fetches fresh
+    # If Paystack/Nomba creds were changed, bust the banks cache + Nomba token so the next call uses fresh creds
     if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload:
         _banks_cache["items"] = []
         _banks_cache["at"] = 0
+        try:
+            from nomba import _token_cache as _nomba_tok
+            _nomba_tok["token"] = None
+            _nomba_tok["expires_at"] = 0
+            _nomba_tok["base"] = ""
+        except Exception:
+            pass
     return await db.settings.find_one({"id": "global"}, {"_id": 0})

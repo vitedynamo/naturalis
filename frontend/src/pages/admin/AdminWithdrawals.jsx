@@ -39,7 +39,7 @@ function AdminBankPicker({ value, banks, onSelect }) {
         data-testid="payout-bank-trigger"
         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 input-base text-left">
         <span className={selected ? "text-[color:var(--text-primary)] font-semibold truncate" : "text-[color:var(--text-tertiary)] truncate"}>
-          {selected ? `${selected.name} (${selected.code})` : "— select bank —"}
+          {selected ? selected.name : "— select bank —"}
         </span>
         <ChevronDown className={`w-4 h-4 text-[color:var(--text-tertiary)] transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
@@ -65,7 +65,6 @@ function AdminBankPicker({ value, banks, onSelect }) {
                   className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-[color:var(--surface-alt)] ${active ? "bg-[color:var(--brand-soft)]" : ""}`}>
                   <div className="min-w-0">
                     <div className="font-semibold text-[color:var(--text-primary)] truncate">{b.name}</div>
-                    <div className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{b.code}</div>
                   </div>
                   {active && <Check className="w-4 h-4 text-[color:var(--brand)] shrink-0" />}
                 </button>

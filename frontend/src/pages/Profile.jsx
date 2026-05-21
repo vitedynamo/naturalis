@@ -84,7 +84,6 @@ function BankPicker({ value, banks, onSelect }) {
                 >
                   <div className="min-w-0">
                     <div className="font-semibold text-[color:var(--text-primary)] truncate">{b.name}</div>
-                    <div className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{b.code}</div>
                   </div>
                   {active && <Check className="w-4 h-4 text-[color:var(--brand)] shrink-0" />}
                 </button>
