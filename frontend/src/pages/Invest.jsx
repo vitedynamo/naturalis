@@ -144,7 +144,7 @@ export default function Invest() {
       </div>
 
       <Dialog open={open} onOpenChange={(o) => { if (!submitting) setOpen(o); }}>
-        <DialogContent data-testid="invest-dialog">
+        <DialogContent data-testid="invest-dialog" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="font-display">Invest in {selected?.name}</DialogTitle>
           </DialogHeader>
@@ -158,9 +158,11 @@ export default function Invest() {
                 ref={amountRef}
                 type="number" min={selected.min_amount || selected.price} value={amount}
                 onChange={(e)=>setAmount(e.target.value)}
-                disabled={submitting}
+                disabled
+                readOnly
+                tabIndex={-1}
                 data-testid="invest-amount-input"
-                className="w-full px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full px-3 py-3 bg-[color:var(--surface-alt)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-semibold opacity-90 cursor-not-allowed focus:outline-none"
               />
               <div className="text-sm text-[color:var(--text-secondary)]">
                 Daily return: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira((Number(amount) || 0) * selected.daily_profit_percent / 100)}</span>
