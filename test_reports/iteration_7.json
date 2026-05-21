@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 7 full regression. Backend: 19/19 pytest pass (test_iter7.py) covering notification removal (404), settings public+admin shape (no gen3_percent, nomba+gateway+announcement_image keys), referral chain A->B->C->D (only gen1+gen2 referrals, no gen3 record for A), /referrals API returns 2 gens only, /referrals/3/details -> 400, _award_referral_commissions only credits gen1+gen2 (A gets 0), /admin/withdrawals/{wid}/pay-nomba mock-mode marks paid with method=auto and admin_note containing 'Nomba transfer', /admin/upload-image still works, and regression smoke (login, products, banks, deposit init+verify, invest). Frontend (mobile 390x844): /admin/settings has Payment gateways + Nomba credentials + announcement image upload sections; /team shows Generation 1 + Generation 2 cards (no Gen 3), copy says 'across 2 generations', invite-link text below Copy buttons is hidden; /withdraw has NO 'Available: ₦' helper; /history filter chips remain on a single line on mobile and body.scrollWidth == clientWidth (no overflow); /deposit renders as cards (no <table>); /my-packages restyled (empty state for test user). Zero console errors related to NotificationBell or gen3.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter7.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "payouts._award_referral_commissions correctly bounded to 2 generations (range(2)); old gen3_percent field still defined in SettingsDB model (models.py:261) and SettingsUpdate (models.py:282) — harmless since /settings/public excludes it and admin UI no longer renders it, but consider removing the dead field in a follow-up cleanup.",
+    "routes_user.py register endpoint correctly inserts gen1 + (optional) gen2 referral records only; gen3 logic fully removed.",
+    "/admin/withdrawals/{wid}/pay-nomba: when no Nomba creds set, mode='mock' and admin_note correctly contains 'Nomba transfer ... mock'. Logic mirrors the existing Paystack pay endpoint."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter7.py"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% on tested flows"},
+  "test_credentials": "Admin: 08123456789 / personally · User: 08099887766 / newpwd",
+  "seed_data_creation": "test_iter7 creates throwaway TEST7_* users + a few chains (4 users per chain) for referral/payout verification; admin settings briefly mutated then restored to defaults (deposit_gateway=paystack, payout_gateway=paystack, empty Nomba creds). One TEST7 withdrawal created and marked paid via Nomba mock.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter7.py covers iteration-7 scope (notification removal, 2-generation referrals, Nomba gateway/credentials, settings shape, upload, regression smoke). Reuse it as a stable baseline. Note: /products requires Bearer auth; /deposit/initialize minimum is ₦3,000; /withdrawal/request requires bank details on profile first — these are real product constraints, the test fixture handles them. Phone generator uses random.randint to avoid collisions across rapid runs.",
+  "rca_of_the_issue": "n/a (no failures after fixes). During test authoring two issues were debugged before tests stabilized: (1) initial _rand_phone() used time.time() which produced identical phones for a single batch — replaced with random.randint + de-dup set; (2) _register() positional arg mismatch — _register(phone, code) was passing the referral code as the password parameter, breaking the chain so referred_by was always None. Fixed by switching to keyword arg referral_code=codeX. After both fixes all 19 backend tests pass."
+}

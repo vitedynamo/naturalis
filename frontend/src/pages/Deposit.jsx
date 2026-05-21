@@ -95,33 +95,41 @@ export default function Deposit() {
       </div>
 
       <div className="mt-8">
-        <h2 className="font-display text-xl font-semibold mb-3">Recent deposits</h2>
-        <div className="card-soft overflow-hidden">
-          <table className="w-full text-sm" data-testid="deposit-history-table">
-            <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
-              <tr>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Reference</th>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Amount</th>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Status</th>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((d) => (
-                <tr key={d.id} className="border-t border-[color:var(--border-default)]">
-                  <td className="p-3 font-mono text-xs text-[color:var(--text-primary)]">{d.reference}</td>
-                  <td className="p-3 font-semibold">{formatNaira(d.amount)}</td>
-                  <td className="p-3">
-                    <span className={`pill ${d.status === "success" ? "pill-success" : d.status === "failed" ? "pill-error" : "pill-warn"}`}>{d.status}</span>
-                  </td>
-                  <td className="p-3 text-[color:var(--text-secondary)]">{formatDate(d.created_at)}</td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr><td colSpan={4} className="p-6 text-center text-[color:var(--text-tertiary)]">No deposits yet.</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-display text-xl font-semibold text-[color:var(--text-primary)]">Recent deposits</h2>
+          {history.length > 0 && (
+            <span className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">{history.length} total</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="deposit-history-list">
+          {history.map((d) => {
+            const tone = d.status === "success" ? "success" : d.status === "failed" ? "error" : "warn";
+            return (
+              <div key={d.id} className="card-soft p-4 relative overflow-hidden" data-testid={`dep-${d.id}`}>
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                  tone === "success" ? "bg-[color:var(--success)]"
+                  : tone === "error" ? "bg-[color:var(--error)]"
+                  : "bg-[color:var(--warning)]"
+                }`} />
+                <div className="pl-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Amount</div>
+                      <div className="font-display font-bold text-2xl text-[color:var(--text-primary)] leading-tight mt-0.5">{formatNaira(d.amount)}</div>
+                    </div>
+                    <span className={`pill ${tone === "success" ? "pill-success" : tone === "error" ? "pill-error" : "pill-warn"}`}>{d.status}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
+                    <span className="font-mono text-[color:var(--text-tertiary)] truncate" title={d.reference}>{d.reference}</span>
+                    <span className="shrink-0 text-[color:var(--text-secondary)]">{formatDate(d.created_at)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {history.length === 0 && (
+            <div className="col-span-full card-soft p-8 text-center text-[color:var(--text-tertiary)]">No deposits yet. Your top-ups will appear here.</div>
+          )}
         </div>
       </div>
     </UserLayout>

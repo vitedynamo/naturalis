@@ -59,12 +59,20 @@ export default function Dashboard() {
       </div>
 
       {/* Admin-controlled announcement banner */}
-      {settings.home_announcement_active && settings.home_announcement && (
-        <div className="mt-5 card-soft p-4 flex items-start gap-3 border-l-4 border-[color:var(--accent-main)] animate-fade-up" data-testid="home-announcement">
-          <div className="w-9 h-9 rounded-lg bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] flex items-center justify-center shrink-0">
-            <Megaphone className="w-4 h-4" />
-          </div>
-          <div className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{settings.home_announcement}</div>
+      {settings.home_announcement_active && (settings.home_announcement || settings.home_announcement_image_url) && (
+        <div className="mt-5 card-soft overflow-hidden border-l-4 border-[color:var(--accent-main)] animate-fade-up" data-testid="home-announcement">
+          {settings.home_announcement_image_url && (
+            <img src={resolveUrl(settings.home_announcement_image_url)} alt="Announcement"
+                 className="w-full max-h-56 object-cover" data-testid="home-announcement-image" />
+          )}
+          {settings.home_announcement && (
+            <div className="p-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] flex items-center justify-center shrink-0">
+                <Megaphone className="w-4 h-4" />
+              </div>
+              <div className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{settings.home_announcement}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -119,7 +127,7 @@ export default function Dashboard() {
               </div>
               <div className="flex-1">
                 <div className="font-display font-semibold text-[color:var(--text-primary)]">Invite & earn</div>
-                <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">Earn {settings.gen1_percent || 10}% / {settings.gen2_percent || 5}% / {settings.gen3_percent || 2}% across 3 generations</div>
+                <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">Earn {settings.gen1_percent || 10}% / {settings.gen2_percent || 5}% across 2 generations</div>
               </div>
               <ArrowRight className="w-4 h-4 text-[color:var(--text-tertiary)]" />
             </Link>

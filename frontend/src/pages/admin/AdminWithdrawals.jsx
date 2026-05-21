@@ -5,12 +5,13 @@ import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Banknote, Send } from "lucide-react";
+import { Banknote, Send, Smartphone } from "lucide-react";
 
 export default function AdminWithdrawals() {
   const [items, setItems] = useState([]);
   const [banks, setBanks] = useState([]);
-  const [paystackTarget, setPaystackTarget] = useState(null);
+  const [target, setTarget] = useState(null);
+  const [gateway, setGateway] = useState("paystack"); // paystack | nomba
   const [bankCode, setBankCode] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,33 +26,34 @@ export default function AdminWithdrawals() {
     return data;
   };
 
-  const openPaystack = async (w) => {
-    setPaystackTarget(w);
+  const openPay = async (w, gw) => {
+    setTarget(w);
+    setGateway(gw);
     setReason(`Withdrawal payout to ${w.account_name}`);
     const list = await ensureBanks();
-    // Try to auto-match by bank name
     const match = list.find((b) => b.name.toLowerCase() === (w.bank_name || "").toLowerCase().trim());
     setBankCode(match?.code || "");
   };
 
-  const submitPaystack = async () => {
+  const submitPay = async () => {
     if (!bankCode) {
       toast.error("Pick the bank for this account first");
       return;
     }
     setBusy(true);
     try {
-      const { data } = await api.post(`/admin/withdrawals/${paystackTarget.id}/pay-paystack`, {
+      const endpoint = gateway === "nomba" ? "pay-nomba" : "pay-paystack";
+      const { data } = await api.post(`/admin/withdrawals/${target.id}/${endpoint}`, {
         bank_code: bankCode,
         reason,
       });
-      toast.success(`Paid via Paystack (${data.mode})`);
-      setPaystackTarget(null);
+      toast.success(`Paid via ${gateway === "nomba" ? "Nomba" : "Paystack"} (${data.mode})`);
+      setTarget(null);
       setBankCode("");
       setReason("");
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Paystack payment failed");
+      toast.error(e?.response?.data?.detail || "Payment failed");
     } finally { setBusy(false); }
   };
 
@@ -98,12 +100,16 @@ export default function AdminWithdrawals() {
                   <td className="p-3 text-right">
                     {w.status === "pending" && (
                       <div className="flex flex-wrap gap-2 justify-end">
-                        <button onClick={() => openPaystack(w)} data-testid={`pay-paystack-${w.id}`}
+                        <button onClick={() => openPay(w, "paystack")} data-testid={`pay-paystack-${w.id}`}
                           className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] inline-flex items-center gap-1.5">
                           <Send className="w-3 h-3" /> Pay via Paystack
                         </button>
-                        <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
+                        <button onClick={() => openPay(w, "nomba")} data-testid={`pay-nomba-${w.id}`}
                           className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] inline-flex items-center gap-1.5">
+                          <Smartphone className="w-3 h-3" /> Pay via Nomba
+                        </button>
+                        <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
+                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] inline-flex items-center gap-1.5 border border-[color:var(--border-default)]">
                           <Banknote className="w-3 h-3" /> Mark paid manually
                         </button>
                         <button onClick={() => act(w, "reject")} data-testid={`reject-${w.id}`}
@@ -120,21 +126,21 @@ export default function AdminWithdrawals() {
         </div>
       </div>
 
-      <Dialog open={!!paystackTarget} onOpenChange={(o) => !o && setPaystackTarget(null)}>
+      <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pay via Paystack Transfer</DialogTitle>
+            <DialogTitle>Pay via {gateway === "nomba" ? "Nomba" : "Paystack"} Transfer</DialogTitle>
           </DialogHeader>
-          {paystackTarget && (
+          {target && (
             <div className="space-y-3 text-sm">
               <div className="rounded-lg bg-[color:var(--surface-alt)] p-3">
-                <div className="text-[color:var(--text-primary)] font-semibold">{paystackTarget.user_name} · {formatNaira(paystackTarget.amount)}</div>
-                <div className="font-mono text-xs text-[color:var(--text-primary)]">{paystackTarget.account_number}</div>
-                <div className="text-xs text-[color:var(--text-secondary)]">{paystackTarget.bank_name} · {paystackTarget.account_name}</div>
+                <div className="text-[color:var(--text-primary)] font-semibold">{target.user_name} · {formatNaira(target.amount)}</div>
+                <div className="font-mono text-xs text-[color:var(--text-primary)]">{target.account_number}</div>
+                <div className="text-xs text-[color:var(--text-secondary)]">{target.bank_name} · {target.account_name}</div>
               </div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Bank</label>
               <select value={bankCode} onChange={(e) => setBankCode(e.target.value)}
-                data-testid="paystack-bank-select"
+                data-testid="payout-bank-select"
                 className="w-full input-base">
                 <option value="">— select bank —</option>
                 {banks.map((b) => (
@@ -143,13 +149,14 @@ export default function AdminWithdrawals() {
               </select>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Reason / narration</label>
               <input value={reason} onChange={(e) => setReason(e.target.value)}
-                data-testid="paystack-reason-input"
+                data-testid="payout-reason-input"
                 className="w-full input-base" />
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaystackTarget(null)}>Cancel</Button>
-            <Button onClick={submitPaystack} disabled={busy} data-testid="paystack-confirm-btn" className="bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)]">
+            <Button variant="outline" onClick={() => setTarget(null)}>Cancel</Button>
+            <Button onClick={submitPay} disabled={busy} data-testid="payout-confirm-btn"
+              className={gateway === "nomba" ? "bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)]" : "bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)]"}>
               {busy ? "Processing…" : "Confirm transfer"}
             </Button>
           </DialogFooter>

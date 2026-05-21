@@ -47,7 +47,6 @@ export default function UserLayout({ children }) {
             <div className="text-label mt-1">Daily Returns Platform</div>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell />
             <ThemeToggle />
           </div>
         </div>
@@ -100,7 +99,6 @@ export default function UserLayout({ children }) {
               {formatNaira(user?.wallet_balance)}
             </div>
           </div>
-          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

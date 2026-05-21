@@ -46,19 +46,18 @@ def _new_id():
 
 
 async def _award_referral_commissions(db, investor_id: str, profit_amount: float, source_investment_id: str):
-    """Walk up to 3 generations and credit each referrer based on settings percentages of the profit."""
+    """Walk up to 2 generations and credit each referrer based on settings percentages of the profit."""
     settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     percents = [
         settings.get("gen1_percent", 10.0),
         settings.get("gen2_percent", 5.0),
-        settings.get("gen3_percent", 2.0),
     ]
 
     current_user = await db.users.find_one({"id": investor_id}, {"_id": 0})
     if not current_user:
         return
 
-    for gen in range(3):
+    for gen in range(2):
         ref_id = current_user.get("referred_by")
         if not ref_id:
             break

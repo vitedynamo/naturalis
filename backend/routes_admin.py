@@ -11,7 +11,6 @@ from fastapi.responses import Response
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
 from storage import put_object, get_object
-from notifications import notify
 from nomba import transfer_to_bank as nomba_transfer
 
 router = APIRouter()
@@ -155,6 +154,50 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
         }},
     )
     return {"status": "ok", "reference": transfer_ref, "mode": mode if (mode == "live" and secret) else "mock"}
+
+
+@router.post("/admin/withdrawals/{wid}/pay-nomba")
+async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, request: Request, _admin=Depends(get_current_admin)):
+    """Approve a pending withdrawal via Nomba bank transfer (or mock if creds missing)."""
+    db = request.app.state.db
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    if not w:
+        raise HTTPException(404, "Withdrawal not found")
+    if w["status"] != "pending":
+        raise HTTPException(400, f"Already {w['status']}")
+
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    client_id = s.get("nomba_client_id") or ""
+    client_secret = s.get("nomba_client_secret") or ""
+    account_id = s.get("nomba_account_id") or ""
+    mode = s.get("payment_mode", "mock")
+    transfer_ref = gen_reference("ntr")
+    transfer_resp = None
+
+    if mode == "live" and client_id and client_secret and account_id:
+        try:
+            transfer_resp = await nomba_transfer(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+                amount_naira=float(w["amount"]),
+                account_number=w["account_number"], account_name=w["account_name"],
+                bank_code=payload.bank_code, merchant_tx_ref=transfer_ref,
+                narration=payload.reason or f"Withdrawal {wid}",
+            )
+        except Exception as e:
+            raise HTTPException(502, f"Nomba transfer failed: {e}")
+
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {
+            "status": "paid",
+            "method": "auto",
+            "admin_note": f"Nomba transfer · ref {transfer_ref}" + (" · live" if transfer_resp else " · mock"),
+            "nomba_transfer_ref": transfer_ref,
+            "bank_code": payload.bank_code,
+            "updated_at": _now_iso(),
+        }},
+    )
+    return {"status": "ok", "reference": transfer_ref, "mode": "live" if transfer_resp else "mock"}
 
 
 # ===== Image upload =====
@@ -361,10 +404,6 @@ async def approve_deposit(deposit_id: str, request: Request, _admin=Depends(get_
         "meta": {"reference": deposit["reference"], "by_admin": True},
         "created_at": _now_iso(),
     })
-    await notify(db, deposit["user_id"], ntype="success",
-                 title="Deposit approved",
-                 message=f"₦{float(deposit['amount']):,.2f} has been credited to your wallet.",
-                 meta={"reference": deposit["reference"]})
     return {"status": "ok"}
 
 
@@ -392,10 +431,6 @@ async def approve_withdrawal(wid: str, payload: AdminWithdrawalAction, request: 
         {"id": wid},
         {"$set": {"status": "paid", "admin_note": payload.note, "updated_at": _now_iso()}},
     )
-    await notify(db, w["user_id"], ntype="success",
-                 title="Withdrawal paid",
-                 message=f"Your withdrawal of ₦{float(w['amount']):,.2f} has been marked paid by admin.",
-                 meta={"withdrawal_id": wid})
     return {"status": "ok"}
 
 
@@ -428,10 +463,6 @@ async def reject_withdrawal(wid: str, payload: AdminWithdrawalAction, request: R
         "meta": {"withdrawal_id": wid},
         "created_at": _now_iso(),
     })
-    await notify(db, w["user_id"], ntype="warn",
-                 title="Withdrawal rejected",
-                 message=f"Your withdrawal of ₦{float(w['amount']):,.2f} was rejected. The amount has been refunded.",
-                 meta={"withdrawal_id": wid, "reason": payload.note})
     return {"status": "ok"}
 
 

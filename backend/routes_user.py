@@ -28,7 +28,6 @@ from models import (
     ResetWithQuestionsRequest,
 )
 from payouts import process_investment_payouts
-from notifications import notify
 
 router = APIRouter()
 
@@ -154,15 +153,6 @@ async def register(data: RegisterRequest, request: Request):
                 "generation": 2,
                 "created_at": _now_iso(),
             })
-            gen3 = await db.users.find_one({"id": gen2.get("referred_by")}, {"_id": 0}) if gen2.get("referred_by") else None
-            if gen3:
-                await db.referrals.insert_one({
-                    "id": gen_reference("ref"),
-                    "referrer_id": gen3["id"],
-                    "referred_id": user["id"],
-                    "generation": 3,
-                    "created_at": _now_iso(),
-                })
 
     token = create_token(user["id"], user["is_admin"])
     return {"token": token, "user": await _public_user(db, user["id"])}
@@ -468,10 +458,6 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
             "meta": {"reference": reference},
             "created_at": _now_iso(),
         })
-        await notify(db, user["id"], ntype="success",
-                     title="Deposit successful",
-                     message=f"₦{deposit['amount']:,.2f} credited to your wallet.",
-                     meta={"reference": reference})
         deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
         return {"status": "success", "deposit": deposit, "wallet_balance": new_user["wallet_balance"]}
     else:
@@ -590,16 +576,26 @@ async def my_referrals(request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
     refs = await db.referrals.find({"referrer_id": user["id"]}, {"_id": 0}).to_list(2000)
     # Group by generation and join user names
-    out = {1: [], 2: [], 3: []}
+    out = {1: [], 2: []}
     for r in refs:
+        if r.get("generation") not in (1, 2):
+            continue
         u = await db.users.find_one({"id": r["referred_id"]}, {"_id": 0, "password_hash": 0})
         if not u:
             continue
+        # Pull this referred user's investments for the team detail (amount + date)
+        invs = await db.investments.find({"user_id": u["id"]}, {"_id": 0}).sort("started_at", -1).to_list(50)
+        total_invested = sum(float(i.get("amount", 0)) for i in invs)
         out[r["generation"]].append({
             "id": u["id"],
             "name": u["name"],
             "phone": u["phone"],
             "joined_at": u["created_at"],
+            "total_invested": total_invested,
+            "investments": [
+                {"id": i["id"], "product_name": i["product_name"], "amount": i["amount"], "started_at": i["started_at"]}
+                for i in invs
+            ],
         })
 
     # Sum referral earnings per gen
@@ -607,9 +603,9 @@ async def my_referrals(request: Request, user=Depends(get_current_user)):
         {"$match": {"user_id": user["id"], "type": "referral"}},
         {"$group": {"_id": "$meta.generation", "total": {"$sum": "$amount"}}},
     ]).to_list(10)
-    earnings_by_gen = {1: 0.0, 2: 0.0, 3: 0.0}
+    earnings_by_gen = {1: 0.0, 2: 0.0}
     for row in pipeline_earn:
-        if row.get("_id") in (1, 2, 3):
+        if row.get("_id") in (1, 2):
             earnings_by_gen[row["_id"]] = float(row.get("total", 0.0))
 
     settings = await _settings(db)
@@ -617,7 +613,6 @@ async def my_referrals(request: Request, user=Depends(get_current_user)):
         "referral_code": user["referral_code"],
         "gen1": {"users": out[1], "count": len(out[1]), "earnings": earnings_by_gen[1], "percent": settings.get("gen1_percent", 10)},
         "gen2": {"users": out[2], "count": len(out[2]), "earnings": earnings_by_gen[2], "percent": settings.get("gen2_percent", 5)},
-        "gen3": {"users": out[3], "count": len(out[3]), "earnings": earnings_by_gen[3], "percent": settings.get("gen3_percent", 2)},
         "total_referral_earnings": sum(earnings_by_gen.values()),
     }
 
@@ -675,35 +670,12 @@ async def my_transactions(request: Request, ttype: Optional[str] = None, user=De
     return items
 
 
-# =========== NOTIFICATIONS ===========
-@router.get("/notifications")
-async def list_notifications(request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    items = await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
-    unread = sum(1 for n in items if not n.get("read"))
-    return {"items": items, "unread": unread}
-
-
-@router.post("/notifications/mark-all-read")
-async def mark_all_read(request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
-    return {"status": "ok"}
-
-
-@router.post("/notifications/{nid}/read")
-async def mark_read(nid: str, request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    await db.notifications.update_one({"id": nid, "user_id": user["id"]}, {"$set": {"read": True}})
-    return {"status": "ok"}
-
-
 # =========== TEAM DETAIL ===========
 @router.get("/referrals/{generation}/details")
 async def gen_details(generation: int, request: Request, user=Depends(get_current_user)):
     """Per-generation member detail: who they are + how much they have invested + when they invested."""
-    if generation not in (1, 2, 3):
-        raise HTTPException(400, "Generation must be 1, 2 or 3")
+    if generation not in (1, 2):
+        raise HTTPException(400, "Generation must be 1 or 2")
     db = request.app.state.db
     refs = await db.referrals.find({"referrer_id": user["id"], "generation": generation}, {"_id": 0}).to_list(2000)
     out = []
@@ -744,7 +716,6 @@ async def public_settings(request: Request):
         "payout_gateway": s.get("payout_gateway", "paystack"),
         "gen1_percent": s.get("gen1_percent", 10),
         "gen2_percent": s.get("gen2_percent", 5),
-        "gen3_percent": s.get("gen3_percent", 2),
         "featured_product_id": s.get("featured_product_id"),
         "home_announcement": s.get("home_announcement", ""),
         "home_announcement_active": s.get("home_announcement_active", False),

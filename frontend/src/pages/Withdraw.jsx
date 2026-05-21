@@ -62,7 +62,6 @@ export default function Withdraw() {
           data-testid="withdraw-amount-input"
           className="w-full mt-2 px-3 py-3 input-base"
         />
-        <div className="mt-2 text-xs text-[color:var(--text-tertiary)]">Available: {formatNaira(user?.wallet_balance)}</div>
 
         <button type="submit" disabled={busy || !bankReady}
           data-testid="withdraw-submit-btn"

@@ -1,12 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Save, Megaphone, Flame } from "lucide-react";
+import { Save, Megaphone, Flame, ImagePlus, X, Banknote } from "lucide-react";
+
+function resolveImg(url) {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("//")) return url;
+  return `${process.env.REACT_APP_BACKEND_URL}${url}`;
+}
 
 export default function AdminSettings() {
   const [s, setS] = useState(null);
   const [products, setProducts] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -18,6 +26,26 @@ export default function AdminSettings() {
     });
   }, []);
 
+  const uploadAnnouncement = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/admin/upload-image", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setS((prev) => ({ ...prev, home_announcement_image_url: data.url }));
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   const save = async (e) => {
     e.preventDefault();
     try {
@@ -27,13 +55,18 @@ export default function AdminSettings() {
         min_withdrawal: Number(s.min_withdrawal),
         gen1_percent: Number(s.gen1_percent),
         gen2_percent: Number(s.gen2_percent),
-        gen3_percent: Number(s.gen3_percent),
         paystack_public_key: s.paystack_public_key || "",
         paystack_secret_key: s.paystack_secret_key || "",
+        nomba_client_id: s.nomba_client_id || "",
+        nomba_client_secret: s.nomba_client_secret || "",
+        nomba_account_id: s.nomba_account_id || "",
+        deposit_gateway: s.deposit_gateway || "paystack",
+        payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
         featured_product_id: s.featured_product_id || null,
         home_announcement: s.home_announcement || "",
         home_announcement_active: !!s.home_announcement_active,
+        home_announcement_image_url: s.home_announcement_image_url || "",
       };
       const { data } = await api.put("/admin/settings", payload);
       setS(data);
@@ -43,13 +76,15 @@ export default function AdminSettings() {
 
   if (!s) return <AdminLayout title="Settings"><div className="text-[color:var(--text-secondary)]">Loading…</div></AdminLayout>;
 
+  const annImg = s.home_announcement_image_url;
+
   return (
     <AdminLayout title="Settings">
       <form onSubmit={save} className="space-y-6 max-w-3xl" data-testid="settings-form">
         <div className="card-soft p-6">
           <div className="text-label flex items-center gap-2"><Flame className="w-3.5 h-3.5 text-[color:var(--accent-main)]" /> Home page content</div>
           <p className="text-xs text-[color:var(--text-secondary)] mt-1">
-            Pick the plan that shows as the <strong>featured "Hot pick"</strong> on every user's home page, and broadcast an announcement.
+            Pick the plan that shows as the <strong>featured "Hot pick"</strong> on every user's home page, and broadcast an announcement (text + optional image).
           </p>
           <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Featured plan</label>
           <select
@@ -77,9 +112,38 @@ export default function AdminSettings() {
           </div>
           <textarea rows={3} value={s.home_announcement || ""}
             onChange={(e) => setS({ ...s, home_announcement: e.target.value })}
-            placeholder="e.g. 🎉 Weekend bonus: top-up ₦20,000 and get an extra 5%!"
+            placeholder="e.g. Weekend bonus: top-up ₦20,000 and get an extra 5%!"
             data-testid="home-announcement-input"
             className="w-full mt-2 input-base resize-none" />
+
+          <div className="mt-4">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Announcement image (optional)</label>
+            <div className="mt-2 flex items-start gap-4">
+              <div className="w-32 h-20 rounded-xl border border-dashed border-[color:var(--border-default)] bg-[color:var(--surface-alt)] flex items-center justify-center overflow-hidden shrink-0">
+                {annImg ? (
+                  <img src={resolveImg(annImg)} alt="ann" className="w-full h-full object-cover" data-testid="ann-image-preview" />
+                ) : (
+                  <ImagePlus className="w-5 h-5 text-[color:var(--text-tertiary)]" />
+                )}
+              </div>
+              <div className="flex-1 flex flex-wrap gap-2">
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadAnnouncement} className="hidden" data-testid="ann-image-input" />
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                  data-testid="ann-image-upload-btn"
+                  className="px-3 py-2 text-xs rounded-md bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-60">
+                  {uploading ? "Uploading…" : (annImg ? "Replace image" : "Upload image")}
+                </button>
+                {annImg && (
+                  <button type="button" onClick={() => setS({ ...s, home_announcement_image_url: "" })}
+                    data-testid="ann-image-clear-btn"
+                    className="px-3 py-2 text-xs rounded-md bg-[color:var(--error-soft)] text-[color:var(--error)] inline-flex items-center gap-1">
+                    <X className="w-3 h-3" /> Remove
+                  </button>
+                )}
+                <p className="text-[11px] text-[color:var(--text-tertiary)] basis-full mt-1">JPG/PNG/WebP up to 5MB. Shown above the announcement text on the user home page.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="card-soft p-6">
@@ -93,32 +157,71 @@ export default function AdminSettings() {
 
         <div className="card-soft p-6">
           <div className="text-label">Referral commission percentages</div>
-          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Applied to each daily profit payout your referrals receive.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Applied to each daily profit payout your referrals receive (2 generations).</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <Field label="Generation 1 (%)" value={s.gen1_percent} step="0.1" onChange={(v)=>setS({...s, gen1_percent: v})} testid="gen1" />
             <Field label="Generation 2 (%)" value={s.gen2_percent} step="0.1" onChange={(v)=>setS({...s, gen2_percent: v})} testid="gen2" />
-            <Field label="Generation 3 (%)" value={s.gen3_percent} step="0.1" onChange={(v)=>setS({...s, gen3_percent: v})} testid="gen3" />
           </div>
         </div>
 
         <div className="card-soft p-6">
-          <div className="text-label">Paystack</div>
-          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Set mode to <code>live</code> after entering real Paystack keys. In <code>mock</code> mode deposits auto-succeed and Paystack transfers are simulated.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+          <div className="text-label flex items-center gap-2"><Banknote className="w-3.5 h-3.5 text-[color:var(--brand)]" /> Payment gateways</div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Switch the active gateway for deposits and payouts. Both Paystack and Nomba support Nigerian Naira transfers.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <label className="text-xs">
-              <span>Payment mode</span>
+              <span>Deposit gateway</span>
+              <select value={s.deposit_gateway || "paystack"} onChange={(e)=>setS({...s, deposit_gateway: e.target.value})}
+                data-testid="deposit-gateway-select"
+                className="w-full mt-1 px-3 py-2.5 input-base">
+                <option value="paystack">Paystack</option>
+                <option value="nomba">Nomba</option>
+              </select>
+            </label>
+            <label className="text-xs">
+              <span>Payout gateway</span>
+              <select value={s.payout_gateway || "paystack"} onChange={(e)=>setS({...s, payout_gateway: e.target.value})}
+                data-testid="payout-gateway-select"
+                className="w-full mt-1 px-3 py-2.5 input-base">
+                <option value="paystack">Paystack</option>
+                <option value="nomba">Nomba</option>
+              </select>
+            </label>
+            <label className="md:col-span-2 text-xs">
+              <span>Mode</span>
               <select value={s.payment_mode} onChange={(e)=>setS({...s, payment_mode: e.target.value})}
                 data-testid="payment-mode-select"
                 className="w-full mt-1 px-3 py-2.5 input-base">
-                <option value="mock">Mock (testing)</option>
-                <option value="live">Live (Paystack)</option>
+                <option value="mock">Mock (testing — deposits auto-succeed, payouts simulated)</option>
+                <option value="live">Live (real Paystack / Nomba calls)</option>
               </select>
             </label>
+          </div>
+        </div>
+
+        <div className="card-soft p-6">
+          <div className="text-label">Paystack credentials</div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Required only when a Paystack gateway is active and mode is <code>live</code>.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <Field label="Public key" value={s.paystack_public_key} text onChange={(v)=>setS({...s, paystack_public_key: v})} testid="pk-key" />
-            <label className="md:col-span-2 text-xs">
+            <label className="text-xs">
               <span>Secret key</span>
               <input type="password" value={s.paystack_secret_key || ""} onChange={(e)=>setS({...s, paystack_secret_key: e.target.value})}
                 data-testid="sk-key-input"
+                className="w-full mt-1 input-base font-mono text-sm" />
+            </label>
+          </div>
+        </div>
+
+        <div className="card-soft p-6">
+          <div className="text-label">Nomba credentials</div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Required only when a Nomba gateway is active and mode is <code>live</code>.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <Field label="Client ID" value={s.nomba_client_id} text onChange={(v)=>setS({...s, nomba_client_id: v})} testid="nomba-client-id" />
+            <Field label="Account ID" value={s.nomba_account_id} text onChange={(v)=>setS({...s, nomba_account_id: v})} testid="nomba-account-id" />
+            <label className="md:col-span-2 text-xs">
+              <span>Client secret</span>
+              <input type="password" value={s.nomba_client_secret || ""} onChange={(e)=>setS({...s, nomba_client_secret: e.target.value})}
+                data-testid="nomba-client-secret-input"
                 className="w-full mt-1 input-base font-mono text-sm" />
             </label>
           </div>
