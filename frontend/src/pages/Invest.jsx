@@ -35,7 +35,7 @@ export default function Invest() {
   const openInvest = (p) => {
     setSelected(p);
     setAmount(String(p.price));
-    setOpen(true);
+    setTimeout(() => setOpen(true), 2000);
   };
 
   const submit = async () => {
