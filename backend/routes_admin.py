@@ -62,18 +62,18 @@ _NG_BANKS_FALLBACK = [
 
 @router.get("/admin/banks")
 async def list_banks(request: Request, _admin=Depends(get_current_admin)):
-    """List Nigerian banks. Uses Paystack /bank when live mode has a key, else fallback list."""
+    """List Nigerian banks. Uses Paystack /bank whenever a secret key is set (read-only call, safe in any mode)."""
     db = request.app.state.db
     now = time.time()
     if _banks_cache["items"] and (now - _banks_cache["at"]) < 3600:
         return _banks_cache["items"]
-    secret, mode = await _get_secret_key(db)
-    if mode == "live" and secret:
+    secret, _ = await _get_secret_key(db)
+    if secret:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(
                     "https://api.paystack.co/bank",
-                    params={"country": "nigeria"},
+                    params={"country": "nigeria", "perPage": "200"},
                     headers={"Authorization": f"Bearer {secret}"},
                 )
                 data = resp.json()
@@ -819,4 +819,8 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             payload[k] = v
     if payload:
         await db.settings.update_one({"id": "global"}, {"$set": payload}, upsert=True)
+    # If the Paystack secret was changed, bust the banks cache so the next /banks call fetches fresh
+    if "paystack_secret_key" in payload:
+        _banks_cache["items"] = []
+        _banks_cache["at"] = 0
     return await db.settings.find_one({"id": "global"}, {"_id": 0})

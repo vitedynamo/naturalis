@@ -11,45 +11,56 @@ function AdminBankPicker({ value, banks, onSelect }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const rootRef = useRef(null);
+  const searchRef = useRef(null);
   useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => searchRef.current?.focus(), 50);
     const onDoc = (e) => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+    document.addEventListener("keydown", onKey);
+    return () => { clearTimeout(t); document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
   const selected = useMemo(() => banks.find((b) => b.code === value) || null, [banks, value]);
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     if (!ql) return banks;
     return banks.filter((b) => b.name.toLowerCase().includes(ql) || b.code.includes(ql));
   }, [banks, q]);
+  const pick = (b) => {
+    onSelect(b);
+    setOpen(false);
+    setQ("");
+    setTimeout(() => rootRef.current?.querySelector('[data-testid="payout-bank-trigger"]')?.focus(), 0);
+  };
   return (
     <div ref={rootRef} className="relative">
       <button type="button" onClick={() => setOpen((o) => !o)}
         data-testid="payout-bank-trigger"
         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 input-base text-left">
-        <span className={selected ? "text-[color:var(--text-primary)] font-semibold" : "text-[color:var(--text-tertiary)]"}>
+        <span className={selected ? "text-[color:var(--text-primary)] font-semibold truncate" : "text-[color:var(--text-tertiary)] truncate"}>
           {selected ? `${selected.name} (${selected.code})` : "— select bank —"}
         </span>
-        <ChevronDown className={`w-4 h-4 text-[color:var(--text-tertiary)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-4 h-4 text-[color:var(--text-tertiary)] transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-2 rounded-2xl bg-[color:var(--surface)] border border-[color:var(--border-default)] shadow-2xl overflow-hidden">
-          <div className="px-3 py-2 border-b border-[color:var(--border-default)] sticky top-0 bg-[color:var(--surface)]">
+        <div className="absolute z-40 left-0 right-0 mt-2 rounded-2xl bg-[color:var(--surface)] border border-[color:var(--border-default)] shadow-2xl flex flex-col" style={{ maxHeight: "min(60vh, 380px)" }}>
+          <div className="px-3 py-2 border-b border-[color:var(--border-default)] bg-[color:var(--surface)]">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[color:var(--text-tertiary)]" />
-              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Search banks…"
+              <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)}
+                placeholder={`Search ${banks.length} banks…`}
                 data-testid="payout-bank-search"
                 className="w-full pl-8 pr-3 py-2 text-sm bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]" />
             </div>
           </div>
-          <div className="max-h-72 overflow-y-auto">
+          <div className="overflow-y-auto">
             {filtered.length === 0 && <div className="p-6 text-center text-sm text-[color:var(--text-tertiary)]">No bank matches "{q}"</div>}
             {filtered.map((b) => {
               const active = selected?.code === b.code;
               return (
                 <button key={b.code} type="button"
-                  onClick={() => { onSelect(b); setOpen(false); setQ(""); }}
+                  onClick={() => pick(b)}
                   data-testid={`payout-bank-option-${b.code}`}
                   className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-[color:var(--surface-alt)] ${active ? "bg-[color:var(--brand-soft)]" : ""}`}>
                   <div className="min-w-0">

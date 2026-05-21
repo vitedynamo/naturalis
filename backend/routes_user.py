@@ -208,17 +208,16 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
 # =========== BANKS (PUBLIC USER ENDPOINTS) ===========
 @router.get("/banks")
 async def banks_for_user(request: Request, user=Depends(get_current_user)):
-    """List of Nigerian banks for users adding their payout account."""
+    """List of Nigerian banks. Calls Paystack whenever a secret key is set (read-only)."""
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     secret = s.get("paystack_secret_key") or ""
-    mode = s.get("payment_mode", "mock")
-    if mode == "live" and secret:
+    if secret:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(
                     "https://api.paystack.co/bank",
-                    params={"country": "nigeria"},
+                    params={"country": "nigeria", "perPage": "200"},
                     headers={"Authorization": f"Bearer {secret}"},
                 )
                 data = resp.json()
@@ -232,7 +231,7 @@ async def banks_for_user(request: Request, user=Depends(get_current_user)):
 
 @router.post("/banks/resolve")
 async def resolve_bank_account(payload: dict, request: Request, user=Depends(get_current_user)):
-    """Resolve account_number + bank_code → account_name via Paystack."""
+    """Resolve account_number + bank_code → account_name via Paystack. Calls live whenever secret is set."""
     account_number = (payload.get("account_number") or "").strip()
     bank_code = (payload.get("bank_code") or "").strip()
     if not account_number or not bank_code:
@@ -243,9 +242,8 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     secret = s.get("paystack_secret_key") or ""
-    mode = s.get("payment_mode", "mock")
 
-    if mode == "live" and secret:
+    if secret:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(
@@ -264,8 +262,8 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
         except httpx.HTTPError as e:
             raise HTTPException(502, f"Paystack lookup failed: {e}")
 
-    fake_name = f"{user.get('name','TEST')} VERIFIED"
-    return {"account_name": fake_name.upper(), "account_number": account_number, "mode": "mock"}
+    # No secret configured — cannot resolve
+    raise HTTPException(503, "Bank account verification is unavailable. Please ask the admin to configure Paystack credentials.")
 
 
 # =========== FORGOT PASSWORD ===========
