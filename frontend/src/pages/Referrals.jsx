@@ -2,79 +2,85 @@ import React, { useEffect, useState } from "react";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate } from "@/lib/format";
-import { Copy, Share2, Users, ChevronDown, ChevronUp, TrendingUp } from "lucide-react";
+import { Copy, Share2, Users, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
-function GenCard({ gen, data, color, open, onToggle }) {
+function GenTab({ gen, data, active, onClick, color }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`gen-${gen}-tab`}
+      className={`flex-1 p-4 rounded-2xl text-left transition-all border-2 ${
+        active
+          ? "bg-[color:var(--surface)] border-[color:var(--brand)] shadow-lg shadow-[color:var(--brand)]/15"
+          : "bg-[color:var(--surface)] border-transparent hover:border-[color:var(--border-default)]"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
+          <Users className="w-5 h-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Gen {gen}</div>
+          <div className="font-display font-bold text-xl text-[color:var(--text-primary)] leading-tight" data-testid={`gen-${gen}-count`}>
+            {data?.count || 0}
+          </div>
+          <div className="text-[11px] text-[color:var(--text-secondary)] truncate">{data?.percent}% · {formatNaira(data?.earnings)}</div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ReferralList({ gen, data }) {
   const users = data?.users || [];
   return (
-    <div className="card-soft overflow-hidden" data-testid={`gen-${gen}-card`}>
-      <button type="button" onClick={onToggle} data-testid={`gen-${gen}-toggle`}
-        className="w-full p-5 flex items-center justify-between text-left hover:bg-[color:var(--surface-alt)]/40 transition-colors">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
-            <Users className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-label">Generation {gen}</div>
-            <div className="font-display font-bold text-2xl text-[color:var(--text-primary)] leading-tight" data-testid={`gen-${gen}-count`}>
-              {data?.count || 0} <span className="text-sm font-medium text-[color:var(--text-secondary)]">member{(data?.count || 0) === 1 ? "" : "s"}</span>
-            </div>
-            <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-              {data?.percent}% commission · earned <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(data?.earnings)}</span>
-            </div>
-          </div>
-        </div>
-        {open ? <ChevronUp className="w-5 h-5 text-[color:var(--text-tertiary)]" /> : <ChevronDown className="w-5 h-5 text-[color:var(--text-tertiary)]" />}
-      </button>
-
-      {open && (
-        <div className="border-t border-[color:var(--border-light)]" data-testid={`gen-${gen}-list`}>
-          {users.length === 0 && (
-            <div className="p-6 text-center text-sm text-[color:var(--text-tertiary)]">No referrals in this generation yet.</div>
-          )}
-          {users.map((u) => (
-            <div key={u.id} className="p-4 border-b last:border-b-0 border-[color:var(--border-light)]" data-testid={`gen-${gen}-user-${u.id}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-[color:var(--text-primary)] truncate">{u.name}</div>
-                  <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{u.phone}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Invested</div>
-                  <div className="font-bold text-[color:var(--accent-main)]">{formatNaira(u.total_invested || 0)}</div>
-                </div>
-              </div>
-              <div className="mt-1 text-[11px] text-[color:var(--text-tertiary)]">
-                Joined {formatDate(u.joined_at)}
-              </div>
-              {u.investments && u.investments.length > 0 && (
-                <div className="mt-2 pl-3 border-l-2 border-[color:var(--brand-soft)] space-y-1">
-                  {u.investments.map((i) => (
-                    <div key={i.id} className="text-xs flex items-center justify-between gap-2" data-testid={`gen-${gen}-inv-${i.id}`}>
-                      <div className="flex items-center gap-1.5 text-[color:var(--text-secondary)] truncate">
-                        <TrendingUp className="w-3 h-3 shrink-0 text-[color:var(--brand)]" />
-                        <span className="truncate">{i.product_name}</span>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(i.amount)}</span>
-                        <span className="text-[color:var(--text-tertiary)] ml-2">{formatDate(i.started_at)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+    <div className="space-y-3" data-testid={`gen-${gen}-list`}>
+      {users.length === 0 && (
+        <div className="card-soft p-8 text-center text-sm text-[color:var(--text-tertiary)]">
+          No referrals in this generation yet. Share your code to invite friends.
         </div>
       )}
+      {users.map((u) => (
+        <div key={u.id} className="card-soft p-4" data-testid={`gen-${gen}-user-${u.id}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-[color:var(--text-primary)] truncate">{u.name}</div>
+              <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{u.phone}</div>
+              <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">Joined {formatDate(u.joined_at)}</div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Invested</div>
+              <div className="font-bold text-[color:var(--accent-main)]">{formatNaira(u.total_invested || 0)}</div>
+            </div>
+          </div>
+
+          {u.investments && u.investments.length > 0 && (
+            <div className="mt-3 pl-3 border-l-2 border-[color:var(--brand-soft)] space-y-1.5">
+              {u.investments.map((i) => (
+                <div key={i.id} className="text-xs flex items-center justify-between gap-2" data-testid={`gen-${gen}-inv-${i.id}`}>
+                  <div className="flex items-center gap-1.5 text-[color:var(--text-secondary)] truncate min-w-0">
+                    <TrendingUp className="w-3 h-3 shrink-0 text-[color:var(--brand)]" />
+                    <span className="truncate">{i.product_name}</span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(i.amount)}</span>
+                    <span className="text-[color:var(--text-tertiary)] ml-2">{formatDate(i.started_at)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
 export default function Referrals() {
   const [info, setInfo] = useState(null);
-  const [openGen, setOpenGen] = useState(1);
+  const [activeGen, setActiveGen] = useState(1);
 
   useEffect(() => {
     api.get("/referrals").then(({ data }) => setInfo(data));
@@ -86,6 +92,8 @@ export default function Referrals() {
     navigator.clipboard.writeText(text);
     toast.success(msg);
   };
+
+  const current = activeGen === 1 ? info?.gen1 : info?.gen2;
 
   return (
     <UserLayout>
@@ -113,15 +121,22 @@ export default function Referrals() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mt-6" data-testid="team-generations">
-        <div className="flex-1">
-          <GenCard gen={1} data={info?.gen1} color="bg-[color:var(--success-soft)] text-[color:var(--success)]"
-                   open={openGen === 1} onToggle={() => setOpenGen(openGen === 1 ? null : 1)} />
+      {/* Sticky generation tabs */}
+      <div
+        className="sticky top-14 lg:top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 mt-6 py-3 bg-[color:var(--app-bg)]/95 backdrop-blur border-b border-[color:var(--border-default)]"
+        data-testid="team-tabs"
+      >
+        <div className="flex gap-3">
+          <GenTab gen={1} data={info?.gen1} active={activeGen === 1}
+                  onClick={() => setActiveGen(1)} color="bg-[color:var(--success-soft)] text-[color:var(--success)]" />
+          <GenTab gen={2} data={info?.gen2} active={activeGen === 2}
+                  onClick={() => setActiveGen(2)} color="bg-[color:var(--brand-soft)] text-[color:var(--brand)]" />
         </div>
-        <div className="flex-1">
-          <GenCard gen={2} data={info?.gen2} color="bg-[color:var(--brand-soft)] text-[color:var(--brand)]"
-                   open={openGen === 2} onToggle={() => setOpenGen(openGen === 2 ? null : 2)} />
-        </div>
+      </div>
+
+      {/* Selected generation's referrals */}
+      <div className="mt-5">
+        <ReferralList gen={activeGen} data={current} />
       </div>
     </UserLayout>
   );

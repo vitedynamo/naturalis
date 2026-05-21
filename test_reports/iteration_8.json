@@ -1,0 +1,28 @@
+{
+  "summary": "Iter8 verified: welcome_bonus PUT/GET persists and applies to new registrations; gen3_percent removed from Settings model (admin GET/PUT + public — verified gen3 silently dropped); /referrals returns only gen1+gen2; regression smoke (login, products, invest, investments, referrals) green. Frontend: product grid restyled with gradient stripe, ROI pill, 3-cell stats, Invest button; Invest dialog disables and blurs amount input on submit; redirects to /my-packages with ring highlight that scrolls into view; toast displayed. Team page sticky tabs (Gen1 default), switches lists correctly, invite-link plain text hidden. Admin /admin/settings welcome bonus value persists across reload (shown 750 after test restore). Welcome bonus restored to 750.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/settings", "issues": ["React hydration warning: <span> cannot be a child of <option> in featured-product <select>. Caused by visual-editor instrumentation wrapping option text in <span data-ve-dynamic>. Non-blocking, but noisy in console. Consider rendering option text without the visual-editor span wrapper (e.g., template literal or {`${p.name}`})."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter8.py", "/app/test_reports/pytest/iter8.xml"],
+  "action_items": [
+    "(Optional) Suppress the <option><span> hydration warning on /admin/settings featured-product select."
+  ],
+  "critical_code_review_comments": [
+    "Invest.jsx submit() sets submitting=true before blur()+API call so the disabled prop applies synchronously — confirmed by browser test (disabled became true within 50ms of click). Good.",
+    "MyPackages.jsx scrollIntoView fires 100ms after items render; on slower networks /investments may not be loaded yet when location.state.highlightId is read — fortunately the effect depends on `items` so it re-runs. Works as verified.",
+    "Referrals.jsx: invite-link plain text is correctly NOT rendered below the Copy buttons. Sticky positioning works (top-14 lg:top-0). Gen 1 default active styling confirmed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all iter8 criteria passed)"},
+  "test_credentials": "Admin: 08123456789 / personally · User: 08099887766 / newpwd",
+  "seed_data_creation": "Topped up test user 08099887766 wallet via mock deposit (+₦20,000) to enable invest flow. New investment in Agro Starter (₦5,000) created and remains on user's account.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter8.py covers welcome_bonus persistence and gen3 removal. It auto-restores welcome_bonus=750 via module-scope autouse fixture. test_iter7.py is still valid regression baseline. The visual-editor (<span data-ve-dynamic>) inserts spans inside <option> tags causing hydration warnings on the admin settings page — non-blocking.",
+  "rca of the issue": "N/A — no failing tests."
+}

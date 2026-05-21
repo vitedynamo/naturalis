@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate, timeUntilNextPayout } from "@/lib/format";
@@ -9,12 +10,29 @@ export default function MyPackages() {
   const [items, setItems] = useState([]);
   const [tick, setTick] = useState(0);
   const [filter, setFilter] = useState("all");
+  const [highlightId, setHighlightId] = useState(null);
+  const location = useLocation();
+  const cardRefs = useRef({});
 
   useEffect(() => {
     api.get("/investments").then(({ data }) => setItems(data));
     const i = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(i);
   }, []);
+
+  // After load, if we arrived with state.highlightId, scroll to that card and pulse it briefly
+  useEffect(() => {
+    const target = location.state?.highlightId;
+    if (!target || items.length === 0) return;
+    setHighlightId(target);
+    // Wait for DOM to render the card
+    setTimeout(() => {
+      const el = cardRefs.current[target];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    const t = setTimeout(() => setHighlightId(null), 3000);
+    return () => clearTimeout(t);
+  }, [items, location.state]);
 
   const filtered = items.filter((i) => filter === "all" ? true : i.status === filter);
   const totalActiveAmount = items.filter(i => i.status === "active").reduce((s, i) => s + i.amount, 0);
@@ -57,7 +75,9 @@ export default function MyPackages() {
           const pct = Math.min(100, ((inv.days_paid || 0) / inv.duration_days) * 100);
           const active = inv.status === "active";
           return (
-            <div key={inv.id} className="card-soft p-5 relative overflow-hidden animate-fade-up"
+            <div key={inv.id}
+                 ref={(el) => { if (el) cardRefs.current[inv.id] = el; }}
+                 className={`card-soft p-5 relative overflow-hidden animate-fade-up transition-all ${highlightId === inv.id ? "ring-2 ring-[color:var(--accent-main)] shadow-xl shadow-[color:var(--accent-main)]/20" : ""}`}
                  style={{ animationDelay: `${idx * 60}ms` }}
                  data-testid={`pkg-${inv.id}`}>
               {/* Top stripe with status color */}

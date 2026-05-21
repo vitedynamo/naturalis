@@ -258,7 +258,6 @@ class Settings(BaseModel):
     min_withdrawal: float = 1000.0
     gen1_percent: float = 10.0
     gen2_percent: float = 5.0
-    gen3_percent: float = 2.0
     paystack_public_key: str = ""
     paystack_secret_key: str = ""
     nomba_client_id: str = ""
@@ -279,7 +278,6 @@ class SettingsUpdate(BaseModel):
     min_withdrawal: Optional[float] = None
     gen1_percent: Optional[float] = None
     gen2_percent: Optional[float] = None
-    gen3_percent: Optional[float] = None
     paystack_public_key: Optional[str] = None
     paystack_secret_key: Optional[str] = None
     nomba_client_id: Optional[str] = None
