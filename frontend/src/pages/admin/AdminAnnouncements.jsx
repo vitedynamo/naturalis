@@ -60,7 +60,7 @@ export default function AdminAnnouncements() {
       <div className="text-label">Push messages to every user</div>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Manage the home announcement banner and the welcome modal that greets every user.</p>
 
-      <form onSubmit={save} className="space-y-5 mt-5 max-w-3xl" data-testid="announcements-form">
+      <form onSubmit={save} className="space-y-5 mt-5 w-full" data-testid="announcements-form">
         <div className="card-soft p-6">
           <div className="flex items-center justify-between">
             <div className="text-label flex items-center gap-2"><Megaphone className="w-3.5 h-3.5 text-[color:var(--accent-main)]" /> Home banner</div>

@@ -84,7 +84,8 @@ export default function AdminSettings() {
 
   return (
     <AdminLayout title="Settings">
-      <form onSubmit={save} className="space-y-6 max-w-3xl" data-testid="settings-form">
+      <form onSubmit={save} className="w-full" data-testid="settings-form">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="card-soft p-6">
           <div className="text-label flex items-center gap-2"><Flame className="w-3.5 h-3.5 text-[color:var(--accent-main)]" /> Home page content</div>
           <p className="text-xs text-[color:var(--text-secondary)] mt-1">
@@ -267,7 +268,9 @@ export default function AdminSettings() {
           </div>
         </div>
 
-        <button data-testid="save-settings-btn" className="flex items-center gap-2 btn-primary">
+        </div>
+
+        <button data-testid="save-settings-btn" className="mt-6 flex items-center gap-2 btn-primary">
           <Save className="w-4 h-4" /> Save settings
         </button>
       </form>
