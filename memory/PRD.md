@@ -42,6 +42,28 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 10)
+
+### Modernized admin (modeled on user-provided screenshots)
+- **Backend**:
+  - New `GET /api/admin/stats/extended` — platform profit, next-24h-payout projection, today-Lagos metrics, all-time totals (paid-out, fees, awaiting verification, total invested, bonuses, referral paid, profit credited), system-health counters.
+  - New `GET /api/admin/stats/inflow?frm=&to=` — total/count/avg, peak day, day-by-day **zero-filled series**, gateway breakdown.
+- **Admin layout** — full sidebar rebuild: gradient `NI` brand badge, new nav items (Announcements / Manual Adjustments / Fraud Monitor / Financial Report), `View as user` button (admin can now preview the user side — `Protected.jsx` no longer bounces admins off `/dashboard`), pinned theme toggle + logout in footer.
+- **Admin Dashboard** — full rebuild matching the screenshots:
+  - Hero row: gradient Platform Profit card + Next 24h Payout card
+  - Top stats: Total users / Total deposits / Active investments / Pending withdrawals
+  - Today (Lagos) row + Inflow-by-date section (range chips + From/To pickers + mini bar chart + gateway pills)
+  - All-time row + System health row + Quick actions
+- **4 new admin pages**:
+  - **Announcements** — manage home banner + welcome modal (text/image/CTA/Telegram URL) from one screen
+  - **Manual Adjustments** — audit log of admin wallet credits/debits with credit/debit totals
+  - **Fraud Monitor** — placeholder cards for fraud counters + amount-mismatch + blocked accounts + the active detection rules list
+  - **Financial Report** — consolidated cashflow report + CSV export
+- Routes added in `App.js` for the 4 new pages.
+
+### Tests
+- iter 10: 11/11 backend pytest pass. Frontend ~95% pre-fix. After fix: View-as-user routing works (Protected.jsx admin-bounce removed), /admin/stats/inflow series zero-filled for continuous chart x-axis.
+
 ## Recent Changes (Feb 2026 — iteration 9)
 
 ### Added

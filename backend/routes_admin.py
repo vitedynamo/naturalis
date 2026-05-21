@@ -412,7 +412,14 @@ async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Op
         by_gateway[gw]["total"] += float(d["amount"])
         by_gateway[gw]["count"] += 1
 
-    series = [{"date": k, "total": round(v, 2)} for k, v in sorted(by_day.items())]
+    # Zero-fill every day in the range so the bar chart shows a continuous x-axis
+    series = []
+    cursor = frm_dt.date()
+    end_date = to_dt.date()
+    while cursor <= end_date:
+        key = cursor.isoformat()
+        series.append({"date": key, "total": round(by_day.get(key, 0), 2)})
+        cursor = cursor + timedelta(days=1)
     peak = max(series, key=lambda x: x["total"], default={"date": "—", "total": 0})
     gateways = [{"name": k, "total": round(v["total"], 2), "count": v["count"]} for k, v in by_gateway.items()]
 

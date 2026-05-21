@@ -13,6 +13,6 @@ export function Protected({ children, admin = false }) {
   }
   if (!user) return <Navigate to="/login" replace />;
   if (admin && !user.is_admin) return <Navigate to="/dashboard" replace />;
-  if (!admin && user.is_admin) return <Navigate to="/admin" replace />;
+  // Admins can preview user routes — they're authorised for both surfaces.
   return children;
 }
