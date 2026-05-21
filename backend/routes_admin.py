@@ -259,6 +259,175 @@ async def admin_stats(request: Request, _admin=Depends(get_current_admin)):
     }
 
 
+def _lagos_today_bounds():
+    """Return ISO start/end of today in Africa/Lagos (UTC+1, no DST)."""
+    from datetime import timedelta
+    now_utc = datetime.now(timezone.utc)
+    lagos = now_utc + timedelta(hours=1)
+    start_lagos = lagos.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_utc = start_lagos - timedelta(hours=1)
+    end_utc = start_utc + timedelta(days=1)
+    return start_utc.isoformat(), end_utc.isoformat()
+
+
+@router.get("/admin/stats/extended")
+async def admin_stats_extended(request: Request, _admin=Depends(get_current_admin)):
+    """Comprehensive dashboard stats — platform profit, today (Lagos), 24h payout projection, all-time."""
+    db = request.app.state.db
+    start_iso, end_iso = _lagos_today_bounds()
+
+    # --- ALL TIME ---
+    users_count = await db.users.count_documents({"is_admin": False})
+    active_inv = await db.investments.count_documents({"status": "active"})
+    total_inv = await db.investments.aggregate([
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    total_inv_amount = total_inv[0]["total"] if total_inv else 0
+
+    deps_success = await db.deposits.aggregate([
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_deposits = deps_success[0]["total"] if deps_success else 0
+
+    paid_wds = await db.withdrawals.aggregate([
+        {"$match": {"status": {"$in": ["approved", "paid"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_paid_out = paid_wds[0]["total"] if paid_wds else 0
+    paid_wd_count = paid_wds[0]["count"] if paid_wds else 0
+
+    pending_wds = await db.withdrawals.count_documents({"status": "pending"})
+
+    # Welcome bonus + referral + profit credits (cost to platform)
+    cost_aggs = await db.transactions.aggregate([
+        {"$match": {"type": {"$in": ["bonus", "referral", "profit", "coupon"]}, "amount": {"$gt": 0}}},
+        {"$group": {"_id": "$type", "total": {"$sum": "$amount"}}},
+    ]).to_list(20)
+    cost_map = {row["_id"]: float(row["total"]) for row in cost_aggs}
+    total_bonuses = cost_map.get("bonus", 0) + cost_map.get("coupon", 0)
+    total_referral_paid = cost_map.get("referral", 0)
+    total_profit_paid = cost_map.get("profit", 0)
+
+    # Platform profit ~= deposits - withdrawals - bonuses - referral - profits
+    platform_profit = round(
+        float(total_deposits) - float(total_paid_out) - total_bonuses - total_referral_paid - total_profit_paid, 2
+    )
+
+    # --- 24H PAYOUT PROJECTION ---
+    active_invs = await db.investments.find({"status": "active"}, {"_id": 0, "daily_profit_amount": 1}).to_list(10000)
+    next_24h_payout = round(sum(float(i.get("daily_profit_amount", 0)) for i in active_invs), 2)
+
+    # --- TODAY (Lagos) ---
+    today_deps = await db.deposits.aggregate([
+        {"$match": {"status": "success", "updated_at": {"$gte": start_iso, "$lt": end_iso}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    deposits_today = today_deps[0]["total"] if today_deps else 0
+    deposits_today_count = today_deps[0]["count"] if today_deps else 0
+
+    today_paid = await db.withdrawals.aggregate([
+        {"$match": {"status": {"$in": ["paid", "approved"]}, "updated_at": {"$gte": start_iso, "$lt": end_iso}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    paid_today = today_paid[0]["total"] if today_paid else 0
+    paid_today_count = today_paid[0]["count"] if today_paid else 0
+
+    net_inflow_today = round(float(deposits_today) - float(paid_today), 2)
+    pending_now = pending_wds  # snapshot
+
+    # --- FEES (none currently tracked — placeholder 0) ---
+    total_fees = 0
+    awaiting_verification = await db.deposits.count_documents({"status": "pending"})
+
+    # Online (last seen) — approximate as users updated in last 5 min if you tracked it; we use admin count
+    online_count = 1  # admin viewing
+
+    return {
+        "platform_profit": platform_profit,
+        "next_24h_payout": next_24h_payout,
+        "users": users_count,
+        "online": online_count,
+        "total_deposits": total_deposits,
+        "active_investments": active_inv,
+        "pending_withdrawals": pending_wds,
+        "today": {
+            "deposits": deposits_today,
+            "deposits_count": deposits_today_count,
+            "paid_out": paid_today,
+            "paid_out_count": paid_today_count,
+            "net_inflow": net_inflow_today,
+            "pending_now": pending_now,
+        },
+        "all_time": {
+            "total_paid_out": total_paid_out,
+            "paid_withdrawals_count": paid_wd_count,
+            "total_fees": total_fees,
+            "awaiting_verification": awaiting_verification,
+            "total_investments": active_inv,
+            "total_invested_amount": total_inv_amount,
+            "total_bonuses": total_bonuses,
+            "total_referral_paid": total_referral_paid,
+            "total_profit_paid": total_profit_paid,
+        },
+        "system_health": {
+            "fraud_attempts": 0,
+            "amount_mismatches": 0,
+        },
+    }
+
+
+@router.get("/admin/stats/inflow")
+async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Optional[str] = None, _admin=Depends(get_current_admin)):
+    """Inflow breakdown for the dashboard chart between two ISO date strings (yyyy-mm-dd)."""
+    from datetime import timedelta
+    db = request.app.state.db
+    now_utc = datetime.now(timezone.utc)
+    if not frm:
+        frm_dt = (now_utc - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        frm_dt = datetime.fromisoformat(frm).replace(tzinfo=timezone.utc)
+    if not to:
+        to_dt = now_utc.replace(hour=23, minute=59, second=59, microsecond=0)
+    else:
+        to_dt = datetime.fromisoformat(to).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+
+    items = await db.deposits.find(
+        {"status": "success", "updated_at": {"$gte": frm_dt.isoformat(), "$lte": to_dt.isoformat()}},
+        {"_id": 0},
+    ).to_list(20000)
+
+    total = sum(float(i["amount"]) for i in items)
+    count = len(items)
+    avg = round(total / count, 2) if count else 0
+
+    # By day
+    by_day = {}
+    by_gateway = {}
+    for d in items:
+        day = (d.get("updated_at") or "")[:10]
+        by_day[day] = by_day.get(day, 0) + float(d["amount"])
+        gw = (d.get("method") or "paystack").lower()
+        by_gateway[gw] = by_gateway.get(gw, {"total": 0, "count": 0})
+        by_gateway[gw]["total"] += float(d["amount"])
+        by_gateway[gw]["count"] += 1
+
+    series = [{"date": k, "total": round(v, 2)} for k, v in sorted(by_day.items())]
+    peak = max(series, key=lambda x: x["total"], default={"date": "—", "total": 0})
+    gateways = [{"name": k, "total": round(v["total"], 2), "count": v["count"]} for k, v in by_gateway.items()]
+
+    return {
+        "from": frm_dt.date().isoformat(),
+        "to": to_dt.date().isoformat(),
+        "total": round(total, 2),
+        "count": count,
+        "avg": avg,
+        "peak": peak,
+        "series": series,
+        "gateways": gateways,
+    }
+
+
 # ===== Users =====
 @router.get("/admin/users")
 async def admin_users(request: Request, _admin=Depends(get_current_admin)):

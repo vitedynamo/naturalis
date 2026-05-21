@@ -29,6 +29,10 @@ import AdminReferrals from "@/pages/admin/AdminReferrals";
 import AdminCoupons from "@/pages/admin/AdminCoupons";
 import AdminSettings from "@/pages/admin/AdminSettings";
 import AdminPasswordResets from "@/pages/admin/AdminPasswordResets";
+import AdminAnnouncements from "@/pages/admin/AdminAnnouncements";
+import AdminManualAdjustments from "@/pages/admin/AdminManualAdjustments";
+import AdminFraudMonitor from "@/pages/admin/AdminFraudMonitor";
+import AdminFinancialReport from "@/pages/admin/AdminFinancialReport";
 import MyPackages from "@/pages/MyPackages";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -65,6 +69,10 @@ function App() {
               <Route path="/admin/investments" element={<Protected admin><AdminInvestments /></Protected>} />
               <Route path="/admin/referrals" element={<Protected admin><AdminReferrals /></Protected>} />
               <Route path="/admin/coupons" element={<Protected admin><AdminCoupons /></Protected>} />
+              <Route path="/admin/announcements" element={<Protected admin><AdminAnnouncements /></Protected>} />
+              <Route path="/admin/manual-adjustments" element={<Protected admin><AdminManualAdjustments /></Protected>} />
+              <Route path="/admin/fraud-monitor" element={<Protected admin><AdminFraudMonitor /></Protected>} />
+              <Route path="/admin/financial-report" element={<Protected admin><AdminFinancialReport /></Protected>} />
               <Route path="/admin/password-resets" element={<Protected admin><AdminPasswordResets /></Protected>} />
               <Route path="/admin/settings" element={<Protected admin><AdminSettings /></Protected>} />
 

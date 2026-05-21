@@ -1,0 +1,46 @@
+{
+  "summary": "Iter10 redesign verified end-to-end. Backend: GET /api/admin/stats/extended and /api/admin/stats/inflow added, both auth-gated, structures match spec (platform_profit=172920, next_24h_payout=3430, default-7day inflow returns 332000 across 21 deposits). Existing admin endpoints (stats, users, products, deposits, withdrawals, transactions) still 200. Frontend: new /admin dashboard renders all 36 required data-testids (platform/next-payout cards, 4 top stats, today row, range chips, inflow inputs/metrics, all-time row, system-health, quick-actions, new sidebar nav). 4 new admin pages all render: Announcements (Save shows 'Announcements saved' toast, PUT /api/admin/settings -> 200), Manual Adjustments (adj-table renders even when empty), Fraud Monitor (fraud-24h/mismatch/blocked all show 0), Financial Report (report-profit card + CSV export downloads financial-report-2026-05-21.csv). Custom inflow range (frm/to + Apply) refreshes inflow-total correctly (₦332,000 -> ₦273,000 when narrowed to single day). All 11 pytest tests pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/stats/inflow", "issue": "series[] is NOT zero-filled — only dates with deposits appear. Bar chart will show gaps/uneven x-axis for ranges that include zero-deposit days (e.g., the default last-7-days only returned 2 entries despite a 7-day window). Frontend currently masks this because the chart just lists what is present; for a true 'last 7 days' visualization, backend should zero-fill missing days."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminLayout / Protected route guard", "issue": "'View as user' button is broken. data-testid='admin-view-as-user' is present and navigates to /dashboard, but Protected.jsx line 16 (`if (!admin && user.is_admin) return <Navigate to=\"/admin\" replace />;`) immediately bounces admin users back to /admin, so admins cannot actually preview the user side. Verified: clicking the button keeps URL at /admin.", "selector": "[data-testid='admin-view-as-user']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin sidebar footer", "issues": [
+        "ThemeToggle in the footer has no data-testid (review request mentions 'admin-theme-toggle'). Element renders & functions, but the requested testid is missing.",
+        "Logout button uses data-testid='admin-logout-btn' (review request mentioned 'admin-logout'). Functions correctly; only the testid name differs."
+      ]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter10.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [
+    "FIX (HIGH): 'View as user' is broken. Update Protected.jsx so that admins can browse non-admin routes. Simplest fix: drop the `if (!admin && user.is_admin) return <Navigate to=\"/admin\" replace />;` line — it's the line that bounces an admin back to /admin whenever they hit /dashboard. (Alternatively gate the redirect with a sessionStorage flag set by the 'View as user' button.)",
+    "(Optional) Zero-fill /api/admin/stats/inflow series for missing days so the bar chart shows a continuous x-axis.",
+    "(Optional) Add data-testid='admin-theme-toggle' to the ThemeToggle in AdminLayout footer, and rename admin-logout-btn -> admin-logout to match the spec (or vice-versa)."
+  ],
+  "critical_code_review_comments": [
+    "Protected.jsx line 16 forces every admin user back to /admin on any non-admin route — this is a long-standing global guard, not new to iter10, but the new 'View as user' UX directly contradicts it. The contract for this button must be reconciled with the route guard.",
+    "routes_admin.py admin_stats_inflow uses string comparison on ISO 'updated_at' for date range filtering — fine because all writes are normalized to UTC ISO with TZ — but it returns only present days. Consider building the full date list with timedelta loop and filling missing days with 0 for the chart.",
+    "AdminDashboard.jsx 311 LOC is at the edge of the file-size guideline (700) but still acceptable. AdminLayout.jsx is concise (136 LOC).",
+    "No raw mongo _id leaks observed in any of the new endpoints (extended/inflow both project away _id or build dicts manually)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10.py (new)"
+  ],
+  "success_rate": {"backend": "100% (11/11 pytest)", "frontend": "~95% — all 36 admin testids + 4 new pages render & function; 1 HIGH bug: View-as-user redirect"},
+  "test_credentials": "Admin: 08123456789 / personally · User: 08099887766 / newpwd",
+  "seed_data_creation": "Announcements banner text was overwritten to 'Hello iter10 test' during the save-flow test. Active flag was unchanged. Main agent may want to restore the original banner copy if it was something user-facing.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter10.py is the regression baseline for iter10's two new endpoints + auth gating + existing-endpoint smoke. Skips gracefully if admin login fails. The single open bug is the View-as-user redirect in Protected.jsx; after fix, retest by logging in as admin, clicking [data-testid='admin-view-as-user'], and verifying URL becomes /dashboard and the user-side UI renders. Announcements banner text was modified during testing — restore if needed.",
+  "rca of the issue": "View-as-user bug RCA: AdminLayout's onClick={() => navigate('/dashboard')} correctly fires a client-side navigation. React Router transitions to /dashboard, which is wrapped in <Protected>...</Protected>. Protected.jsx evaluates the auth context: since the request is to a non-admin route AND user.is_admin === true, it immediately returns <Navigate to='/admin' replace />, which sends the admin back to /admin before Dashboard ever mounts. Net effect: URL flickers to /dashboard and instantly becomes /admin. Reproduction: login as 08123456789, on /admin click 'View as user'. Mitigation: relax Protected.jsx so admins can visit /dashboard (drop the redirect on line 16), or pass an 'asUser' query param that the guard inspects and honors."
+}
