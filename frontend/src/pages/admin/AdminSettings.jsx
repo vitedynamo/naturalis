@@ -69,6 +69,8 @@ export default function AdminSettings() {
         home_announcement_image_url: s.home_announcement_image_url || "",
         telegram_url: s.telegram_url || "",
         welcome_message: s.welcome_message || "",
+        welcome_modal_title: s.welcome_modal_title || "",
+        welcome_modal_active: s.welcome_modal_active !== false,
       };
       const { data } = await api.put("/admin/settings", payload);
       setS(data);
@@ -149,8 +151,24 @@ export default function AdminSettings() {
         </div>
 
         <div className="card-soft p-6">
-          <div className="text-label flex items-center gap-2"><MessageCircle className="w-3.5 h-3.5 text-[color:var(--brand)]" /> Welcome modal & community</div>
-          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Shown to every user the first time they open their dashboard. Leave the message empty to disable.</p>
+          <div className="flex items-center justify-between">
+            <div className="text-label flex items-center gap-2"><MessageCircle className="w-3.5 h-3.5 text-[color:var(--brand)]" /> Welcome modal & community</div>
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={s.welcome_modal_active !== false}
+                onChange={(e) => setS({ ...s, welcome_modal_active: e.target.checked })}
+                data-testid="welcome-modal-active-checkbox" />
+              <span className="text-[color:var(--text-secondary)]">Show modal</span>
+            </label>
+          </div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Shown to every user when they open their dashboard. Untick the box above to disable the modal entirely.</p>
+
+          <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Heading</label>
+          <input type="text" value={s.welcome_modal_title || ""}
+            onChange={(e) => setS({ ...s, welcome_modal_title: e.target.value })}
+            placeholder="e.g. Hi {name} — welcome to NaijaInvest"
+            data-testid="welcome-modal-title-input"
+            className="w-full mt-2 input-base" />
+          <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Use <code>{`{name}`}</code> to inject the user's first name. Leave empty for the default greeting.</p>
 
           <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Welcome message</label>
           <textarea rows={4} value={s.welcome_message || ""}
@@ -165,7 +183,7 @@ export default function AdminSettings() {
             placeholder="https://t.me/your-group"
             data-testid="telegram-url-input"
             className="w-full mt-2 input-base" />
-          <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Shows as a "Join Telegram" button inside the welcome modal.</p>
+          <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Shows as a "Join Telegram" button inside the welcome modal. Leave empty to hide the button.</p>
         </div>
 
         <div className="card-soft p-6">

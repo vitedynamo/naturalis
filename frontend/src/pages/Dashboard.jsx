@@ -6,7 +6,6 @@ import { formatNaira } from "@/lib/format";
 import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 
 function resolveUrl(url) {
   if (!url) return "";
@@ -29,8 +28,10 @@ export default function Dashboard() {
       ]);
       setProducts(ps);
       setSettings(s);
-      // Show welcome modal every time the user opens the homepage
-      setWelcomeOpen(true);
+      // Show welcome modal every time the user opens the homepage, unless admin disabled it
+      if (s.welcome_modal_active !== false) {
+        setWelcomeOpen(true);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,11 +165,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Welcome modal — admin-configurable, shown once per user */}
+      {/* Welcome modal — admin-configurable, shown on every homepage visit */}
       <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
         <DialogContent
           data-testid="welcome-modal"
-          className="duration-500 sm:max-w-md overflow-hidden p-0 border-0"
+          className="duration-500 max-w-[calc(100vw-2rem)] sm:max-w-md mx-4 sm:mx-auto rounded-3xl overflow-hidden p-0 border-0 shadow-2xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="hero-gradient grain text-white px-6 pt-6 pb-8 relative">
@@ -177,8 +178,13 @@ export default function Dashboard() {
               <Sparkle className="w-3 h-3" /> Welcome aboard
             </div>
             <DialogHeader>
-              <DialogTitle className="text-white font-display text-2xl md:text-3xl font-extrabold mt-2">
-                Hi {user?.name?.split(" ")[0] || "there"} — welcome to NaijaInvest
+              <DialogTitle className="text-white font-display text-2xl md:text-3xl font-extrabold mt-2" data-testid="welcome-modal-title">
+                {(() => {
+                  const firstName = user?.name?.split(" ")[0] || "there";
+                  const tpl = settings.welcome_modal_title;
+                  if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
+                  return `Hi ${firstName} — welcome to NaijaInvest`;
+                })()}
               </DialogTitle>
             </DialogHeader>
             <p className="mt-3 text-white/90 text-sm leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
@@ -209,14 +215,6 @@ export default function Dashboard() {
                   <Send className="w-4 h-4" /> Join our Telegram group
                 </a>
               )}
-              <Button
-                onClick={closeWelcome}
-                data-testid="welcome-close-btn"
-                variant="ghost"
-                className="w-full"
-              >
-                Maybe later
-              </Button>
             </DialogFooter>
           </div>
         </DialogContent>

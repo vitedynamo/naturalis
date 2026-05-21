@@ -272,6 +272,8 @@ class Settings(BaseModel):
     home_announcement_image_url: str = ""
     telegram_url: str = ""
     welcome_message: str = ""
+    welcome_modal_title: str = ""
+    welcome_modal_active: bool = True
 
 
 class SettingsUpdate(BaseModel):
@@ -294,6 +296,8 @@ class SettingsUpdate(BaseModel):
     home_announcement_image_url: Optional[str] = None
     telegram_url: Optional[str] = None
     welcome_message: Optional[str] = None
+    welcome_modal_title: Optional[str] = None
+    welcome_modal_active: Optional[bool] = None
 
 
 class PaystackPayRequest(BaseModel):

@@ -722,4 +722,6 @@ async def public_settings(request: Request):
         "home_announcement_image_url": s.get("home_announcement_image_url", ""),
         "telegram_url": s.get("telegram_url", ""),
         "welcome_message": s.get("welcome_message", ""),
+        "welcome_modal_title": s.get("welcome_modal_title", ""),
+        "welcome_modal_active": s.get("welcome_modal_active", True),
     }
