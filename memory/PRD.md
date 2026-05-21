@@ -42,6 +42,18 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 8)
+
+### Cleanup / polish
+- **Removed dead `gen3_percent` field** from `Settings` and `SettingsUpdate` models. Existing DB row scrubbed via `$unset`. Sending the field is silently ignored.
+- **Invest page restyle**: cards now have a gradient top stripe, ROI pill on the image, hover-lift, 3-cell stats grid (Daily / Days / Total), and a gradient CTA button.
+- **Invest dialog UX**: on Confirm, the amount input is immediately disabled and blurred. After a successful invest, the user is redirected to `/my-packages` via `useNavigate` carrying `state.highlightId` — that card auto-scrolls into view and pulses with an accent ring for 3 seconds. Added `gap-3` between Cancel and Confirm buttons.
+- **Team page (Gen tabs)**: Gen 1 and Gen 2 are sticky **side-by-side tabs** (sticky on scroll, just under the topbar). Gen 1 is selected by default; tapping a tab swaps the inline referral list below. Each list entry still shows phone, total invested, per-investment breakdown with dates, and joined date. Invite-link plain text remains hidden under the Copy buttons.
+- **Welcome bonus**: already admin-customizable via Settings (`welcome_bonus`); verified end-to-end — value persists, is read on registration, and is credited to the new user's wallet.
+
+### Tests
+- iter 8: 11/11 backend pytest, 100% on frontend flows. One non-blocking React hydration warning on `/admin/settings` due to visual-editor instrumentation (cosmetic, deferred).
+
 ## Recent Changes (Feb 2026 — iteration 7)
 
 ### Removed
