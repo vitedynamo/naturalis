@@ -29,19 +29,13 @@ export default function Dashboard() {
       ]);
       setProducts(ps);
       setSettings(s);
-      // Show welcome modal once per user (always, since we always show the bonus CTA)
-      const flagKey = user ? `ni_welcome_seen_${user.id}` : "ni_welcome_seen";
-      const seen = localStorage.getItem(flagKey);
-      if (!seen) {
-        setWelcomeOpen(true);
-      }
+      // Show welcome modal every time the user opens the homepage
+      setWelcomeOpen(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const closeWelcome = () => {
-    const flagKey = user ? `ni_welcome_seen_${user.id}` : "ni_welcome_seen";
-    localStorage.setItem(flagKey, "1");
     setWelcomeOpen(false);
   };
 
