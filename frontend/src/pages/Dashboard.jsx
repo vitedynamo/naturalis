@@ -169,7 +169,7 @@ export default function Dashboard() {
       <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
         <DialogContent
           data-testid="welcome-modal"
-          className="duration-500 max-w-[calc(100vw-2rem)] sm:max-w-md mx-4 sm:mx-auto rounded-3xl overflow-hidden p-0 border-0 shadow-2xl"
+          className="duration-500 w-[calc(100vw-2rem)] max-w-md rounded-3xl overflow-hidden p-0 border-0 shadow-2xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="hero-gradient grain text-white px-6 pt-6 pb-8 relative">
