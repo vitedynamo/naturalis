@@ -91,6 +91,10 @@ export default function Register() {
             <ThemeToggle />
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight mt-2 text-[color:var(--text-primary)]">Get started</h1>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-2">
+            Already have an account?{" "}
+            <Link to="/login" data-testid="go-login-link" className="text-[color:var(--brand)] font-semibold hover:underline underline-offset-2">Sign in</Link>
+          </p>
 
           <label className="block mt-6 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Full name</label>
           <div className="relative mt-2">
@@ -154,17 +158,6 @@ export default function Register() {
             className="mt-6 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60">
             {loading ? "Creating…" : (<>Create account <ArrowRight className="w-4 h-4" /></>)}
           </button>
-
-          <div className="relative my-5 flex items-center">
-            <div className="flex-1 h-px bg-[color:var(--border-default)]" />
-            <span className="px-3 text-[11px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Already have an account?</span>
-            <div className="flex-1 h-px bg-[color:var(--border-default)]" />
-          </div>
-
-          <Link to="/login" data-testid="go-login-btn"
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-[color:var(--brand)] text-[color:var(--brand)] font-semibold hover:bg-[color:var(--brand-soft)] transition-colors">
-            Sign in to your account
-          </Link>
         </form>
       </div>
     </div>
