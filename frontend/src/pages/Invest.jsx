@@ -146,7 +146,7 @@ export default function Invest() {
       <Dialog open={open} onOpenChange={(o) => { if (!submitting) setOpen(o); }}>
         <DialogContent
           data-testid="invest-dialog"
-          className="duration-500 w-[calc(100vw-2rem)] max-w-lg rounded-2xl"
+          className="duration-1000 w-[calc(100vw-2rem)] max-w-lg rounded-2xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
