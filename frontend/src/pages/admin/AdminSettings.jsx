@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Save, Megaphone, Flame, ImagePlus, X, Banknote } from "lucide-react";
+import { Save, Megaphone, Flame, ImagePlus, X, Banknote, MessageCircle } from "lucide-react";
 
 function resolveImg(url) {
   if (!url) return "";
@@ -67,6 +67,8 @@ export default function AdminSettings() {
         home_announcement: s.home_announcement || "",
         home_announcement_active: !!s.home_announcement_active,
         home_announcement_image_url: s.home_announcement_image_url || "",
+        telegram_url: s.telegram_url || "",
+        welcome_message: s.welcome_message || "",
       };
       const { data } = await api.put("/admin/settings", payload);
       setS(data);
@@ -144,6 +146,26 @@ export default function AdminSettings() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="card-soft p-6">
+          <div className="text-label flex items-center gap-2"><MessageCircle className="w-3.5 h-3.5 text-[color:var(--brand)]" /> Welcome modal & community</div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Shown to every user the first time they open their dashboard. Leave the message empty to disable.</p>
+
+          <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Welcome message</label>
+          <textarea rows={4} value={s.welcome_message || ""}
+            onChange={(e) => setS({ ...s, welcome_message: e.target.value })}
+            placeholder="Welcome to NaijaInvest! Earn daily returns on every plan. Join our Telegram community for tips, updates and support."
+            data-testid="welcome-message-input"
+            className="w-full mt-2 input-base resize-none" />
+
+          <label className="block mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Telegram group link</label>
+          <input type="url" value={s.telegram_url || ""}
+            onChange={(e) => setS({ ...s, telegram_url: e.target.value })}
+            placeholder="https://t.me/your-group"
+            data-testid="telegram-url-input"
+            className="w-full mt-2 input-base" />
+          <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Shows as a "Join Telegram" button inside the welcome modal.</p>
         </div>
 
         <div className="card-soft p-6">

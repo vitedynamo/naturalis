@@ -3,8 +3,10 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 function resolveUrl(url) {
   if (!url) return "";
@@ -16,6 +18,7 @@ export default function Dashboard() {
   const { user, refresh } = useAuth();
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState({});
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -26,9 +29,21 @@ export default function Dashboard() {
       ]);
       setProducts(ps);
       setSettings(s);
+      // Show welcome modal once per user (always, since we always show the bonus CTA)
+      const flagKey = user ? `ni_welcome_seen_${user.id}` : "ni_welcome_seen";
+      const seen = localStorage.getItem(flagKey);
+      if (!seen) {
+        setWelcomeOpen(true);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const closeWelcome = () => {
+    const flagKey = user ? `ni_welcome_seen_${user.id}` : "ni_welcome_seen";
+    localStorage.setItem(flagKey, "1");
+    setWelcomeOpen(false);
+  };
 
   // Featured = admin-selected, else highest ROI
   const featured =
@@ -154,6 +169,64 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Welcome modal — admin-configurable, shown once per user */}
+      <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
+        <DialogContent
+          data-testid="welcome-modal"
+          className="duration-500 sm:max-w-md overflow-hidden p-0 border-0"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div className="hero-gradient grain text-white px-6 pt-6 pb-8 relative">
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative flex items-center gap-2 text-white/85 text-[10px] uppercase tracking-[0.18em] font-bold">
+              <Sparkle className="w-3 h-3" /> Welcome aboard
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-white font-display text-2xl md:text-3xl font-extrabold mt-2">
+                Hi {user?.name?.split(" ")[0] || "there"} — welcome to NaijaInvest
+              </DialogTitle>
+            </DialogHeader>
+            <p className="mt-3 text-white/90 text-sm leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
+              {settings.welcome_message ||
+                "Earn daily returns on every plan you fund. Top up your wallet, pick a plan, and watch your profit land every 24 hours. Refer friends to earn across 2 generations."}
+            </p>
+          </div>
+
+          <div className="px-6 py-5 bg-[color:var(--surface)]">
+            <DialogFooter className="flex-col sm:flex-col gap-3">
+              <Link
+                to="/deposit"
+                onClick={closeWelcome}
+                data-testid="welcome-bonus-cta"
+                className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--accent-main)] hover:from-[color:var(--brand-hover)] hover:to-[color:var(--accent-hover)] text-white font-semibold rounded-xl px-5 py-3 shadow-lg shadow-[color:var(--brand)]/20 transition-all"
+              >
+                <Sparkles className="w-4 h-4" /> Get started — claim your {formatNaira(settings.welcome_bonus ?? 750)} bonus
+              </Link>
+              {settings.telegram_url && (
+                <a
+                  href={settings.telegram_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={closeWelcome}
+                  data-testid="welcome-telegram-btn"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#229ED9] hover:bg-[#1f8fc4] text-white font-semibold rounded-xl px-5 py-3 shadow-md transition-colors"
+                >
+                  <Send className="w-4 h-4" /> Join our Telegram group
+                </a>
+              )}
+              <Button
+                onClick={closeWelcome}
+                data-testid="welcome-close-btn"
+                variant="ghost"
+                className="w-full"
+              >
+                Maybe later
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </UserLayout>
   );
 }

@@ -42,6 +42,16 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 9)
+
+### Added
+- **Welcome modal on dashboard**: shown once per user (keyed by user id in localStorage as `ni_welcome_seen_<id>`). Renders an admin-configurable welcome message + an optional "Join our Telegram group" button. Modal uses the indigo `hero-gradient` header for a strong first-touch impression. Closes via the X button, the "Start exploring" button, or clicking the Telegram link.
+- **Admin Settings → "Welcome modal & community"**: new card with `welcome_message` textarea + `telegram_url` input. Backend Settings model adds `telegram_url` and `welcome_message` (both default `""`); exposed via `GET /api/settings/public`.
+
+### Polish
+- **Invest dialog fade-in**: bumped Dialog `duration` from 200ms to 500ms via `className="duration-500"` so the modal's existing fade + zoom transition is clearly perceived.
+- **Cosmetic `<option>` hydration warning** fixed on `AdminSettings` and `AdminWithdrawals` by using template-literal option content (single text child, so visual-editor doesn't inject `<span>`).
+
 ## Recent Changes (Feb 2026 — iteration 8)
 
 ### Cleanup / polish

@@ -144,7 +144,7 @@ export default function Invest() {
       </div>
 
       <Dialog open={open} onOpenChange={(o) => { if (!submitting) setOpen(o); }}>
-        <DialogContent data-testid="invest-dialog" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogContent data-testid="invest-dialog" className="duration-500" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="font-display">Invest in {selected?.name}</DialogTitle>
           </DialogHeader>
