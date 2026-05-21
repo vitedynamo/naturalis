@@ -42,6 +42,19 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 12)
+
+### Fixes from user feedback
+- **Dedicated admin login** — new `/admin/login` route with its own dark "ops console" UI (NI brand badge, gradient pink/indigo CTA, restricted-area banner). `Protected admin` now redirects unauthenticated admin requests to `/admin/login` (not `/login`). The user-side `/login` rejects admin credentials and redirects them to `/admin/login`.
+- **Full-width admin** — removed `max-w-7xl mx-auto`; admin content now uses `px-3 py-4 sm:p-6 md:p-8 w-full` so it stretches edge-to-edge on every viewport (no side margins on mobile, comfortable padding on tablet/desktop).
+- **Clickable inflow chart guaranteed** — bars are now real `<button>` elements (not disabled), use larger 32px min-width tap targets, no `disabled` attribute that was previously short-circuiting clicks on small-data days. Verified end-to-end in Playwright: click on bar `2026-05-21` opens the drill-dialog with all 11 deposits listed.
+
+## Recent Changes (Feb 2026 — iteration 11)
+
+- **Clickable inflow bars** with drill-down dialog
+- **Dark-mode contrast** bump on text tokens
+- **Responsive admin** wrapper with `max-w-7xl mx-auto` (superseded in iteration 12)
+
 ## Recent Changes (Feb 2026 — iteration 10)
 
 ### Modernized admin (modeled on user-provided screenshots)

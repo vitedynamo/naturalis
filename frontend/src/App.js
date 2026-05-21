@@ -18,6 +18,7 @@ import History from "@/pages/History";
 import Profile from "@/pages/Profile";
 import PaymentCallback from "@/pages/PaymentCallback";
 import ForgotPassword from "@/pages/ForgotPassword";
+import AdminLogin from "@/pages/AdminLogin";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
@@ -49,6 +50,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/payment/callback" element={<PaymentCallback />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
 
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
               <Route path="/invest" element={<Protected><Invest /></Protected>} />

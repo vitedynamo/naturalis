@@ -22,9 +22,15 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/login", { phone, password });
+      if (data.user.is_admin) {
+        toast.error("Please use the admin sign-in page.");
+        setLoading(false);
+        navigate("/admin/login", { replace: true });
+        return;
+      }
       setSession(data.token, data.user);
       toast.success(`Welcome back, ${data.user.name}`);
-      navigate(data.user.is_admin ? "/admin" : "/dashboard", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Login failed");
     } finally { setLoading(false); }

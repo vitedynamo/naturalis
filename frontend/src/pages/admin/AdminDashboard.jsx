@@ -231,34 +231,39 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Mini bar chart — clickable bars open day drill-down */}
+            {/* Mini bar chart — every bar is clickable */}
             <div className="mt-6">
               <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] mb-2 flex items-center justify-between">
                 <span>{inflow.from} → {inflow.to}</span>
-                <span className="hidden sm:inline">tap a bar to view deposits</span>
+                <span>Tap a bar to view that day's deposits</span>
               </div>
               <div className="bg-[color:var(--surface-alt)] rounded-xl p-3 overflow-x-auto">
-                <div className="flex items-end gap-1 h-32 min-w-full" style={{ minWidth: `${Math.max(inflow.series.length * 36, 100)}px` }}>
+                <div className="flex items-end gap-1 h-36 min-w-full" style={{ minWidth: `${Math.max(inflow.series.length * 40, 100)}px` }}>
                   {inflow.series.length === 0 ? (
                     <div className="w-full text-center text-xs text-[color:var(--text-tertiary)] self-center">No deposits in this range.</div>
                   ) : (
                     inflow.series.map((p) => {
                       const empty = p.total <= 0;
+                      const pct = empty ? 0 : (p.total / maxSeries) * 100;
                       return (
                         <button
                           key={p.date}
                           type="button"
                           onClick={() => openDrill(p.date)}
-                          disabled={empty}
                           data-testid={`bar-${p.date}`}
+                          aria-label={`Open deposits for ${p.date}`}
                           title={`${p.date}: ${formatNaira(p.total)} — click to view deposits`}
-                          className={`flex-1 flex flex-col items-center justify-end h-full group ${empty ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                          className="flex-1 min-w-[32px] flex flex-col items-center justify-end h-full group cursor-pointer p-0 bg-transparent border-0 hover:bg-[color:var(--surface)]/30 rounded-md transition-colors"
                         >
                           <div
-                            className={`w-full max-w-[28px] rounded-t-md bg-gradient-to-t from-[color:var(--brand)] to-[color:var(--accent-main)] transition-all ${empty ? "" : "group-hover:from-[color:var(--brand-hover)] group-hover:to-[color:var(--accent-hover)] group-hover:scale-105"}`}
-                            style={{ height: `${(p.total / maxSeries) * 100}%`, minHeight: empty ? "2px" : "6px" }}
+                            className={`w-full max-w-[28px] rounded-t-md transition-all ${
+                              empty
+                                ? "bg-[color:var(--border-default)] group-hover:bg-[color:var(--text-tertiary)]"
+                                : "bg-gradient-to-t from-[color:var(--brand)] to-[color:var(--accent-main)] group-hover:from-[color:var(--brand-hover)] group-hover:to-[color:var(--accent-hover)] group-hover:scale-y-105"
+                            }`}
+                            style={{ height: `${pct}%`, minHeight: "6px" }}
                           />
-                          <div className="text-[9px] text-[color:var(--text-secondary)] mt-1 truncate w-full text-center">{p.date.slice(5)}</div>
+                          <div className="text-[10px] text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)] mt-1 truncate w-full text-center font-medium">{p.date.slice(5)}</div>
                         </button>
                       );
                     })
