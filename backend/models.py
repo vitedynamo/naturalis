@@ -34,6 +34,10 @@ class User(BaseModel):
     security_answer_hash_1: Optional[str] = None
     security_question_2: Optional[str] = None
     security_answer_hash_2: Optional[str] = None
+    # Withdrawal PIN (4-digit). Stored as bcrypt hash. Required for every withdrawal.
+    withdrawal_pin_hash: Optional[str] = None
+    withdrawal_pin_failed: int = 0
+    withdrawal_pin_locked_until: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
 
 
@@ -177,6 +181,17 @@ class Withdrawal(BaseModel):
 class WithdrawRequest(BaseModel):
     amount: float
     method: str = "manual"  # manual | auto
+    pin: Optional[str] = None  # 4-digit withdrawal PIN
+
+
+class SetWithdrawalPinRequest(BaseModel):
+    pin: str  # 4-digit
+    password: str  # account password — re-auth to set/change PIN
+
+
+class ChangeWithdrawalPinRequest(BaseModel):
+    old_pin: str
+    new_pin: str
 
 
 class AdminWithdrawalAction(BaseModel):

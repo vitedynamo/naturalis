@@ -171,3 +171,82 @@ async def resolve_account(
     if not name:
         raise RuntimeError(data.get("description") or data.get("message") or "Nomba account lookup failed")
     return {"account_name": name, "account_number": num}
+
+
+async def get_wallet_balance(*, client_id: str, client_secret: str, account_id: str) -> float:
+    """Fetch the merchant's parent-account NGN balance via Nomba.
+
+    Endpoint: GET /v1/accounts/balance
+    Returns balance in naira (float). Raises RuntimeError on failure.
+    """
+    token, base = await _get_token(client_id, client_secret, account_id)
+    async with httpx.AsyncClient(timeout=20) as client:
+        async def _get(b):
+            return await client.get(
+                f"{b}/v1/accounts/balance",
+                headers={"Authorization": f"Bearer {token}", "accountId": account_id},
+            )
+        resp = await _get(base)
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        if _is_sandbox_redirect(resp.status_code, data):
+            other = NOMBA_BASE_SANDBOX if base == NOMBA_BASE_PROD else NOMBA_BASE_PROD
+            _token_cache["base"] = other
+            resp = await _get(other)
+            data = resp.json()
+    d = data.get("data") or {}
+    amt = d.get("amount") or d.get("balance") or d.get("availableBalance")
+    if amt is None:
+        raise RuntimeError(data.get("description") or data.get("message") or "Nomba balance fetch failed")
+    try:
+        return float(amt)
+    except Exception:
+        raise RuntimeError(f"Nomba returned non-numeric balance: {amt}")
+
+
+async def get_transfer_status(
+    *, client_id: str, client_secret: str, account_id: str, merchant_tx_ref: str,
+) -> dict:
+    """Query Nomba for the status of a previous transfer by merchantTxRef.
+
+    Endpoint: GET /v1/transactions/accounts/single?transactionRef=<ref>
+    Returns dict with at least {status: 'SUCCESS'|'FAILED'|'PENDING', raw: ...}.
+    """
+    token, base = await _get_token(client_id, client_secret, account_id)
+    async with httpx.AsyncClient(timeout=20) as client:
+        async def _get(b):
+            return await client.get(
+                f"{b}/v1/transactions/accounts/single",
+                params={"transactionRef": merchant_tx_ref},
+                headers={"Authorization": f"Bearer {token}", "accountId": account_id},
+            )
+        resp = await _get(base)
+        try:
+            data = resp.json()
+        except Exception:
+            data = {}
+        if _is_sandbox_redirect(resp.status_code, data):
+            other = NOMBA_BASE_SANDBOX if base == NOMBA_BASE_PROD else NOMBA_BASE_PROD
+            _token_cache["base"] = other
+            resp = await _get(other)
+            data = resp.json()
+    d = data.get("data") or {}
+    # Nomba may return the transaction object or a list; normalize
+    if isinstance(d, list):
+        d = d[0] if d else {}
+    raw_status = (d.get("status") or d.get("transactionStatus") or "").upper().strip()
+    if raw_status in ("SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID"):
+        norm = "SUCCESS"
+    elif raw_status in ("FAILED", "FAILURE", "DECLINED", "REVERSED", "REJECTED"):
+        norm = "FAILED"
+    elif raw_status in ("PENDING", "PROCESSING", "IN_PROGRESS"):
+        norm = "PENDING"
+    elif not raw_status:
+        # Not found yet (Nomba sometimes lags) — treat as PENDING so caller retries later
+        norm = "PENDING"
+    else:
+        norm = raw_status
+    return {"status": norm, "raw_status": raw_status, "raw": d, "description": data.get("description")}
+

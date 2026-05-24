@@ -3,7 +3,7 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Lock, Building2, Save, Search, ChevronDown, Check, Loader2, BadgeCheck, Pencil } from "lucide-react";
+import { Lock, Building2, Save, Search, ChevronDown, Check, Loader2, BadgeCheck, Pencil, KeyRound, ShieldCheck } from "lucide-react";
 
 function BankPicker({ value, banks, onSelect }) {
   const [open, setOpen] = useState(false);
@@ -105,9 +105,15 @@ export default function Profile() {
   const [resolving, setResolving] = useState(false);
   const [resolved, setResolved] = useState(false);
   const [pwd, setPwd] = useState({ old_password: "", new_password: "" });
+  const [pinState, setPinState] = useState({ has_pin: false });
+  const [pinForm, setPinForm] = useState({ pin: "", password: "" });
+  const [changePinForm, setChangePinForm] = useState({ old_pin: "", new_pin: "" });
+  const [pinBusy, setPinBusy] = useState(false);
+  const [showChangePin, setShowChangePin] = useState(false);
 
   useEffect(() => {
     api.get("/banks").then(({ data }) => setBanks(data)).catch(() => setBanks([]));
+    api.get("/profile/withdrawal-pin/status").then(({ data }) => setPinState(data)).catch(() => {});
   }, []);
 
   // When edit mode toggles on, start with a cleared form
@@ -170,6 +176,34 @@ export default function Profile() {
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Failed");
     }
+  };
+
+  const submitSetPin = async (e) => {
+    e.preventDefault();
+    if (!/^\d{4}$/.test(pinForm.pin)) { toast.error("PIN must be 4 digits"); return; }
+    setPinBusy(true);
+    try {
+      await api.post("/profile/withdrawal-pin/set", pinForm);
+      toast.success("Withdrawal PIN set successfully");
+      setPinState({ has_pin: true });
+      setPinForm({ pin: "", password: "" });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to set PIN");
+    } finally { setPinBusy(false); }
+  };
+
+  const submitChangePin = async (e) => {
+    e.preventDefault();
+    if (!/^\d{4}$/.test(changePinForm.new_pin)) { toast.error("New PIN must be 4 digits"); return; }
+    setPinBusy(true);
+    try {
+      await api.post("/profile/withdrawal-pin/change", changePinForm);
+      toast.success("Withdrawal PIN updated");
+      setChangePinForm({ old_pin: "", new_pin: "" });
+      setShowChangePin(false);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to change PIN");
+    } finally { setPinBusy(false); }
   };
 
   return (
@@ -302,6 +336,97 @@ export default function Profile() {
           <Save className="w-4 h-4" /> Update password
         </button>
       </form>
+
+      {/* Withdrawal PIN card */}
+      <div className="card-soft p-6 mt-6 max-w-xl relative overflow-hidden" data-testid="withdrawal-pin-card">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--accent-main)]" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-label"><KeyRound className="w-3.5 h-3.5" /> Withdrawal PIN</div>
+          {pinState.has_pin && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--success)]" data-testid="pin-status-set">
+              <ShieldCheck className="w-3.5 h-3.5" /> PIN set
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+          {pinState.has_pin
+            ? "Your 4-digit PIN is required every time you request a withdrawal."
+            : "Set a 4-digit PIN. You'll need it to authorise every withdrawal."}
+        </p>
+
+        {!pinState.has_pin && (
+          <form onSubmit={submitSetPin} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" data-testid="set-pin-form">
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+              placeholder="4-digit PIN"
+              value={pinForm.pin}
+              onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              required
+              data-testid="set-pin-input"
+              className="w-full input-base font-mono tracking-[0.5em] text-center"
+            />
+            <input
+              type="password" placeholder="Confirm with your password"
+              value={pinForm.password}
+              onChange={(e) => setPinForm({ ...pinForm, password: e.target.value })}
+              required
+              data-testid="set-pin-password"
+              className="w-full input-base"
+            />
+            <button
+              type="submit" disabled={pinBusy || pinForm.pin.length !== 4 || !pinForm.password}
+              data-testid="set-pin-submit"
+              className="md:col-span-2 mt-1 flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+              <Save className="w-4 h-4" /> {pinBusy ? "Saving…" : "Set withdrawal PIN"}
+            </button>
+          </form>
+        )}
+
+        {pinState.has_pin && !showChangePin && (
+          <button
+            type="button" onClick={() => setShowChangePin(true)}
+            data-testid="show-change-pin-btn"
+            className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--brand)] hover:text-[color:var(--brand-hover)]"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Change PIN
+          </button>
+        )}
+
+        {pinState.has_pin && showChangePin && (
+          <form onSubmit={submitChangePin} className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" data-testid="change-pin-form">
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+              placeholder="Current PIN"
+              value={changePinForm.old_pin}
+              onChange={(e) => setChangePinForm({ ...changePinForm, old_pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              required
+              data-testid="change-pin-old"
+              className="w-full input-base font-mono tracking-[0.5em] text-center"
+            />
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+              placeholder="New PIN"
+              value={changePinForm.new_pin}
+              onChange={(e) => setChangePinForm({ ...changePinForm, new_pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+              required
+              data-testid="change-pin-new"
+              className="w-full input-base font-mono tracking-[0.5em] text-center"
+            />
+            <div className="md:col-span-2 flex gap-3">
+              <button
+                type="submit" disabled={pinBusy}
+                data-testid="change-pin-submit"
+                className="flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+                <Save className="w-4 h-4" /> {pinBusy ? "Updating…" : "Update PIN"}
+              </button>
+              <button
+                type="button" onClick={() => { setShowChangePin(false); setChangePinForm({ old_pin: "", new_pin: "" }); }}
+                className="px-4 py-2.5 rounded-lg font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
+              >Cancel</button>
+            </div>
+          </form>
+        )}
+      </div>
     </UserLayout>
   );
 }

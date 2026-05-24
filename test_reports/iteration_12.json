@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 12: Comprehensive testing of Withdrawal PIN flow + Nomba transaction verification (no webhook). 20/20 backend pytest tests PASSED. Frontend e2e via Playwright: admin AdminWithdrawals + user Profile PIN card + Withdraw page all working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/withdraw (no bank + no PIN user)",
+        "issues": [
+          "When user has neither bank nor PIN, only the bank-missing-warn banner is shown — the no-pin-banner is hidden behind `bankReady && !hasPin`. The PIN input placeholder ('Set PIN on Profile first') and disabled submit button still convey the requirement, but the explicit 'Set my PIN' banner with link to /profile only appears after bank is added. Minor UX concern; not a functional bug."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_pin_nomba.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [
+    "(optional UX) Consider showing the no-pin-banner regardless of bankReady state so users see both onboarding requirements at once, OR add inline PIN hint inside the bank-missing-warn."
+  ],
+  "critical_code_review_comments": [
+    "routes_admin.py pay-nomba: pre-flight balance check only triggers when `available is not None`. If nomba_balance() raises, balance_err is set but never raised — the code then proceeds to transfer_to_bank, which will fail if float is truly insufficient but auth succeeded. Consider raising 503 when balance check itself errored OR adding a strict mode setting.",
+    "routes_user.py withdraw flow: PIN lockout check uses `datetime.fromisoformat(locked.replace('Z','+00:00'))` but the stored value is already an ISO string with offset; this works but may double-replace and silently swallow exceptions via the bare `except Exception: pass`. Lockout failure mode could let a locked user through if isoformat parsing breaks — recommend explicit logging.",
+    "Profile.jsx: set-pin-input uses inputMode='numeric' but no `maxLength={4}` constraint — the API rejects, so it's just UX polish.",
+    "Withdraw.jsx no-pin-banner gated by `bankReady` — see design_issues above."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter12_pin_nomba.py"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20)",
+    "frontend": "100% (all expected elements/integrations verified)"
+  },
+  "test_credentials": "Admin: 08123456789/personally. PIN-test users created during run are TEST_PinUser / TEST_NoPin / TEST_GoodPin with phones starting with 080xxxxxxxx. Welcome bonus ₦750.",
+  "seed_data_creation": "Backend test suite registers 4 fresh TEST_ users per run (TEST_PinUser, TEST_NoPin, TEST_GoodPin, no_pin_user). UI test created 2 additional UI_PinTest / UI_NoPin users. No cleanup performed (tests are idempotent via unique phones).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file is /app/backend/tests/test_iter12_pin_nomba.py. Run with: pytest backend/tests/test_iter12_pin_nomba.py -v. Verified: (1) PIN status/set/change endpoints; (2) PIN format/password/duplicate validation; (3) /withdrawal/request rejects no-PIN, wrong-PIN counter 4→3→2→1, 5th wrong locks for 15min (429), even correct PIN during lock returns 429; (4) Correct PIN proceeds past PIN check and resets fail counter; (5) /api/auth/me has_withdrawal_pin field; (6) /api/admin/nomba/balance LIVE mode returns ₦57.60 (sandbox); (7) /api/admin/withdrawals/poll-pending returns proper counter dict; (8) /api/admin/withdrawals/{wid}/refresh-status works on existing records, returns 404 for missing; (9) Backend poller log line 'Withdrawal status poller scheduled every 300s' confirmed in supervisor logs. Frontend: AdminWithdrawals page shows Nomba float card (₦57.60 live), Refresh all pending button (poll-all-btn) triggers /poll-pending and shows toast, refresh-status buttons only render when withdrawal has provider ref (correct). Profile page shows withdrawal-pin-card with set-pin-form, transitions to pin-status-set badge + show-change-pin-btn after setting. Withdraw page renders withdraw-pin-input, disables submit when no bank/no PIN.",
+  "rca of the issue": "n/a — all features working as specified."
+}

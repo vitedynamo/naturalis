@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
 from storage import put_object, get_object
-from nomba import transfer_to_bank as nomba_transfer
+from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status
 
 router = APIRouter()
 
@@ -175,12 +175,16 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
 
 @router.post("/admin/withdrawals/{wid}/pay-nomba")
 async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, request: Request, _admin=Depends(get_current_admin)):
-    """Approve a pending withdrawal via Nomba bank transfer (or mock if creds missing)."""
+    """Approve a pending withdrawal via Nomba bank transfer (or mock if creds missing).
+
+    Pre-flight: checks Nomba float balance. If insufficient, rejects the request and flags
+    the withdrawal for admin attention without touching the user wallet.
+    """
     db = request.app.state.db
     w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
     if not w:
         raise HTTPException(404, "Withdrawal not found")
-    if w["status"] != "pending":
+    if w["status"] not in ("pending",):
         raise HTTPException(400, f"Already {w['status']}")
 
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
@@ -192,6 +196,28 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
     transfer_resp = None
 
     if mode == "live" and client_id and client_secret and account_id:
+        # PRE-FLIGHT balance check — reject if Nomba float is insufficient
+        try:
+            available = await nomba_balance(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+            )
+        except Exception as e:
+            available = None
+            balance_err = str(e)
+        else:
+            balance_err = None
+        if available is not None and available < float(w["amount"]):
+            await db.withdrawals.update_one(
+                {"id": wid},
+                {"$set": {
+                    "needs_attention": True,
+                    "insufficient_float": True,
+                    "float_balance_at_request": available,
+                    "admin_note": f"Insufficient Nomba float: ₦{available:,.2f} available, ₦{float(w['amount']):,.2f} requested. Top up Nomba then retry.",
+                    "updated_at": _now_iso(),
+                }},
+            )
+            raise HTTPException(402, f"Insufficient Nomba float (₦{available:,.2f} available). Top up your Nomba wallet then retry.")
         try:
             transfer_resp = await nomba_transfer(
                 client_id=client_id, client_secret=client_secret, account_id=account_id,
@@ -202,19 +228,35 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
             )
         except Exception as e:
             raise HTTPException(502, f"Nomba transfer failed: {e}")
+        # Live transfer initiated — mark as "processing" so the status-poll confirms final state
+        await db.withdrawals.update_one(
+            {"id": wid},
+            {"$set": {
+                "status": "processing",
+                "method": "auto",
+                "admin_note": f"Nomba transfer · ref {transfer_ref} (status pending confirmation)",
+                "nomba_transfer_ref": transfer_ref,
+                "bank_code": payload.bank_code,
+                "needs_attention": False,
+                "insufficient_float": False,
+                "updated_at": _now_iso(),
+            }},
+        )
+        return {"status": "processing", "reference": transfer_ref, "mode": "live"}
 
+    # Mock mode — no real transfer, mark as paid immediately
     await db.withdrawals.update_one(
         {"id": wid},
         {"$set": {
             "status": "paid",
             "method": "auto",
-            "admin_note": f"Nomba transfer · ref {transfer_ref}" + (" · live" if transfer_resp else " · mock"),
+            "admin_note": f"Nomba transfer · ref {transfer_ref} · mock",
             "nomba_transfer_ref": transfer_ref,
             "bank_code": payload.bank_code,
             "updated_at": _now_iso(),
         }},
     )
-    return {"status": "ok", "reference": transfer_ref, "mode": "live" if transfer_resp else "mock"}
+    return {"status": "ok", "reference": transfer_ref, "mode": "mock"}
 
 
 # ===== Image upload =====
@@ -648,7 +690,7 @@ async def approve_withdrawal(wid: str, payload: AdminWithdrawalAction, request: 
     w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
     if not w:
         raise HTTPException(404, "Withdrawal not found")
-    if w["status"] != "pending":
+    if w["status"] not in ("pending", "processing"):
         raise HTTPException(400, f"Already {w['status']}")
     await db.withdrawals.update_one(
         {"id": wid},
@@ -663,7 +705,7 @@ async def reject_withdrawal(wid: str, payload: AdminWithdrawalAction, request: R
     w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
     if not w:
         raise HTTPException(404, "Withdrawal not found")
-    if w["status"] != "pending":
+    if w["status"] not in ("pending", "processing"):
         raise HTTPException(400, f"Already {w['status']}")
     # Refund wallet
     new_user = await db.users.find_one_and_update(
@@ -812,6 +854,169 @@ async def reject_password_reset(rid: str, payload: PasswordResetActionRequest, r
         {"$set": {"status": "rejected", "admin_note": payload.note, "updated_at": _now_iso()}},
     )
     return {"status": "ok"}
+
+
+# ===== Nomba float balance + transfer status =====
+@router.get("/admin/nomba/balance")
+async def admin_nomba_balance(request: Request, _admin=Depends(get_current_admin)):
+    """Return current Nomba parent-account float balance. Returns null balance if creds missing or live mode off."""
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    if s.get("payment_mode") != "live" or not (s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id")):
+        return {"balance": None, "currency": "NGN", "live": False, "message": "Nomba live credentials not configured."}
+    try:
+        bal = await nomba_balance(
+            client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
+            account_id=s["nomba_account_id"],
+        )
+        return {"balance": round(float(bal), 2), "currency": "NGN", "live": True}
+    except Exception as e:
+        return {"balance": None, "currency": "NGN", "live": True, "error": str(e)}
+
+
+async def _refresh_one_withdrawal(db, w: dict) -> dict:
+    """Query the payment provider for the actual status of a single withdrawal and apply it.
+
+    Returns the updated withdrawal dict (with `_refresh` field describing the action taken).
+    """
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    mode = s.get("payment_mode", "mock")
+    ref = w.get("nomba_transfer_ref") or ""
+    paystack_ref = w.get("paystack_transfer_ref") or ""
+    action = "no_op"
+    new_status = w.get("status")
+    note_extra = None
+
+    # Only refresh statuses that are not yet final
+    if w.get("status") in ("paid", "rejected"):
+        return {**w, "_refresh": "already_final"}
+
+    if ref and mode == "live" and s.get("nomba_client_id"):
+        try:
+            res = await nomba_status(
+                client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
+                account_id=s.get("nomba_account_id", ""), merchant_tx_ref=ref,
+            )
+            st = res.get("status", "PENDING")
+            if st == "SUCCESS":
+                new_status = "paid"
+                action = "marked_paid"
+                note_extra = f"Confirmed via Nomba status poll · {res.get('raw_status') or 'SUCCESS'}"
+            elif st == "FAILED":
+                # Refund the user and mark withdrawal as rejected
+                refund_amount = float(w["amount"])
+                user_after = await db.users.find_one_and_update(
+                    {"id": w["user_id"]},
+                    {"$inc": {"wallet_balance": refund_amount}},
+                    return_document=True, projection={"_id": 0},
+                )
+                if user_after:
+                    await db.transactions.insert_one({
+                        "id": gen_reference("tx"),
+                        "user_id": w["user_id"], "type": "refund", "amount": refund_amount,
+                        "description": f"Auto-refund: Nomba transfer failed ({ref})",
+                        "balance_after": user_after["wallet_balance"],
+                        "meta": {"withdrawal_id": w["id"], "by": "nomba_status_poll"},
+                        "created_at": _now_iso(),
+                    })
+                new_status = "rejected"
+                action = "marked_rejected_refunded"
+                note_extra = f"Nomba reports {res.get('raw_status') or 'FAILED'} — user refunded ₦{refund_amount:,.2f}"
+            else:
+                action = "still_pending"
+                note_extra = f"Nomba status: {res.get('raw_status') or 'PENDING'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Status poll error: {e}"
+
+    elif paystack_ref and mode == "live" and s.get("paystack_secret_key"):
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(
+                    f"https://api.paystack.co/transfer/verify/{paystack_ref}",
+                    headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
+                )
+                data = resp.json()
+            d = data.get("data") or {}
+            st = (d.get("status") or "").lower()
+            if st in ("success", "successful"):
+                new_status = "paid"
+                action = "marked_paid"
+                note_extra = f"Confirmed via Paystack transfer/verify · {st}"
+            elif st in ("failed", "reversed"):
+                refund_amount = float(w["amount"])
+                user_after = await db.users.find_one_and_update(
+                    {"id": w["user_id"]},
+                    {"$inc": {"wallet_balance": refund_amount}},
+                    return_document=True, projection={"_id": 0},
+                )
+                if user_after:
+                    await db.transactions.insert_one({
+                        "id": gen_reference("tx"),
+                        "user_id": w["user_id"], "type": "refund", "amount": refund_amount,
+                        "description": f"Auto-refund: Paystack transfer {st} ({paystack_ref})",
+                        "balance_after": user_after["wallet_balance"],
+                        "meta": {"withdrawal_id": w["id"], "by": "paystack_status_poll"},
+                        "created_at": _now_iso(),
+                    })
+                new_status = "rejected"
+                action = "marked_rejected_refunded"
+                note_extra = f"Paystack reports {st} — user refunded ₦{refund_amount:,.2f}"
+            else:
+                action = "still_pending"
+                note_extra = f"Paystack status: {st or 'unknown'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Status poll error: {e}"
+    else:
+        action = "no_provider_ref"
+
+    update = {"updated_at": _now_iso()}
+    if new_status != w.get("status"):
+        update["status"] = new_status
+    if note_extra:
+        prev = (w.get("admin_note") or "").strip()
+        update["admin_note"] = f"{prev} · {note_extra}" if prev else note_extra
+    await db.withdrawals.update_one({"id": w["id"]}, {"$set": update})
+
+    fresh = await db.withdrawals.find_one({"id": w["id"]}, {"_id": 0})
+    fresh["_refresh"] = action
+    return fresh
+
+
+@router.post("/admin/withdrawals/{wid}/refresh-status")
+async def admin_refresh_status(wid: str, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    if not w:
+        raise HTTPException(404, "Withdrawal not found")
+    return await _refresh_one_withdrawal(db, w)
+
+
+@router.post("/admin/withdrawals/poll-pending")
+async def admin_poll_pending(request: Request, _admin=Depends(get_current_admin)):
+    """Admin trigger: poll provider status for every non-final withdrawal."""
+    db = request.app.state.db
+    items = await db.withdrawals.find({"status": {"$in": ["pending", "processing"]}}, {"_id": 0}).to_list(500)
+    results = {"refreshed": 0, "marked_paid": 0, "marked_rejected": 0, "still_pending": 0, "no_provider_ref": 0, "errors": 0}
+    for w in items:
+        try:
+            r = await _refresh_one_withdrawal(db, w)
+            results["refreshed"] += 1
+            act = r.get("_refresh")
+            if act == "marked_paid":
+                results["marked_paid"] += 1
+            elif act == "marked_rejected_refunded":
+                results["marked_rejected"] += 1
+            elif act == "still_pending":
+                results["still_pending"] += 1
+            elif act == "no_provider_ref":
+                results["no_provider_ref"] += 1
+            elif act == "error":
+                results["errors"] += 1
+        except Exception:
+            results["errors"] += 1
+    return results
 
 
 # ===== Settings =====

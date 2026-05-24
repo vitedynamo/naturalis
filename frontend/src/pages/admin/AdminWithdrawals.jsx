@@ -5,7 +5,7 @@ import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Banknote, Send, Smartphone, Search, ChevronDown, Check, Loader2, BadgeCheck, AlertTriangle } from "lucide-react";
+import { Banknote, Send, Smartphone, Search, ChevronDown, Check, Loader2, BadgeCheck, AlertTriangle, RefreshCw, Wallet } from "lucide-react";
 
 function AdminBankPicker({ value, banks, onSelect }) {
   const [open, setOpen] = useState(false);
@@ -87,9 +87,42 @@ export default function AdminWithdrawals() {
   const [busy, setBusy] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [verifiedName, setVerifiedName] = useState("");
+  const [nombaFloat, setNombaFloat] = useState(null); // {balance, live, ...}
+  const [polling, setPolling] = useState(false);
+  const [refreshingId, setRefreshingId] = useState(null);
 
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
-  useEffect(() => { load(); }, []);
+  const loadFloat = () => api.get("/admin/nomba/balance").then(({ data }) => setNombaFloat(data)).catch(() => setNombaFloat(null));
+  useEffect(() => { load(); loadFloat(); }, []);
+
+  const refreshOne = async (w) => {
+    setRefreshingId(w.id);
+    try {
+      const { data } = await api.post(`/admin/withdrawals/${w.id}/refresh-status`);
+      const action = data?._refresh || "no_op";
+      if (action === "marked_paid") toast.success("Confirmed PAID by provider");
+      else if (action === "marked_rejected_refunded") toast.warning("Provider reports FAILED — user refunded");
+      else if (action === "still_pending") toast.info("Still pending at provider");
+      else if (action === "no_provider_ref") toast.info("No provider reference — nothing to poll");
+      else if (action === "already_final") toast.info("Already finalised");
+      else toast.info(`Refresh: ${action}`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Refresh failed");
+    } finally { setRefreshingId(null); }
+  };
+
+  const pollAll = async () => {
+    setPolling(true);
+    try {
+      const { data } = await api.post("/admin/withdrawals/poll-pending");
+      toast.success(`Polled ${data.refreshed} · paid ${data.marked_paid} · rejected ${data.marked_rejected}`);
+      load();
+      loadFloat();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Poll failed");
+    } finally { setPolling(false); }
+  };
 
   const ensureBanks = async () => {
     if (banks.length) return banks;
@@ -159,6 +192,38 @@ export default function AdminWithdrawals() {
 
   return (
     <AdminLayout title="Withdrawals">
+      {/* Header strip: live Nomba float + poll-all */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" data-testid="withdrawals-toolbar">
+        <div className="card-soft p-4 flex items-center gap-3" data-testid="nomba-float-card">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${nombaFloat?.live ? "bg-[color:var(--brand-soft)] text-[color:var(--brand)]" : "bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)]"}`}>
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Nomba float (live)</div>
+            <div className="font-display font-bold text-lg text-[color:var(--text-primary)] mt-0.5 truncate" data-testid="nomba-float-amount">
+              {nombaFloat?.live === false ? "Live mode off"
+                : nombaFloat?.balance == null ? (nombaFloat?.error ? "Unavailable" : "—")
+                : formatNaira(nombaFloat.balance)}
+            </div>
+            {nombaFloat?.error && <div className="text-[10px] text-[color:var(--error)] mt-0.5 truncate" title={nombaFloat.error}>{nombaFloat.error}</div>}
+          </div>
+          <button onClick={loadFloat} title="Refresh balance" className="ml-auto p-2 rounded-lg hover:bg-[color:var(--surface-alt)]" data-testid="refresh-float-btn">
+            <RefreshCw className="w-4 h-4 text-[color:var(--text-secondary)]" />
+          </button>
+        </div>
+        <div className="card-soft p-4 flex items-center gap-3 md:col-span-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Status verification</div>
+            <div className="text-sm text-[color:var(--text-secondary)] mt-0.5">Live withdrawals are polled every 5 min automatically. Manually trigger to verify all non-final transfers now.</div>
+          </div>
+          <button onClick={pollAll} disabled={polling}
+            data-testid="poll-all-btn"
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Polling…" : "Refresh all pending"}
+          </button>
+        </div>
+      </div>
+
       <div className="card-soft overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[850px]" data-testid="admin-withdrawals-table">
@@ -185,25 +250,41 @@ export default function AdminWithdrawals() {
                     <div className="font-mono text-xs text-[color:var(--text-primary)]">{w.account_number}</div>
                     <div className="text-xs text-[color:var(--text-tertiary)]">{w.account_name}</div>
                   </td>
-                  <td className="p-3"><span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span></td>
+                  <td className="p-3">
+                    <span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : w.status === "processing" ? "pill-warn" : w.insufficient_float ? "pill-error" : "pill-warn"}`}>
+                      {w.insufficient_float && w.status === "pending" ? "insufficient float" : w.status}
+                    </span>
+                  </td>
                   <td className="p-3 text-[color:var(--text-secondary)] whitespace-nowrap">{formatDate(w.created_at)}</td>
                   <td className="p-3 text-right">
-                    {w.status === "pending" && (
+                    {(w.status === "pending" || w.status === "processing") && (
                       <div className="flex flex-wrap gap-2 justify-end">
-                        <button onClick={() => openPay(w, "paystack")} data-testid={`pay-paystack-${w.id}`}
-                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] inline-flex items-center gap-1.5">
-                          <Send className="w-3 h-3" /> Pay via Paystack
-                        </button>
-                        <button onClick={() => openPay(w, "nomba")} data-testid={`pay-nomba-${w.id}`}
-                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] inline-flex items-center gap-1.5">
-                          <Smartphone className="w-3 h-3" /> Pay via Nomba
-                        </button>
-                        <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
-                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] inline-flex items-center gap-1.5 border border-[color:var(--border-default)]">
-                          <Banknote className="w-3 h-3" /> Mark paid manually
-                        </button>
-                        <button onClick={() => act(w, "reject")} data-testid={`reject-${w.id}`}
-                          className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--error-soft)] text-[color:var(--error)]">Reject</button>
+                        {(w.nomba_transfer_ref || w.paystack_transfer_ref) && (
+                          <button onClick={() => refreshOne(w)} disabled={refreshingId === w.id}
+                            data-testid={`refresh-status-${w.id}`}
+                            title="Verify status with provider"
+                            className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand-soft)] text-[color:var(--brand)] inline-flex items-center gap-1.5">
+                            <RefreshCw className={`w-3 h-3 ${refreshingId === w.id ? "animate-spin" : ""}`} /> Refresh status
+                          </button>
+                        )}
+                        {w.status === "pending" && (
+                          <>
+                            <button onClick={() => openPay(w, "paystack")} data-testid={`pay-paystack-${w.id}`}
+                              className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] inline-flex items-center gap-1.5">
+                              <Send className="w-3 h-3" /> Pay via Paystack
+                            </button>
+                            <button onClick={() => openPay(w, "nomba")} data-testid={`pay-nomba-${w.id}`}
+                              className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] inline-flex items-center gap-1.5">
+                              <Smartphone className="w-3 h-3" /> Pay via Nomba
+                            </button>
+                            <button onClick={() => act(w, "approve")} data-testid={`approve-${w.id}`}
+                              className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] inline-flex items-center gap-1.5 border border-[color:var(--border-default)]">
+                              <Banknote className="w-3 h-3" /> Mark paid manually
+                            </button>
+                            <button onClick={() => act(w, "reject")} data-testid={`reject-${w.id}`}
+                              className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--error-soft)] text-[color:var(--error)]">Reject</button>
+                          </>
+                        )}
                       </div>
                     )}
                     {w.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic">{w.admin_note}</div>}
@@ -258,6 +339,16 @@ export default function AdminWithdrawals() {
                   <div>
                     <div className="font-bold">Name mismatch.</div>
                     User saved <span className="font-mono">"{target.account_name}"</span> but the bank returned <span className="font-mono font-bold">"{verifiedName}"</span>. Verify before paying.
+                  </div>
+                </div>
+              )}
+
+              {gateway === "nomba" && nombaFloat?.live && nombaFloat?.balance != null && nombaFloat.balance < Number(target.amount) && (
+                <div className="rounded-lg bg-[color:var(--error-soft)] text-[color:var(--error)] p-3 text-xs flex items-start gap-2" data-testid="insufficient-float-banner">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-bold">Insufficient Nomba float.</div>
+                    Available <span className="font-mono font-bold">{formatNaira(nombaFloat.balance)}</span> · Required <span className="font-mono font-bold">{formatNaira(target.amount)}</span>. Top up your Nomba wallet before paying.
                   </div>
                 </div>
               )}

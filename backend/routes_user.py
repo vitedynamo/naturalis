@@ -27,6 +27,8 @@ from models import (
     CouponRedeemRequest,
     ForgotPasswordRequest,
     ResetWithQuestionsRequest,
+    SetWithdrawalPinRequest,
+    ChangeWithdrawalPinRequest,
 )
 from payouts import process_investment_payouts
 
@@ -45,7 +47,11 @@ async def _settings(db):
 
 
 async def _public_user(db, user_id: str):
-    u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "withdrawal_pin_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0})
+    if u:
+        # Expose only whether a PIN is set, never the hash itself
+        fresh = await db.users.find_one({"id": user_id}, {"_id": 0, "withdrawal_pin_hash": 1})
+        u["has_withdrawal_pin"] = bool((fresh or {}).get("withdrawal_pin_hash"))
     return u
 
 
@@ -206,6 +212,58 @@ async def update_bank(data: BankUpdateRequest, request: Request, user=Depends(ge
         }},
     )
     return await _public_user(db, user["id"])
+
+
+# =========== WITHDRAWAL PIN ===========
+def _validate_pin(pin: str) -> str:
+    p = (pin or "").strip()
+    if not p.isdigit() or len(p) != 4:
+        raise HTTPException(400, "PIN must be exactly 4 digits")
+    return p
+
+
+@router.get("/profile/withdrawal-pin/status")
+async def withdrawal_pin_status(request: Request, user=Depends(get_current_user)):
+    return {"has_pin": bool(user.get("withdrawal_pin_hash"))}
+
+
+@router.post("/profile/withdrawal-pin/set")
+async def set_withdrawal_pin(data: SetWithdrawalPinRequest, request: Request, user=Depends(get_current_user)):
+    """Set the initial 4-digit withdrawal PIN. Re-authenticates with account password."""
+    db = request.app.state.db
+    if user.get("withdrawal_pin_hash"):
+        raise HTTPException(400, "Withdrawal PIN already set. Use change-pin instead.")
+    if not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(400, "Account password is incorrect")
+    pin = _validate_pin(data.pin)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "withdrawal_pin_hash": hash_password(pin),
+            "withdrawal_pin_failed": 0,
+            "withdrawal_pin_locked_until": None,
+        }},
+    )
+    return {"status": "ok", "message": "Withdrawal PIN set successfully"}
+
+
+@router.post("/profile/withdrawal-pin/change")
+async def change_withdrawal_pin(data: ChangeWithdrawalPinRequest, request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    if not user.get("withdrawal_pin_hash"):
+        raise HTTPException(400, "No PIN set yet. Use set-pin instead.")
+    if not verify_password(data.old_pin, user["withdrawal_pin_hash"]):
+        raise HTTPException(400, "Current PIN is incorrect")
+    new_pin = _validate_pin(data.new_pin)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "withdrawal_pin_hash": hash_password(new_pin),
+            "withdrawal_pin_failed": 0,
+            "withdrawal_pin_locked_until": None,
+        }},
+    )
+    return {"status": "ok", "message": "Withdrawal PIN updated"}
 
 
 # =========== BANKS (PUBLIC USER ENDPOINTS) ===========
@@ -689,6 +747,38 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
     db = request.app.state.db
     settings = await _settings(db)
 
+    # Withdrawal PIN — REQUIRED for every withdrawal
+    if not user.get("withdrawal_pin_hash"):
+        raise HTTPException(400, "Please set your 4-digit withdrawal PIN on your Profile page before withdrawing.")
+    # Brute-force protection: 5 fails → 15 min lock
+    locked = user.get("withdrawal_pin_locked_until")
+    if locked:
+        try:
+            locked_until = datetime.fromisoformat(locked.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) < locked_until:
+                mins = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+                raise HTTPException(429, f"Too many wrong PIN attempts. Try again in {mins} min.")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+    if not data.pin or not verify_password(data.pin.strip(), user["withdrawal_pin_hash"]):
+        # increment fail counter
+        new_fail = int(user.get("withdrawal_pin_failed", 0)) + 1
+        update = {"withdrawal_pin_failed": new_fail}
+        from datetime import timedelta as _td
+        if new_fail >= 5:
+            update["withdrawal_pin_locked_until"] = (datetime.now(timezone.utc) + _td(minutes=15)).isoformat()
+            update["withdrawal_pin_failed"] = 0
+            await db.users.update_one({"id": user["id"]}, {"$set": update})
+            raise HTTPException(429, "Too many wrong PIN attempts. PIN locked for 15 minutes.")
+        await db.users.update_one({"id": user["id"]}, {"$set": update})
+        remaining = 5 - new_fail
+        raise HTTPException(400, f"Invalid PIN. {remaining} attempt{'s' if remaining != 1 else ''} remaining.")
+    # PIN ok — reset fail counter
+    if user.get("withdrawal_pin_failed"):
+        await db.users.update_one({"id": user["id"]}, {"$set": {"withdrawal_pin_failed": 0, "withdrawal_pin_locked_until": None}})
+
     # Master kill-switch
     if not settings.get("withdrawals_open", True):
         raise HTTPException(400, "Withdrawals are temporarily closed. Please try again later.")
@@ -748,7 +838,34 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         mode = settings.get("payment_mode", "mock")
         try:
             if payout_gateway == "nomba" and mode == "live" and settings.get("nomba_client_id"):
-                from nomba import transfer_to_bank as nomba_transfer
+                from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance
+                # PRE-FLIGHT: check Nomba float balance
+                try:
+                    available = await nomba_balance(
+                        client_id=settings["nomba_client_id"],
+                        client_secret=settings["nomba_client_secret"],
+                        account_id=settings.get("nomba_account_id", ""),
+                    )
+                except Exception as be:
+                    logger.warning(f"Nomba balance check failed: {be}")
+                    available = None
+                if available is not None and available < float(data.amount):
+                    # Insufficient float — hold the withdrawal for admin attention
+                    await db.withdrawals.update_one(
+                        {"id": wid},
+                        {"$set": {
+                            "status": "pending",
+                            "needs_attention": True,
+                            "insufficient_float": True,
+                            "float_balance_at_request": available,
+                            "admin_note": f"Insufficient Nomba float (₦{available:,.2f} available). Awaiting admin top-up or manual payout.",
+                            "updated_at": _now_iso(),
+                        }},
+                    )
+                    doc["status"] = "pending"
+                    doc["needs_attention"] = True
+                    return doc
+                # Sufficient (or balance check unavailable) — proceed
                 ref = gen_reference("ntr")
                 await nomba_transfer(
                     client_id=settings["nomba_client_id"], client_secret=settings["nomba_client_secret"],
@@ -757,8 +874,9 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     account_name=user["account_name"], bank_code=user["bank_code"],
                     merchant_tx_ref=ref, narration=f"Auto payout {wid}",
                 )
-                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "paid", "method": "auto", "admin_note": f"Auto Nomba · {ref}", "nomba_transfer_ref": ref, "updated_at": _now_iso()}})
-                doc["status"] = "paid"; doc["method"] = "auto"
+                # Mark as initiated (NOT paid) — final status confirmed by status poll
+                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "processing", "method": "auto", "admin_note": f"Auto Nomba · {ref} (status pending confirmation)", "nomba_transfer_ref": ref, "updated_at": _now_iso()}})
+                doc["status"] = "processing"; doc["method"] = "auto"
             elif payout_gateway == "paystack" and mode == "live" and settings.get("paystack_secret_key"):
                 # Paystack: recipient + transfer
                 async with httpx.AsyncClient(timeout=20) as client:

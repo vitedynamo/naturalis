@@ -3,13 +3,14 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira, formatDate } from "@/lib/format";
-import { ArrowUpFromLine } from "lucide-react";
+import { ArrowUpFromLine, KeyRound, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 export default function Withdraw() {
   const { user, refresh } = useAuth();
   const [amount, setAmount] = useState("1000");
+  const [pin, setPin] = useState("");
   const [history, setHistory] = useState([]);
   const [settings, setSettings] = useState({ min_withdrawal: 1000 });
   const [busy, setBusy] = useState(false);
@@ -24,12 +25,16 @@ export default function Withdraw() {
   };
   useEffect(() => { load(); }, []);
 
+  const hasPin = !!user?.has_withdrawal_pin;
+
   const submit = async (e) => {
     e.preventDefault();
+    if (!/^\d{4}$/.test(pin)) { toast.error("Enter your 4-digit PIN"); return; }
     setBusy(true);
     try {
-      await api.post("/withdrawal/request", { amount: Number(amount), method: "manual" });
+      await api.post("/withdrawal/request", { amount: Number(amount), method: "manual", pin });
       toast.success("Withdrawal request submitted");
+      setPin("");
       await refresh();
       await load();
     } catch (e) {
@@ -72,6 +77,16 @@ export default function Withdraw() {
         </div>
       )}
 
+      {bankReady && !hasPin && (
+        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="no-pin-banner">
+          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Set your withdrawal PIN</div>
+          <div className="text-sm text-[color:var(--text-secondary)] mt-1">A 4-digit PIN is required to authorise withdrawals. Set yours once on your profile page.</div>
+          <Link to="/profile" data-testid="set-pin-link" className="mt-4 inline-block btn-primary text-sm">
+            Set my PIN
+          </Link>
+        </div>
+      )}
+
       {bankReady && !windowState.open && (
         <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="withdrawals-closed-banner">
           <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals closed</div>
@@ -87,7 +102,21 @@ export default function Withdraw() {
           className="w-full mt-2 px-3 py-3 input-base"
         />
 
-        <button type="submit" disabled={busy || !bankReady || !windowState.open}
+        <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mt-4 flex items-center gap-1.5">
+          <KeyRound className="w-3 h-3" /> Withdrawal PIN
+        </label>
+        <input
+          type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          disabled={!hasPin}
+          required
+          placeholder={hasPin ? "••••" : "Set PIN on Profile first"}
+          data-testid="withdraw-pin-input"
+          className="w-full mt-2 px-3 py-3 input-base font-mono tracking-[0.5em] text-center"
+        />
+
+        <button type="submit" disabled={busy || !bankReady || !windowState.open || !hasPin || pin.length !== 4}
           data-testid="withdraw-submit-btn"
           className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60">
           <ArrowUpFromLine className="w-4 h-4" /> {busy ? "Processing…" : "Submit request"}

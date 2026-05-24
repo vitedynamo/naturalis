@@ -75,7 +75,6 @@ async def on_startup():
         init_storage()
     except Exception as e:
         logger.warning(f"Object storage init failed at startup: {e}")
-
     # Seed global settings
     existing = await db.settings.find_one({"id": "global"})
     if not existing:
@@ -168,7 +167,42 @@ async def on_startup():
             })
         logger.info("Seeded default products")
 
+    # Background poller: every 5 minutes, refresh the status of every non-final withdrawal.
+    # No external scheduler dependency — uses asyncio.
+    import asyncio
+    POLL_INTERVAL_SEC = int(os.environ.get("WITHDRAWAL_POLL_INTERVAL", "300"))
+
+    async def _withdrawal_status_poller():
+        from routes_admin import _refresh_one_withdrawal
+        while True:
+            try:
+                await asyncio.sleep(POLL_INTERVAL_SEC)
+                pendings = await db.withdrawals.find(
+                    {"status": {"$in": ["pending", "processing"]}},
+                    {"_id": 0},
+                ).to_list(500)
+                # Only refresh ones that actually have a provider transfer ref
+                touched = 0
+                for w in pendings:
+                    if w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"):
+                        try:
+                            await _refresh_one_withdrawal(db, w)
+                            touched += 1
+                        except Exception as inner:
+                            logger.warning(f"Poller: refresh {w.get('id')} failed: {inner}")
+                if touched:
+                    logger.info(f"Withdrawal poller: refreshed {touched} non-final transfer(s)")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Withdrawal poller crashed (will retry): {e}")
+
+    app.state._withdrawal_poller_task = asyncio.create_task(_withdrawal_status_poller())
+    logger.info(f"Withdrawal status poller scheduled every {POLL_INTERVAL_SEC}s")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    if hasattr(app.state, "_withdrawal_poller_task") and app.state._withdrawal_poller_task:
+        app.state._withdrawal_poller_task.cancel()
     client.close()
