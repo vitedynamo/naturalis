@@ -42,6 +42,29 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 15)
+
+### Added — Security & Float Verification
+- **4-digit Withdrawal PIN (mandatory)**:
+  - Set on Profile (`/profile`) — requires account password re-auth. Stored as bcrypt hash.
+  - Required on EVERY withdrawal — 5 wrong attempts → 15-min lockout (HTTP 429).
+  - Endpoints: `GET /api/profile/withdrawal-pin/status`, `POST /api/profile/withdrawal-pin/set`, `POST /api/profile/withdrawal-pin/change`.
+  - `WithdrawRequest.pin` field; `User.has_withdrawal_pin` exposed via `/auth/me`.
+  - Admin bypasses PIN entirely — admins act on behalf of users via the existing admin payout actions.
+- **Nomba transaction verification (no webhook)** — replaces blind "mark paid" with provider-confirmed state:
+  - **Pre-flight float check**: before initiating ANY Nomba auto-payout or admin `pay-nomba`, the backend calls `GET /v1/accounts/balance`. If float < amount → withdrawal stays `pending` with `needs_attention=true`, `insufficient_float=true`, and the user wallet is NOT debited a second time. Admin sees a red "Insufficient Nomba float" banner in the pay dialog.
+  - **Processing state**: live Nomba transfers now set status to `processing` (not `paid`) until confirmed. Mock mode still marks `paid` immediately.
+  - **Status verification**: `GET /v1/transactions/accounts/single?transactionRef=...` is polled on:
+    - Per-row "Refresh status" button on `/admin/withdrawals` for any row with a provider ref.
+    - "Refresh all pending" admin action: `POST /api/admin/withdrawals/poll-pending` iterates all non-final transfers.
+    - Background asyncio poller every `WITHDRAWAL_POLL_INTERVAL` seconds (default 300).
+  - **Auto-refund on FAILED**: if Nomba/Paystack reports FAILED/REVERSED, the user's wallet is credited back and a refund transaction is logged.
+  - **Live Nomba float card** on `/admin/withdrawals` (`GET /api/admin/nomba/balance`) — shows current `₦` float with manual refresh.
+  - Admin actions `/approve` and `/reject` now also accept `processing` withdrawals (not just `pending`).
+
+### Tests
+- iter 15: 20/20 backend pytest (`backend/tests/test_iter12_pin_nomba.py`) pass. Frontend Playwright: PIN card on Profile, no-pin banner on Withdraw, PIN input enforcement, Nomba float card on AdminWithdrawals, refresh-status buttons, poll-pending toast — all verified.
+
 ## Recent Changes (Feb 2026 — iteration 14)
 
 - **Drill-down "Search by user phone"**: dashboard drill dialog now has a debounced filter (phone / name / reference).
@@ -139,8 +162,8 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 ## Backlog / Future Enhancements
 - **P1** Live Paystack/Nomba: enter keys + flip `payment_mode` to `live` in admin → Settings
 - **P2** Background scheduler (APScheduler) for payouts independent of user activity
-- **P2** Email/SMS notifications (deposit success, withdrawal status)
+- **P2** Email/SMS notifications (deposit success, withdrawal status, PIN change)
 - **P2** Investment plan caps (one per product per user)
 - **P2** Admin transactions view with filters/export
-- **P2** Two-factor auth / PIN for withdrawals
+- **P2** PIN reset via security questions or admin override (currently PIN cannot be reset if forgotten — admin must wipe `withdrawal_pin_hash` manually)
 - **P3** Cleanup dead `gen3_percent` field on Settings model (harmless, not exposed)
