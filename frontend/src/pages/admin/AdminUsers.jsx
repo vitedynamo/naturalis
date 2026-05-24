@@ -22,6 +22,15 @@ export default function AdminUsers() {
     } catch (e) { toast.error("Failed"); }
   };
 
+  const clearPin = async (u) => {
+    if (!window.confirm(`Clear withdrawal PIN for ${u.name} (${u.phone})?\n\nThey will be unable to withdraw until they set a new PIN on their Profile.`)) return;
+    try {
+      await api.post(`/admin/users/${u.id}/clear-pin`);
+      toast.success("PIN cleared — user must set a new one");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+
   const doAdjust = async () => {
     try {
       await api.post(`/admin/users/${editing.id}/adjust`, { amount: Number(adjust.amount), note: adjust.note || "Admin adjustment" });
@@ -68,6 +77,14 @@ export default function AdminUsers() {
                         className="px-3 py-1.5 rounded-md text-xs bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)]">
                         Adjust ₦
                       </button>
+                      {u.has_withdrawal_pin && (
+                        <button onClick={() => clearPin(u)}
+                          data-testid={`clear-pin-${u.id}`}
+                          title={u.withdrawal_pin_locked ? "PIN currently locked due to wrong attempts" : "Clear withdrawal PIN (emergency)"}
+                          className={`px-3 py-1.5 rounded-md text-xs ${u.withdrawal_pin_locked ? "bg-[color:var(--error-soft)] text-[color:var(--error)]" : "bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] border border-[color:var(--border-default)]"}`}>
+                          {u.withdrawal_pin_locked ? "Clear PIN · locked" : "Clear PIN"}
+                        </button>
+                      )}
                       <button onClick={() => toggle(u)}
                         data-testid={`toggle-${u.id}`}
                         className={`px-3 py-1.5 rounded-md text-xs ${u.is_blocked ? "bg-[color:var(--accent-main)] text-[color:var(--text-primary)]" : "bg-[color:var(--error-soft)] text-[color:var(--error)]"}`}>

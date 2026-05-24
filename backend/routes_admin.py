@@ -528,7 +528,11 @@ async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Op
 @router.get("/admin/users")
 async def admin_users(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(5000)
+    # Need withdrawal_pin_hash temporarily to derive has_withdrawal_pin then strip it
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0}).sort("created_at", -1).to_list(5000)
+    for u in users:
+        u["has_withdrawal_pin"] = bool(u.pop("withdrawal_pin_hash", None))
+        u["withdrawal_pin_locked"] = bool(u.get("withdrawal_pin_locked_until"))
     return users
 
 
@@ -572,6 +576,27 @@ async def adjust_balance(user_id: str, payload: dict, request: Request, _admin=D
         "created_at": _now_iso(),
     })
     return {"status": "ok", "wallet_balance": new_user["wallet_balance"]}
+
+
+@router.post("/admin/users/{user_id}/clear-pin")
+async def admin_clear_withdrawal_pin(user_id: str, request: Request, _admin=Depends(get_current_admin)):
+    """Emergency admin action: clear a user's withdrawal PIN + any lockout.
+
+    Useful when the user forgot their PIN AND has no security questions on file.
+    After this, the user must set a new PIN on Profile before they can withdraw again.
+    """
+    db = request.app.state.db
+    res = await db.users.update_one(
+        {"id": user_id, "is_admin": {"$ne": True}},
+        {"$set": {
+            "withdrawal_pin_hash": None,
+            "withdrawal_pin_failed": 0,
+            "withdrawal_pin_locked_until": None,
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "User not found (or target is an admin)")
+    return {"status": "ok", "message": "Withdrawal PIN cleared. User must set a new one on their Profile."}
 
 
 # ===== Products =====

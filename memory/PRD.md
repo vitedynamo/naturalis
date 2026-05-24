@@ -42,6 +42,17 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 17)
+
+### Added — Admin "Clear PIN" emergency action
+- `POST /api/admin/users/{id}/clear-pin` — wipes `withdrawal_pin_hash`, `withdrawal_pin_failed`, `withdrawal_pin_locked_until`. Cannot target admin accounts.
+- `GET /api/admin/users` now exposes `has_withdrawal_pin` and `withdrawal_pin_locked` flags (without leaking the hash).
+- **Admin Users page**: "Clear PIN" button shown only for users with an active PIN. Button turns red and reads "Clear PIN · locked" when the PIN is currently in a 15-min lockout. Confirmation prompt before clearing.
+- After clear, user is told to set a new PIN on Profile before next withdrawal.
+
+### Tests
+- iter 17: smoke-tested via curl — admin lists 91 users (5 with PIN), clear-pin removes hash, user `/auth/me` reflects `has_withdrawal_pin: false`, withdrawal blocked with clear message, PIN re-settable; admin self-clear blocked (404), missing user 404. Frontend lint clean.
+
 ## Recent Changes (Feb 2026 — iteration 16)
 
 ### Added — Forgot PIN recovery
