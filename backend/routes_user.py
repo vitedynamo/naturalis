@@ -29,6 +29,7 @@ from models import (
     ResetWithQuestionsRequest,
     SetWithdrawalPinRequest,
     ChangeWithdrawalPinRequest,
+    ResetWithdrawalPinRequest,
 )
 from payouts import process_investment_payouts
 
@@ -264,6 +265,49 @@ async def change_withdrawal_pin(data: ChangeWithdrawalPinRequest, request: Reque
         }},
     )
     return {"status": "ok", "message": "Withdrawal PIN updated"}
+
+
+@router.get("/profile/withdrawal-pin/recovery-questions")
+async def withdrawal_pin_recovery_questions(request: Request, user=Depends(get_current_user)):
+    """Return the logged-in user's security questions for PIN recovery.
+
+    Returns 400 if the user never set security questions during registration —
+    in that case the user must contact admin to clear the PIN.
+    """
+    q1 = user.get("security_question_1")
+    q2 = user.get("security_question_2")
+    if not q1 or not q2 or not user.get("security_answer_hash_1") or not user.get("security_answer_hash_2"):
+        raise HTTPException(400, "This account has no security questions on file. Please contact admin to reset your PIN.")
+    return {"question_1": q1, "question_2": q2}
+
+
+@router.post("/profile/withdrawal-pin/reset")
+async def reset_withdrawal_pin(data: ResetWithdrawalPinRequest, request: Request, user=Depends(get_current_user)):
+    """Reset the withdrawal PIN using the security questions set at registration.
+
+    Useful when the user has forgotten their PIN. Re-uses the same answer hashes
+    that secure the password recovery flow.
+    """
+    db = request.app.state.db
+    h1 = user.get("security_answer_hash_1")
+    h2 = user.get("security_answer_hash_2")
+    if not h1 or not h2:
+        raise HTTPException(400, "This account has no security questions on file. Please contact admin to reset your PIN.")
+    if not (
+        verify_password(data.answer_1.strip().lower(), h1)
+        and verify_password(data.answer_2.strip().lower(), h2)
+    ):
+        raise HTTPException(400, "One or more security answers are incorrect")
+    new_pin = _validate_pin(data.new_pin)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "withdrawal_pin_hash": hash_password(new_pin),
+            "withdrawal_pin_failed": 0,
+            "withdrawal_pin_locked_until": None,
+        }},
+    )
+    return {"status": "ok", "message": "Withdrawal PIN reset successfully. You can use it on your next withdrawal."}
 
 
 # =========== BANKS (PUBLIC USER ENDPOINTS) ===========

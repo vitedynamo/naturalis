@@ -110,6 +110,10 @@ export default function Profile() {
   const [changePinForm, setChangePinForm] = useState({ old_pin: "", new_pin: "" });
   const [pinBusy, setPinBusy] = useState(false);
   const [showChangePin, setShowChangePin] = useState(false);
+  const [showForgotPin, setShowForgotPin] = useState(false);
+  const [recoveryQs, setRecoveryQs] = useState(null); // {question_1, question_2}
+  const [recoveryErr, setRecoveryErr] = useState("");
+  const [resetForm, setResetForm] = useState({ answer_1: "", answer_2: "", new_pin: "" });
 
   useEffect(() => {
     api.get("/banks").then(({ data }) => setBanks(data)).catch(() => setBanks([]));
@@ -203,6 +207,35 @@ export default function Profile() {
       setShowChangePin(false);
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Failed to change PIN");
+    } finally { setPinBusy(false); }
+  };
+
+  const openForgotPin = async () => {
+    setShowForgotPin(true);
+    setShowChangePin(false);
+    setRecoveryErr("");
+    setRecoveryQs(null);
+    setResetForm({ answer_1: "", answer_2: "", new_pin: "" });
+    try {
+      const { data } = await api.get("/profile/withdrawal-pin/recovery-questions");
+      setRecoveryQs(data);
+    } catch (e) {
+      setRecoveryErr(e?.response?.data?.detail || "Recovery unavailable. Please contact admin.");
+    }
+  };
+
+  const submitResetPin = async (e) => {
+    e.preventDefault();
+    if (!/^\d{4}$/.test(resetForm.new_pin)) { toast.error("New PIN must be 4 digits"); return; }
+    setPinBusy(true);
+    try {
+      await api.post("/profile/withdrawal-pin/reset", resetForm);
+      toast.success("Withdrawal PIN reset successfully");
+      setShowForgotPin(false);
+      setResetForm({ answer_1: "", answer_2: "", new_pin: "" });
+      setPinState({ has_pin: true });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to reset PIN");
     } finally { setPinBusy(false); }
   };
 
@@ -382,14 +415,94 @@ export default function Profile() {
           </form>
         )}
 
-        {pinState.has_pin && !showChangePin && (
+        {pinState.has_pin && !showChangePin && !showForgotPin && (
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              type="button" onClick={() => setShowChangePin(true)}
+              data-testid="show-change-pin-btn"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--brand)] hover:text-[color:var(--brand-hover)]"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Change PIN
+            </button>
+            <button
+              type="button" onClick={openForgotPin}
+              data-testid="forgot-pin-btn"
+              className="text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]"
+            >
+              Forgot PIN?
+            </button>
+          </div>
+        )}
+
+        {/* "Forgot PIN?" recovery form is also reachable when no PIN is set yet — useful if previously locked */}
+        {!pinState.has_pin && !showForgotPin && (
           <button
-            type="button" onClick={() => setShowChangePin(true)}
-            data-testid="show-change-pin-btn"
-            className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--brand)] hover:text-[color:var(--brand-hover)]"
+            type="button" onClick={openForgotPin}
+            data-testid="forgot-pin-btn-empty"
+            className="mt-3 text-xs font-semibold text-[color:var(--text-secondary)] hover:text-[color:var(--brand)] underline"
           >
-            <Pencil className="w-3.5 h-3.5" /> Change PIN
+            Already had a PIN? Reset it with security questions.
           </button>
+        )}
+
+        {showForgotPin && (
+          <div className="mt-4 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-alt)] p-4" data-testid="forgot-pin-form">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Reset PIN via security questions</div>
+              <button type="button" onClick={() => setShowForgotPin(false)} className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]">Cancel</button>
+            </div>
+            {recoveryErr && (
+              <div className="mt-3 text-sm text-[color:var(--error)] bg-[color:var(--error-soft)] rounded-lg p-3" data-testid="recovery-err">
+                {recoveryErr}
+              </div>
+            )}
+            {!recoveryQs && !recoveryErr && (
+              <div className="mt-3 text-sm text-[color:var(--text-secondary)] flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading your security questions…
+              </div>
+            )}
+            {recoveryQs && (
+              <form onSubmit={submitResetPin} className="space-y-3 mt-3">
+                <div>
+                  <label className="block text-xs text-[color:var(--text-secondary)] font-medium">{recoveryQs.question_1}</label>
+                  <input
+                    value={resetForm.answer_1}
+                    onChange={(e) => setResetForm({ ...resetForm, answer_1: e.target.value })}
+                    required
+                    data-testid="reset-answer-1"
+                    className="w-full mt-1 input-base"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[color:var(--text-secondary)] font-medium">{recoveryQs.question_2}</label>
+                  <input
+                    value={resetForm.answer_2}
+                    onChange={(e) => setResetForm({ ...resetForm, answer_2: e.target.value })}
+                    required
+                    data-testid="reset-answer-2"
+                    className="w-full mt-1 input-base"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[color:var(--text-secondary)] font-medium">New 4-digit PIN</label>
+                  <input
+                    type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                    value={resetForm.new_pin}
+                    onChange={(e) => setResetForm({ ...resetForm, new_pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    required
+                    data-testid="reset-new-pin"
+                    className="w-full mt-1 input-base font-mono tracking-[0.5em] text-center"
+                  />
+                </div>
+                <button
+                  type="submit" disabled={pinBusy || resetForm.new_pin.length !== 4 || !resetForm.answer_1 || !resetForm.answer_2}
+                  data-testid="reset-pin-submit"
+                  className="w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+                  <Save className="w-4 h-4" /> {pinBusy ? "Resetting…" : "Reset PIN"}
+                </button>
+              </form>
+            )}
+          </div>
         )}
 
         {pinState.has_pin && showChangePin && (

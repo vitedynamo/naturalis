@@ -194,6 +194,12 @@ class ChangeWithdrawalPinRequest(BaseModel):
     new_pin: str
 
 
+class ResetWithdrawalPinRequest(BaseModel):
+    answer_1: str
+    answer_2: str
+    new_pin: str
+
+
 class AdminWithdrawalAction(BaseModel):
     note: Optional[str] = None
 

@@ -42,6 +42,17 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 16)
+
+### Added — Forgot PIN recovery
+- **PIN reset via security questions**: User can recover a forgotten withdrawal PIN without admin intervention, using the same security questions answered at registration.
+  - `GET /api/profile/withdrawal-pin/recovery-questions` returns the user's two questions (400 if no questions on file → ask user to contact admin).
+  - `POST /api/profile/withdrawal-pin/reset` with `{answer_1, answer_2, new_pin}` verifies answers and atomically sets the new PIN + clears any lockout / fail counter.
+- **Profile UI**: Added "Forgot PIN?" link beside "Change PIN" on the Withdrawal PIN card; opens an inline form showing the user's questions + new PIN input. Also surfaces an "Already had a PIN? Reset it…" link when `has_pin=false` for users whose admin manually cleared their hash.
+
+### Tests
+- iter 16: backend smoke-tested via curl — recovery questions load, wrong answers rejected (400), correct answers reset PIN and allow withdrawal with new PIN. Frontend Profile page renders `forgot-pin-btn` correctly.
+
 ## Recent Changes (Feb 2026 — iteration 15)
 
 ### Added — Security & Float Verification
