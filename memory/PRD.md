@@ -42,6 +42,29 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 18)
+
+### Fixed — Nomba 401/403 cascade
+- **Root cause**: when an admin's credentials authed against production but the actual transfer was rejected with 403, the code fell back to sandbox base URL **reusing the production token** → 401 Unauthorized → cached the wrong token-base binding → all subsequent calls failed.
+- **Fix in `nomba.py`**:
+  - Refactored to centralized `_call_with_fallback()` helper.
+  - When base actually switches via fallback, **the cached token is invalidated and re-issued against the new base** before the retry.
+  - New `Settings.nomba_environment` field (`sandbox|production`, default `sandbox`) makes the choice **explicit** — when set, no silent fallback happens (errors are surfaced instead).
+  - Token cache is keyed by `(client_id, base)` so env-switches never serve a stale token.
+  - All Nomba functions now accept an `environment` parameter; threaded through from settings everywhere.
+- **Admin Settings UI**: New `Environment` dropdown (Sandbox / Production) in the Nomba credentials card; clear hint that sandbox and production use different keys.
+- **Verified**: With env=`production`, balance returns ₦1,057.60 + 601 Nigerian banks. With env=`sandbox`, sandbox keys would route correctly (current creds are prod).
+
+### Added — Admin Activity Log
+- **Backend**:
+  - New `admin_activity` collection + `AdminActivity` model.
+  - `_log_admin_activity()` helper called from: PIN clear, balance adjust, block/unblock, deposit approve, withdrawal approve/reject/Paystack-pay/Nomba-pay, settings update.
+  - `GET /api/admin/activity?action=&target_type=&admin_id=&limit=` returns `{items, count, actions}`. Sensitive setting values (paystack/nomba secrets) are redacted to `•••` in the audit trail.
+- **Frontend**: New `/admin/activity-log` page — searchable (admin phone / name / target / description) + filter by action. Color-coded action badges with icons. Sidebar link added.
+
+### Tests
+- iter 18: curl smoke-test — adjusted balance + cleared PIN + updated settings produced 3 distinct audit rows with correct attribution; Nomba env=production returns live balance.
+
 ## Recent Changes (Feb 2026 — iteration 17)
 
 ### Added — Admin "Clear PIN" emergency action

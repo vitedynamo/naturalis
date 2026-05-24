@@ -324,6 +324,7 @@ async def banks_for_user(request: Request, user=Depends(get_current_user)):
                 client_id=s["nomba_client_id"],
                 client_secret=s["nomba_client_secret"],
                 account_id=s["nomba_account_id"],
+                environment=s.get("nomba_environment"),
             )
             if items:
                 return items
@@ -371,6 +372,7 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
                 account_id=s["nomba_account_id"],
                 account_number=account_number,
                 bank_code=bank_code,
+                environment=s.get("nomba_environment"),
             )
             return {**res, "mode": "live", "provider": "nomba"}
         except Exception as e:
@@ -889,6 +891,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                         client_id=settings["nomba_client_id"],
                         client_secret=settings["nomba_client_secret"],
                         account_id=settings.get("nomba_account_id", ""),
+                        environment=settings.get("nomba_environment"),
                     )
                 except Exception as be:
                     logger.warning(f"Nomba balance check failed: {be}")
@@ -917,6 +920,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     amount_naira=float(data.amount), account_number=user["account_number"],
                     account_name=user["account_name"], bank_code=user["bank_code"],
                     merchant_tx_ref=ref, narration=f"Auto payout {wid}",
+                    environment=settings.get("nomba_environment"),
                 )
                 # Mark as initiated (NOT paid) — final status confirmed by status poll
                 await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "processing", "method": "auto", "admin_note": f"Auto Nomba · {ref} (status pending confirmation)", "nomba_transfer_ref": ref, "updated_at": _now_iso()}})

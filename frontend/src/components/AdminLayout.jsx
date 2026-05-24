@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutGrid, Users, Package, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, Share2, Ticket, Settings as SettingsIcon, KeyRound, LogOut, Menu, X,
-  Megaphone, SlidersHorizontal, ShieldAlert, FileBarChart2, ExternalLink,
+  Megaphone, SlidersHorizontal, ShieldAlert, FileBarChart2, ExternalLink, History,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -20,6 +20,7 @@ const items = [
   { to: "/admin/announcements", icon: Megaphone, label: "Announcements" },
   { to: "/admin/manual-adjustments", icon: SlidersHorizontal, label: "Manual Adjustments" },
   { to: "/admin/fraud-monitor", icon: ShieldAlert, label: "Fraud Monitor" },
+  { to: "/admin/activity-log", icon: History, label: "Activity Log" },
   { to: "/admin/financial-report", icon: FileBarChart2, label: "Financial Report" },
   { to: "/admin/password-resets", icon: KeyRound, label: "Password Resets" },
   { to: "/admin/settings", icon: SettingsIcon, label: "Settings" },

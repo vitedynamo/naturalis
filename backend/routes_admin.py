@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
 from storage import put_object, get_object
-from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status
+from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, invalidate_token_cache as nomba_invalidate_token
 
 router = APIRouter()
 
@@ -25,6 +25,28 @@ _banks_cache: dict = {"at": 0, "items": []}
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+async def _log_admin_activity(db, admin: dict, action: str, *, target_type: str = None, target_id: str = None, description: str = "", meta: dict = None):
+    """Append a row to the admin activity log. Best-effort — failures swallowed so they
+    never break the actual admin action being audited.
+    """
+    try:
+        doc = {
+            "id": gen_reference("act"),
+            "admin_id": admin.get("id", ""),
+            "admin_phone": admin.get("phone", ""),
+            "admin_name": admin.get("name", ""),
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
+            "description": description or "",
+            "meta": meta or {},
+            "created_at": _now_iso(),
+        }
+        await db.admin_activity.insert_one(doc)
+    except Exception:
+        pass
 
 
 async def _get_secret_key(db) -> tuple[str, str]:
@@ -76,6 +98,7 @@ async def list_banks(request: Request, _admin=Depends(get_current_admin)):
                 client_id=s["nomba_client_id"],
                 client_secret=s["nomba_client_secret"],
                 account_id=s["nomba_account_id"],
+                environment=s.get("nomba_environment"),
             )
             if items:
                 _banks_cache["items"] = items
@@ -170,6 +193,12 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
             "updated_at": _now_iso(),
         }},
     )
+    await _log_admin_activity(
+        db, _admin, "withdrawal.paid_paystack",
+        target_type="withdrawal", target_id=wid,
+        description=f"Paid ₦{float(w['amount']):,.2f} via Paystack ({mode if mode == 'live' and secret else 'mock'})",
+        meta={"amount": w["amount"], "user_id": w["user_id"], "reference": transfer_ref},
+    )
     return {"status": "ok", "reference": transfer_ref, "mode": mode if (mode == "live" and secret) else "mock"}
 
 
@@ -200,6 +229,7 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
         try:
             available = await nomba_balance(
                 client_id=client_id, client_secret=client_secret, account_id=account_id,
+                environment=s.get("nomba_environment"),
             )
         except Exception as e:
             available = None
@@ -225,6 +255,7 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
                 account_number=w["account_number"], account_name=w["account_name"],
                 bank_code=payload.bank_code, merchant_tx_ref=transfer_ref,
                 narration=payload.reason or f"Withdrawal {wid}",
+                environment=s.get("nomba_environment"),
             )
         except Exception as e:
             raise HTTPException(502, f"Nomba transfer failed: {e}")
@@ -241,6 +272,12 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
                 "insufficient_float": False,
                 "updated_at": _now_iso(),
             }},
+        )
+        await _log_admin_activity(
+            db, _admin, "withdrawal.paid_nomba",
+            target_type="withdrawal", target_id=wid,
+            description=f"Initiated Nomba payout ₦{float(w['amount']):,.2f} (processing)",
+            meta={"amount": w["amount"], "user_id": w["user_id"], "reference": transfer_ref},
         )
         return {"status": "processing", "reference": transfer_ref, "mode": "live"}
 
@@ -540,6 +577,7 @@ async def admin_users(request: Request, _admin=Depends(get_current_admin)):
 async def block_user(user_id: str, request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     await db.users.update_one({"id": user_id}, {"$set": {"is_blocked": True}})
+    await _log_admin_activity(db, _admin, "user.blocked", target_type="user", target_id=user_id, description="Blocked user account")
     return {"status": "ok"}
 
 
@@ -547,6 +585,7 @@ async def block_user(user_id: str, request: Request, _admin=Depends(get_current_
 async def unblock_user(user_id: str, request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     await db.users.update_one({"id": user_id}, {"$set": {"is_blocked": False}})
+    await _log_admin_activity(db, _admin, "user.unblocked", target_type="user", target_id=user_id, description="Unblocked user account")
     return {"status": "ok"}
 
 
@@ -575,16 +614,18 @@ async def adjust_balance(user_id: str, payload: dict, request: Request, _admin=D
         "meta": {"by_admin": True},
         "created_at": _now_iso(),
     })
+    await _log_admin_activity(
+        db, _admin, "user.balance_adjusted",
+        target_type="user", target_id=user_id,
+        description=f"{'Credited' if amount > 0 else 'Debited'} ₦{abs(amount):,.2f} — {note}",
+        meta={"amount": amount, "note": note, "new_balance": new_user["wallet_balance"]},
+    )
     return {"status": "ok", "wallet_balance": new_user["wallet_balance"]}
 
 
 @router.post("/admin/users/{user_id}/clear-pin")
 async def admin_clear_withdrawal_pin(user_id: str, request: Request, _admin=Depends(get_current_admin)):
-    """Emergency admin action: clear a user's withdrawal PIN + any lockout.
-
-    Useful when the user forgot their PIN AND has no security questions on file.
-    After this, the user must set a new PIN on Profile before they can withdraw again.
-    """
+    """Emergency admin action: clear a user's withdrawal PIN + any lockout."""
     db = request.app.state.db
     res = await db.users.update_one(
         {"id": user_id, "is_admin": {"$ne": True}},
@@ -596,6 +637,11 @@ async def admin_clear_withdrawal_pin(user_id: str, request: Request, _admin=Depe
     )
     if res.matched_count == 0:
         raise HTTPException(404, "User not found (or target is an admin)")
+    await _log_admin_activity(
+        db, _admin, "pin.cleared",
+        target_type="user", target_id=user_id,
+        description="Cleared user withdrawal PIN",
+    )
     return {"status": "ok", "message": "Withdrawal PIN cleared. User must set a new one on their Profile."}
 
 
@@ -694,6 +740,12 @@ async def approve_deposit(deposit_id: str, request: Request, _admin=Depends(get_
         "meta": {"reference": deposit["reference"], "by_admin": True},
         "created_at": _now_iso(),
     })
+    await _log_admin_activity(
+        db, _admin, "deposit.approved",
+        target_type="deposit", target_id=deposit_id,
+        description=f"Approved deposit ₦{float(deposit['amount']):,.2f}",
+        meta={"amount": deposit["amount"], "reference": deposit["reference"], "user_id": deposit["user_id"]},
+    )
     return {"status": "ok"}
 
 
@@ -720,6 +772,12 @@ async def approve_withdrawal(wid: str, payload: AdminWithdrawalAction, request: 
     await db.withdrawals.update_one(
         {"id": wid},
         {"$set": {"status": "paid", "admin_note": payload.note, "updated_at": _now_iso()}},
+    )
+    await _log_admin_activity(
+        db, _admin, "withdrawal.approved",
+        target_type="withdrawal", target_id=wid,
+        description=f"Manually marked ₦{float(w['amount']):,.2f} as paid",
+        meta={"amount": w["amount"], "user_id": w["user_id"], "note": payload.note},
     )
     return {"status": "ok"}
 
@@ -753,6 +811,12 @@ async def reject_withdrawal(wid: str, payload: AdminWithdrawalAction, request: R
         "meta": {"withdrawal_id": wid},
         "created_at": _now_iso(),
     })
+    await _log_admin_activity(
+        db, _admin, "withdrawal.rejected",
+        target_type="withdrawal", target_id=wid,
+        description=f"Rejected ₦{float(w['amount']):,.2f} and refunded user",
+        meta={"amount": w["amount"], "user_id": w["user_id"], "note": payload.note},
+    )
     return {"status": "ok"}
 
 
@@ -893,10 +957,11 @@ async def admin_nomba_balance(request: Request, _admin=Depends(get_current_admin
         bal = await nomba_balance(
             client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
             account_id=s["nomba_account_id"],
+            environment=s.get("nomba_environment"),
         )
-        return {"balance": round(float(bal), 2), "currency": "NGN", "live": True}
+        return {"balance": round(float(bal), 2), "currency": "NGN", "live": True, "environment": s.get("nomba_environment", "auto")}
     except Exception as e:
-        return {"balance": None, "currency": "NGN", "live": True, "error": str(e)}
+        return {"balance": None, "currency": "NGN", "live": True, "environment": s.get("nomba_environment", "auto"), "error": str(e)}
 
 
 async def _refresh_one_withdrawal(db, w: dict) -> dict:
@@ -921,6 +986,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
             res = await nomba_status(
                 client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
                 account_id=s.get("nomba_account_id", ""), merchant_tx_ref=ref,
+                environment=s.get("nomba_environment"),
             )
             st = res.get("status", "PENDING")
             if st == "SUCCESS":
@@ -1066,15 +1132,47 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             payload[k] = v
     if payload:
         await db.settings.update_one({"id": "global"}, {"$set": payload}, upsert=True)
+        # Log settings change (redact sensitive fields)
+        SENSITIVE = {"paystack_secret_key", "nomba_client_secret"}
+        redacted = {k: ("•••" if k in SENSITIVE else v) for k, v in payload.items()}
+        await _log_admin_activity(
+            db, _admin, "settings.updated",
+            target_type="settings", target_id="global",
+            description=f"Updated {len(payload)} setting(s): {', '.join(payload.keys())}",
+            meta={"changed_keys": list(payload.keys()), "values": redacted},
+        )
     # If Paystack/Nomba creds were changed, bust the banks cache + Nomba token so the next call uses fresh creds
-    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload:
+    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload or "nomba_environment" in payload:
         _banks_cache["items"] = []
         _banks_cache["at"] = 0
         try:
-            from nomba import _token_cache as _nomba_tok
-            _nomba_tok["token"] = None
-            _nomba_tok["expires_at"] = 0
-            _nomba_tok["base"] = ""
+            nomba_invalidate_token()
         except Exception:
             pass
     return await db.settings.find_one({"id": "global"}, {"_id": 0})
+
+
+
+# ===== Admin Activity Log =====
+@router.get("/admin/activity")
+async def list_admin_activity(
+    request: Request,
+    action: Optional[str] = None,
+    target_type: Optional[str] = None,
+    admin_id: Optional[str] = None,
+    limit: int = 200,
+    _admin=Depends(get_current_admin),
+):
+    """Return recent admin activity, newest first. Filter by action / target_type / admin_id."""
+    db = request.app.state.db
+    q = {}
+    if action:
+        q["action"] = action
+    if target_type:
+        q["target_type"] = target_type
+    if admin_id:
+        q["admin_id"] = admin_id
+    items = await db.admin_activity.find(q, {"_id": 0}).sort("created_at", -1).to_list(min(limit, 1000))
+    # Distinct actions for filter UI
+    distinct_actions = await db.admin_activity.distinct("action")
+    return {"items": items, "count": len(items), "actions": sorted(distinct_actions)}

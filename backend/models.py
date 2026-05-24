@@ -285,6 +285,7 @@ class Settings(BaseModel):
     nomba_client_id: str = ""
     nomba_client_secret: str = ""
     nomba_account_id: str = ""
+    nomba_environment: str = "sandbox"  # sandbox | production
     deposit_gateway: str = "paystack"  # paystack | nomba
     payout_gateway: str = "paystack"   # paystack | nomba
     payment_mode: str = "mock"  # mock | live
@@ -313,6 +314,7 @@ class SettingsUpdate(BaseModel):
     nomba_client_id: Optional[str] = None
     nomba_client_secret: Optional[str] = None
     nomba_account_id: Optional[str] = None
+    nomba_environment: Optional[str] = None  # sandbox | production
     deposit_gateway: Optional[str] = None
     payout_gateway: Optional[str] = None
     payment_mode: Optional[str] = None
@@ -333,3 +335,18 @@ class SettingsUpdate(BaseModel):
 class PaystackPayRequest(BaseModel):
     bank_code: str
     reason: Optional[str] = None
+
+
+# ----- Admin Activity Log -----
+class AdminActivity(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    admin_id: str
+    admin_phone: str = ""
+    admin_name: str = ""
+    action: str  # e.g. 'pin.cleared', 'withdrawal.approved', 'settings.updated'
+    target_type: Optional[str] = None  # 'user' | 'withdrawal' | 'deposit' | 'settings' | 'product' | 'coupon'
+    target_id: Optional[str] = None
+    description: str = ""
+    meta: dict = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=_now)

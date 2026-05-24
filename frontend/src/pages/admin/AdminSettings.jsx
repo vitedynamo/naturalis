@@ -60,6 +60,7 @@ export default function AdminSettings() {
         nomba_client_id: s.nomba_client_id || "",
         nomba_client_secret: s.nomba_client_secret || "",
         nomba_account_id: s.nomba_account_id || "",
+        nomba_environment: s.nomba_environment || "sandbox",
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -304,8 +305,20 @@ export default function AdminSettings() {
 
         <div className="card-soft p-6">
           <div className="text-label">Nomba credentials</div>
-          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Required only when a Nomba gateway is active and mode is <code>live</code>.</p>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">Required only when a Nomba gateway is active and mode is <code>live</code>. Pick the environment that matches your keys — Nomba sandbox and production are separate.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <label className="text-xs md:col-span-2">
+              <span>Environment</span>
+              <select
+                value={s.nomba_environment || "sandbox"}
+                onChange={(e) => setS({ ...s, nomba_environment: e.target.value })}
+                data-testid="nomba-environment-select"
+                className="w-full mt-1 input-base"
+              >
+                <option value="sandbox">{`Sandbox (sandbox.nomba.com)`}</option>
+                <option value="production">{`Production (api.nomba.com)`}</option>
+              </select>
+            </label>
             <Field label="Client ID" value={s.nomba_client_id} text onChange={(v)=>setS({...s, nomba_client_id: v})} testid="nomba-client-id" />
             <Field label="Account ID" value={s.nomba_account_id} text onChange={(v)=>setS({...s, nomba_account_id: v})} testid="nomba-account-id" />
             <label className="md:col-span-2 text-xs">
