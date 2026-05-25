@@ -1153,6 +1153,125 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
 
 
 
+@router.get("/admin/stats/profit-breakdown")
+async def admin_profit_breakdown(request: Request, _admin=Depends(get_current_admin)):
+    """Detailed line-by-line breakdown of platform profit.
+
+    Returns:
+      - inflow: total successful deposits
+      - outflow buckets: paid withdrawals, welcome bonuses, coupon bonuses, referral commissions, daily profits credited
+      - net profit (sum)
+      - 5 most recent contributing transactions per bucket (for transparency)
+    """
+    db = request.app.state.db
+    # Inflow
+    deps = await db.deposits.aggregate([
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_deposits = float(deps[0]["total"]) if deps else 0.0
+    deposits_count = int(deps[0]["count"]) if deps else 0
+
+    # Paid out
+    paid = await db.withdrawals.aggregate([
+        {"$match": {"status": {"$in": ["approved", "paid"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_paid = float(paid[0]["total"]) if paid else 0.0
+    paid_count = int(paid[0]["count"]) if paid else 0
+
+    # Bonuses/coupons/referrals/profits (all credit transactions that come OUT of the platform's pocket)
+    rows = await db.transactions.aggregate([
+        {"$match": {"type": {"$in": ["bonus", "coupon", "referral", "profit"]}, "amount": {"$gt": 0}}},
+        {"$group": {"_id": "$type", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(20)
+    bucket_map = {r["_id"]: {"total": float(r["total"]), "count": int(r["count"])} for r in rows}
+    welcome = bucket_map.get("bonus", {"total": 0, "count": 0})
+    coupons = bucket_map.get("coupon", {"total": 0, "count": 0})
+    referrals = bucket_map.get("referral", {"total": 0, "count": 0})
+    profits = bucket_map.get("profit", {"total": 0, "count": 0})
+
+    net_profit = round(
+        total_deposits - total_paid - welcome["total"] - coupons["total"] - referrals["total"] - profits["total"],
+        2,
+    )
+
+    # Recent items per bucket (for transparency / drill)
+    async def _recent(ttype, n=5):
+        items = await db.transactions.find({"type": ttype}, {"_id": 0}).sort("created_at", -1).limit(n).to_list(n)
+        for it in items:
+            u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
+            it["user_name"] = u["name"] if u else "—"
+            it["user_phone"] = u["phone"] if u else "—"
+        return items
+
+    return {
+        "inflow": {
+            "total_deposits": total_deposits,
+            "count": deposits_count,
+        },
+        "outflow": {
+            "paid_withdrawals": {"total": total_paid, "count": paid_count},
+            "welcome_bonuses": welcome,
+            "coupon_redemptions": coupons,
+            "referral_commissions": referrals,
+            "daily_profit_credits": profits,
+        },
+        "net_profit": net_profit,
+        "formula": "deposits − paid_withdrawals − welcome_bonuses − coupons − referral_commissions − daily_profits",
+        "recent": {
+            "withdrawals": await db.withdrawals.find(
+                {"status": {"$in": ["approved", "paid"]}}, {"_id": 0}
+            ).sort("updated_at", -1).limit(5).to_list(5),
+            "welcome_bonuses": await _recent("bonus"),
+            "coupons": await _recent("coupon"),
+            "referrals": await _recent("referral"),
+            "profits": await _recent("profit"),
+        },
+    }
+
+
+@router.get("/admin/stats/payout-projection")
+async def admin_payout_projection(request: Request, _admin=Depends(get_current_admin)):
+    """Detailed projection of the next 24h payout liability.
+
+    Returns:
+      - total: sum of daily_profit_amount for every active investment
+      - active_investments: count
+      - by_product: breakdown grouped by product (product_name, total, count)
+      - top_contributors: top 15 active investments by daily payout amount
+    """
+    db = request.app.state.db
+    active = await db.investments.find({"status": "active"}, {"_id": 0}).to_list(20000)
+    total = round(sum(float(i.get("daily_profit_amount", 0)) for i in active), 2)
+
+    by_product = {}
+    for inv in active:
+        key = inv.get("product_name", "—")
+        b = by_product.setdefault(key, {"product_name": key, "total": 0.0, "count": 0, "invested": 0.0})
+        b["total"] += float(inv.get("daily_profit_amount", 0))
+        b["count"] += 1
+        b["invested"] += float(inv.get("amount", 0))
+    by_product_list = sorted(by_product.values(), key=lambda x: x["total"], reverse=True)
+    for b in by_product_list:
+        b["total"] = round(b["total"], 2)
+        b["invested"] = round(b["invested"], 2)
+
+    # Top 15 individual contributors
+    top = sorted(active, key=lambda i: float(i.get("daily_profit_amount", 0)), reverse=True)[:15]
+    for inv in top:
+        u = await db.users.find_one({"id": inv["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
+        inv["user_name"] = u["name"] if u else "—"
+        inv["user_phone"] = u["phone"] if u else "—"
+
+    return {
+        "total": total,
+        "active_count": len(active),
+        "by_product": by_product_list,
+        "top_contributors": top,
+    }
+
+
 # ===== Admin Activity Log =====
 @router.get("/admin/diagnostics/egress")
 async def admin_egress_diagnostics(request: Request, _admin=Depends(get_current_admin)):

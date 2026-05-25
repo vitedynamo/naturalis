@@ -146,7 +146,7 @@ export default function AdminDashboard() {
 
       {/* Hero: Platform profit + Next 24h payout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-        <div className="rounded-3xl p-6 md:p-8 text-white relative overflow-hidden bg-gradient-to-br from-[color:var(--accent-main)] via-[#E11D74] to-[color:var(--brand)] shadow-xl shadow-[color:var(--accent-main)]/30" data-testid="platform-profit-card">
+        <Link to="/admin/profit-breakdown" className="rounded-3xl p-6 md:p-8 text-white relative overflow-hidden bg-gradient-to-br from-[color:var(--accent-main)] via-[#E11D74] to-[color:var(--brand)] shadow-xl shadow-[color:var(--accent-main)]/30 hover:shadow-2xl hover:scale-[1.01] transition-all" data-testid="platform-profit-card">
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/15 blur-2xl" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
@@ -154,26 +154,26 @@ export default function AdminDashboard() {
               <div className="font-display font-extrabold text-4xl md:text-5xl mt-2 leading-none" data-testid="platform-profit-value">
                 {formatNaira(s?.platform_profit ?? 0)}
               </div>
-              <div className="text-white/80 text-xs mt-2">Deposits − payouts − bonuses − referrals − profits</div>
+              <div className="text-white/80 text-xs mt-2">Tap to see the full P&amp;L breakdown</div>
             </div>
             <ArrowUpRight className="w-7 h-7 text-white/80" />
           </div>
-        </div>
+        </Link>
 
-        <div className="card-soft p-6 md:p-8 relative" data-testid="next-payout-card">
+        <Link to="/admin/payout-projection" className="card-soft p-6 md:p-8 relative hover:scale-[1.01] hover:shadow-lg transition-all block" data-testid="next-payout-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-label">Next 24h payout</div>
               <div className="font-display font-extrabold text-4xl md:text-5xl mt-2 leading-none text-[color:var(--text-primary)]" data-testid="next-payout-value">
                 {formatNaira(s?.next_24h_payout ?? 0)}
               </div>
-              <div className="text-xs text-[color:var(--text-tertiary)] mt-2">Projected from active investments' daily profit</div>
+              <div className="text-xs text-[color:var(--text-tertiary)] mt-2">Tap to see which investments drive this</div>
             </div>
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]">
               <Clock className="w-5 h-5" />
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Top stats */}

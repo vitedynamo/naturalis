@@ -42,6 +42,21 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 19)
+
+### Added — Drill-down pages for the dashboard hero cards
+- Both hero cards on `/admin` are now clickable `<Link>` elements with hover lift effect.
+- **`/admin/profit-breakdown`** (P&L page) — backed by `GET /api/admin/stats/profit-breakdown`:
+  - Net profit hero showing the formula `deposits − paid_withdrawals − welcome_bonuses − coupons − referral_commissions − daily_profits`
+  - Inflow section: total deposits + count
+  - Outflow section: 5 buckets (paid withdrawals, welcome bonuses, coupon redemptions, referral commissions, daily profit credits) each with amount & transaction count
+  - Recent activity panels showing the latest 5 entries per bucket with user phone, name, description, timestamp
+- **`/admin/payout-projection`** — backed by `GET /api/admin/stats/payout-projection`:
+  - Projected total hero showing total + active investment count
+  - "By product" table — total invested, count, 24h payout, yield %
+  - "Top 15 contributors" table showing biggest individual investments driving the projection
+- Tested via curl: profit breakdown returned net ₦163,420 across 5 outflow buckets; payout projection returned ₦3,430 across 3 products and 14 active investments.
+
 ## Recent Changes (Feb 2026 — iteration 18)
 
 ### Fixed — Nomba 401/403 cascade
