@@ -1154,6 +1154,43 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
 
 
 # ===== Admin Activity Log =====
+@router.get("/admin/diagnostics/egress")
+async def admin_egress_diagnostics(request: Request, _admin=Depends(get_current_admin)):
+    """One-shot diagnostic: reveals the actual outbound IP the server uses,
+    both directly and through the configured NOMBA_PROXY_URL.
+
+    Use this to verify that the production deployment is actually routing
+    Nomba traffic through Fixie (or whatever proxy you configured).
+    """
+    import httpx as _httpx
+    proxy = os.environ.get("NOMBA_PROXY_URL") or ""
+    out = {
+        "httpx_version": getattr(_httpx, "__version__", "unknown"),
+        "nomba_proxy_url_set": bool(proxy),
+        "nomba_proxy_host": proxy.split("@")[-1] if proxy else None,
+        "direct_egress_ip": None,
+        "proxied_egress_ip": None,
+        "direct_error": None,
+        "proxied_error": None,
+    }
+    # 1. Raw outbound IP (what Emergent's prod sees without proxy)
+    try:
+        async with _httpx.AsyncClient(timeout=10) as c:
+            r = await c.get("https://api.ipify.org")
+            out["direct_egress_ip"] = r.text.strip()
+    except Exception as e:
+        out["direct_error"] = f"{type(e).__name__}: {e}"
+    # 2. Outbound through configured proxy (what Nomba should see)
+    if proxy:
+        try:
+            async with _httpx.AsyncClient(timeout=15, proxy=proxy) as c:
+                r = await c.get("https://api.ipify.org")
+                out["proxied_egress_ip"] = r.text.strip()
+        except Exception as e:
+            out["proxied_error"] = f"{type(e).__name__}: {e}"
+    return out
+
+
 @router.get("/admin/activity")
 async def list_admin_activity(
     request: Request,
