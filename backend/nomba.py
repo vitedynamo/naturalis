@@ -10,6 +10,17 @@ NOMBA_BASE_PROD = "https://api.nomba.com"
 NOMBA_BASE_SANDBOX = "https://sandbox.nomba.com"
 
 
+def _nomba_client(timeout: int = 20) -> httpx.AsyncClient:
+    """Build an httpx client. If NOMBA_PROXY_URL is configured, route Nomba calls
+    through it so Nomba sees a stable, whitelisted outbound IP instead of the
+    app server's real (rotating) IP.
+    """
+    proxy = os.environ.get("NOMBA_PROXY_URL") or None
+    if proxy:
+        return httpx.AsyncClient(timeout=timeout, proxy=proxy)
+    return httpx.AsyncClient(timeout=timeout)
+
+
 def _base_for_env(env: str | None, client_id: str = "") -> str:
     """Resolve the Nomba base URL from the explicit environment setting first,
     then a heuristic on the client_id, then the env var override, then production.
@@ -45,7 +56,7 @@ def invalidate_token_cache():
 async def _issue_token(client_id: str, client_secret: str, account_id: str, base: str) -> str | None:
     """Try to issue a token against a specific base. Returns access_token or None on failure."""
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with _nomba_client(timeout=20) as client:
             resp = await client.post(
                 f"{base}/v1/auth/token/issue",
                 headers={"accountId": account_id, "Content-Type": "application/json"},
@@ -129,7 +140,7 @@ async def _call_with_fallback(
         headers = {"Authorization": f"Bearer {t}", "accountId": account_id}
         if json_body is not None:
             headers["Content-Type"] = "application/json"
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with _nomba_client(timeout=timeout) as client:
             if method.upper() == "GET":
                 return await client.get(f"{b}{path}", params=params, headers=headers)
             else:
