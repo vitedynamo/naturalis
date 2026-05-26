@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
@@ -1154,35 +1154,49 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
 
 
 @router.get("/admin/stats/profit-breakdown")
-async def admin_profit_breakdown(request: Request, _admin=Depends(get_current_admin)):
+async def admin_profit_breakdown(
+    request: Request,
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    _admin=Depends(get_current_admin),
+):
     """Detailed line-by-line breakdown of platform profit.
 
-    Returns:
-      - inflow: total successful deposits
-      - outflow buckets: paid withdrawals, welcome bonuses, coupon bonuses, referral commissions, daily profits credited
-      - net profit (sum)
-      - 5 most recent contributing transactions per bucket (for transparency)
+    Accepts optional ISO datetime range filters `from` and `to`. Without filters
+    the response covers all-time. The filter is applied on `created_at` for
+    deposits / transactions, and on `updated_at` for withdrawals (status change time).
     """
     db = request.app.state.db
-    # Inflow
+
+    def _range_clause(field: str):
+        if not from_ and not to:
+            return {}
+        clause = {}
+        if from_:
+            clause["$gte"] = from_
+        if to:
+            clause["$lte"] = to
+        return {field: clause}
+
+    dep_match = {"status": "success", **_range_clause("created_at")}
     deps = await db.deposits.aggregate([
-        {"$match": {"status": "success"}},
+        {"$match": dep_match},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
     ]).to_list(1)
     total_deposits = float(deps[0]["total"]) if deps else 0.0
     deposits_count = int(deps[0]["count"]) if deps else 0
 
-    # Paid out
+    paid_match = {"status": {"$in": ["approved", "paid"]}, **_range_clause("updated_at")}
     paid = await db.withdrawals.aggregate([
-        {"$match": {"status": {"$in": ["approved", "paid"]}}},
+        {"$match": paid_match},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
     ]).to_list(1)
     total_paid = float(paid[0]["total"]) if paid else 0.0
     paid_count = int(paid[0]["count"]) if paid else 0
 
-    # Bonuses/coupons/referrals/profits (all credit transactions that come OUT of the platform's pocket)
+    tx_match = {"type": {"$in": ["bonus", "coupon", "referral", "profit"]}, "amount": {"$gt": 0}, **_range_clause("created_at")}
     rows = await db.transactions.aggregate([
-        {"$match": {"type": {"$in": ["bonus", "coupon", "referral", "profit"]}, "amount": {"$gt": 0}}},
+        {"$match": tx_match},
         {"$group": {"_id": "$type", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
     ]).to_list(20)
     bucket_map = {r["_id"]: {"total": float(r["total"]), "count": int(r["count"])} for r in rows}
@@ -1196,9 +1210,9 @@ async def admin_profit_breakdown(request: Request, _admin=Depends(get_current_ad
         2,
     )
 
-    # Recent items per bucket (for transparency / drill)
     async def _recent(ttype, n=5):
-        items = await db.transactions.find({"type": ttype}, {"_id": 0}).sort("created_at", -1).limit(n).to_list(n)
+        q = {"type": ttype, **_range_clause("created_at")}
+        items = await db.transactions.find(q, {"_id": 0}).sort("created_at", -1).limit(n).to_list(n)
         for it in items:
             u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
             it["user_name"] = u["name"] if u else "—"
@@ -1206,10 +1220,8 @@ async def admin_profit_breakdown(request: Request, _admin=Depends(get_current_ad
         return items
 
     return {
-        "inflow": {
-            "total_deposits": total_deposits,
-            "count": deposits_count,
-        },
+        "range": {"from": from_, "to": to},
+        "inflow": {"total_deposits": total_deposits, "count": deposits_count},
         "outflow": {
             "paid_withdrawals": {"total": total_paid, "count": paid_count},
             "welcome_bonuses": welcome,
@@ -1221,7 +1233,7 @@ async def admin_profit_breakdown(request: Request, _admin=Depends(get_current_ad
         "formula": "deposits − paid_withdrawals − welcome_bonuses − coupons − referral_commissions − daily_profits",
         "recent": {
             "withdrawals": await db.withdrawals.find(
-                {"status": {"$in": ["approved", "paid"]}}, {"_id": 0}
+                {"status": {"$in": ["approved", "paid"]}, **_range_clause("updated_at")}, {"_id": 0}
             ).sort("updated_at", -1).limit(5).to_list(5),
             "welcome_bonuses": await _recent("bonus"),
             "coupons": await _recent("coupon"),

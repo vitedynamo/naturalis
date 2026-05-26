@@ -42,6 +42,13 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 20)
+
+### Added — Time-range filter on the profit breakdown
+- **Backend**: `GET /api/admin/stats/profit-breakdown` now accepts optional `from` and `to` ISO datetime query params. Applied to deposits.created_at, withdrawals.updated_at, transactions.created_at. Response echoes the active range back.
+- **Frontend**: New filter card with 6 preset buttons — Today / Yesterday / Last 7 days / Last 30 days / All time / Custom. Custom shows two `<input type="date">` pickers with `min`/`max` cross-validation. Currently-selected range is displayed inline. Recent activity lists are also filtered.
+- Tested: all-time net ₦161,020 · 7-day net ₦161,020 (matches because most activity is recent) · today net −₦2,400 (only daily-profit credits today, no deposits) — confirming the filter actually works.
+
 ## Recent Changes (Feb 2026 — iteration 19)
 
 ### Added — Drill-down pages for the dashboard hero cards

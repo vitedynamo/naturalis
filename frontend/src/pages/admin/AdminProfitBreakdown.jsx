@@ -1,9 +1,46 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate } from "@/lib/format";
-import { ArrowLeft, TrendingUp, TrendingDown, Gift, Ticket, Share2, Coins, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Gift, Ticket, Share2, Coins, ArrowDownToLine, ArrowUpFromLine, Calendar } from "lucide-react";
+
+const PRESETS = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "7d", label: "Last 7 days" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "all", label: "All time" },
+  { id: "custom", label: "Custom" },
+];
+
+function _isoStartOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x.toISOString(); }
+function _isoEndOfDay(d) { const x = new Date(d); x.setHours(23,59,59,999); return x.toISOString(); }
+
+function computeRange(presetId, customFrom, customTo) {
+  if (presetId === "all") return { from: null, to: null };
+  const now = new Date();
+  if (presetId === "today") return { from: _isoStartOfDay(now), to: _isoEndOfDay(now) };
+  if (presetId === "yesterday") {
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    return { from: _isoStartOfDay(y), to: _isoEndOfDay(y) };
+  }
+  if (presetId === "7d") {
+    const f = new Date(now); f.setDate(f.getDate() - 6); // include today → 7 days total
+    return { from: _isoStartOfDay(f), to: _isoEndOfDay(now) };
+  }
+  if (presetId === "30d") {
+    const f = new Date(now); f.setDate(f.getDate() - 29);
+    return { from: _isoStartOfDay(f), to: _isoEndOfDay(now) };
+  }
+  if (presetId === "custom") {
+    return {
+      from: customFrom ? _isoStartOfDay(new Date(customFrom)) : null,
+      to: customTo ? _isoEndOfDay(new Date(customTo)) : null,
+    };
+  }
+  return { from: null, to: null };
+}
 
 function MoneyRow({ icon: Icon, label, amount, count, tone, sign = "+" }) {
   const tones = {
@@ -52,7 +89,27 @@ function RecentList({ title, items, money_key = "amount" }) {
 
 export default function AdminProfitBreakdown() {
   const [data, setData] = useState(null);
-  useEffect(() => { api.get("/admin/stats/profit-breakdown").then(({ data }) => setData(data)).catch(() => {}); }, []);
+  const [loading, setLoading] = useState(true);
+  const [preset, setPreset] = useState("all");
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [customFrom, setCustomFrom] = useState(todayStr);
+  const [customTo, setCustomTo] = useState(todayStr);
+
+  const range = useMemo(() => computeRange(preset, customFrom, customTo), [preset, customFrom, customTo]);
+
+  useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+    const qs = params.toString();
+    api.get(`/admin/stats/profit-breakdown${qs ? `?${qs}` : ""}`)
+      .then(({ data }) => setData(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [range.from, range.to]);
+
+  const currentPresetLabel = PRESETS.find((p) => p.id === preset)?.label || "All time";
 
   return (
     <AdminLayout title="">
@@ -63,7 +120,65 @@ export default function AdminProfitBreakdown() {
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-[color:var(--text-primary)]" data-testid="profit-breakdown-title">Platform profit</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">All-time inflow versus everything paid out of the platform's pocket.</p>
 
-      {!data && <div className="card-soft p-6 mt-6 text-center text-[color:var(--text-tertiary)]">Loading…</div>}
+      {/* Time range filter */}
+      <div className="card-soft p-4 mt-5" data-testid="range-filter">
+        <div className="flex flex-wrap items-center gap-2">
+          <Calendar className="w-4 h-4 text-[color:var(--text-secondary)]" />
+          <span className="text-label">Range</span>
+          <div className="flex flex-wrap gap-2 ml-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPreset(p.id)}
+                data-testid={`range-${p.id}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  preset === p.id
+                    ? "bg-[color:var(--brand)] text-white"
+                    : "bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {preset === "custom" && (
+          <div className="flex flex-wrap items-end gap-3 mt-3 pt-3 border-t border-[color:var(--border-default)]" data-testid="custom-range-controls">
+            <label className="text-xs">
+              <span className="text-[color:var(--text-secondary)]">From</span>
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo || todayStr}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                data-testid="custom-from"
+                className="block mt-1 input-base text-sm"
+              />
+            </label>
+            <label className="text-xs">
+              <span className="text-[color:var(--text-secondary)]">To</span>
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom}
+                max={todayStr}
+                onChange={(e) => setCustomTo(e.target.value)}
+                data-testid="custom-to"
+                className="block mt-1 input-base text-sm"
+              />
+            </label>
+          </div>
+        )}
+        <div className="text-[11px] text-[color:var(--text-tertiary)] mt-2">
+          Currently showing: <span className="font-semibold text-[color:var(--text-primary)]">{currentPresetLabel}</span>
+          {range.from && range.to && (
+            <span className="ml-2 font-mono">{range.from.slice(0, 10)} → {range.to.slice(0, 10)}</span>
+          )}
+        </div>
+      </div>
+
+      {!data && loading && <div className="card-soft p-6 mt-6 text-center text-[color:var(--text-tertiary)]">Loading…</div>}
 
       {data && (
         <>
