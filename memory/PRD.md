@@ -42,6 +42,34 @@ Build a Nigerian investment web app with features: deposits, withdrawals, referr
 - **Nomba**: bank transfer for withdrawals (mock mode if creds missing)
 - **Emergent Object Storage**: product images + announcement image (`/api/admin/upload-image`, served at `/api/files/{path}`)
 
+## Recent Changes (Feb 2026 — iteration 21)
+
+### Redesigned — Admin Users page + new User Detail page
+- **New `/admin/users` (full redesign)**:
+  - Gradient hero header with users icon and live total-account subtitle.
+  - 4 stat cards: Total users · Online now (last 5 min) · Verified (≥1 successful deposit) · New today.
+  - Search bar (debounced, name/phone/email/referral) + Export CSV button.
+  - Paginated table (20 rows/page) with: User column (color-seeded avatar + name + @ref-code, clickable to detail page), Phone, Balance, Joined, color-coded action pills — **Add · Deduct · Pwd · PIN · Login · Ban**.
+  - Modals for balance adjust + password reset.
+- **New `/admin/users/:id` user detail page** matching the supplied screenshots:
+  - Hero card with avatar, name, ACTIVE/BANNED badge, phone/email/referral-code/joined copy-buttons, "Referred by X" pill if applicable.
+  - 8 stat cards: Balance · Total deposited · Total invested · Active plans · Profit earned · Total withdrawn · Referrals · Referral bonus.
+  - Admin actions panel: **Add balance · Deduct balance · Reset password · Reset PIN · Change phone · Login as user · Ban/Unban** — every action audited.
+  - 6 tabs: Investments · Deposits · Withdrawals · Referrals · Transactions · Bank (with row count badges).
+- **Backend additions**:
+  - `GET /admin/users` now paginated with `q`, `page`, `page_size`, `sort`, `order` + returns header stats.
+  - `GET /admin/users/export` CSV export (filtered).
+  - `GET /admin/users/{id}/details` — full profile + 13 aggregated stats + referrer info.
+  - `GET /admin/users/{id}/timeline?tab=…` — 6 tabbed feeds.
+  - `POST /admin/users/{id}/reset-password` — set new account password (admin-only).
+  - `POST /admin/users/{id}/change-phone` — set new 11-digit phone (uniqueness checked).
+  - `POST /admin/users/{id}/login-as` — issues a short-lived JWT for impersonation; logged in audit trail.
+- **Login page**: now accepts `?_token=<jwt>` to handle the "Login as user" flow in a new tab.
+
+### Tests
+- Backend curl: paginated users (91 total, page-1 of 5), header stats (online 0/verified 16/today 0), user details (full stats for a known user), timeline tab — all pass.
+- Frontend Playwright: users hero+table render, user detail hero+8 stats+admin-actions+tabs render, tab switching works.
+
 ## Recent Changes (Feb 2026 — iteration 20)
 
 ### Added — Time-range filter on the profit breakdown

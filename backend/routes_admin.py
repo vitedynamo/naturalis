@@ -1,7 +1,7 @@
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import httpx
@@ -563,14 +563,280 @@ async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Op
 
 # ===== Users =====
 @router.get("/admin/users")
-async def admin_users(request: Request, _admin=Depends(get_current_admin)):
+async def admin_users(
+    request: Request,
+    q: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort: str = Query("created_at"),
+    order: str = Query("desc"),
+    _admin=Depends(get_current_admin),
+):
+    """List users with search, pagination, and sorting. Returns {items, total, page, page_size, stats}."""
     db = request.app.state.db
-    # Need withdrawal_pin_hash temporarily to derive has_withdrawal_pin then strip it
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0}).sort("created_at", -1).to_list(5000)
+    base_filter = {}
+    if q:
+        rx = {"$regex": q.strip(), "$options": "i"}
+        base_filter = {"$or": [
+            {"name": rx}, {"phone": rx}, {"email": rx}, {"referral_code": rx},
+        ]}
+    direction = -1 if (order or "desc").lower() == "desc" else 1
+    sort_field = sort if sort in ("created_at", "wallet_balance", "name", "phone") else "created_at"
+    total = await db.users.count_documents(base_filter)
+    skip = (page - 1) * page_size
+    users = await db.users.find(
+        base_filter,
+        {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0},
+    ).sort(sort_field, direction).skip(skip).limit(page_size).to_list(page_size)
     for u in users:
         u["has_withdrawal_pin"] = bool(u.pop("withdrawal_pin_hash", None))
         u["withdrawal_pin_locked"] = bool(u.get("withdrawal_pin_locked_until"))
-    return users
+
+    # Header stats (always include — independent of pagination/search)
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    five_min_ago = (now - timedelta(minutes=5)).isoformat()
+    total_users = await db.users.count_documents({})
+    online_now = await db.users.count_documents({"last_seen_at": {"$gte": five_min_ago}})
+    new_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
+    # "verified" = at least one successful deposit (proxy for KYC-confirmed)
+    pipeline = [
+        {"$match": {"status": "success"}},
+        {"$group": {"_id": "$user_id"}},
+        {"$count": "n"},
+    ]
+    verified_rows = await db.deposits.aggregate(pipeline).to_list(1)
+    verified = int(verified_rows[0]["n"]) if verified_rows else 0
+
+    return {
+        "items": users,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "stats": {
+            "total_users": total_users,
+            "online_now": online_now,
+            "verified": verified,
+            "new_today": new_today,
+        },
+    }
+
+
+@router.get("/admin/users/export")
+async def admin_users_export(request: Request, q: Optional[str] = Query(None), _admin=Depends(get_current_admin)):
+    """CSV export of users (filtered by `q` if provided)."""
+    import csv, io
+    db = request.app.state.db
+    base_filter = {}
+    if q:
+        rx = {"$regex": q.strip(), "$options": "i"}
+        base_filter = {"$or": [{"name": rx}, {"phone": rx}, {"email": rx}, {"referral_code": rx}]}
+    users = await db.users.find(base_filter, {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0, "withdrawal_pin_hash": 0}).sort("created_at", -1).to_list(20000)
+    buf = io.StringIO()
+    cols = ["id", "name", "phone", "email", "wallet_balance", "referral_code", "referred_by_code", "is_blocked", "is_admin", "created_at"]
+    w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
+    w.writeheader()
+    for u in users:
+        w.writerow(u)
+    await _log_admin_activity(db, _admin, "users.exported", description=f"Exported {len(users)} users to CSV", meta={"filter_q": q or ""})
+    return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=users-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.csv"})
+
+
+@router.get("/admin/users/{user_id}/details")
+async def admin_user_details(user_id: str, request: Request, _admin=Depends(get_current_admin)):
+    """Full user detail page: profile + aggregated stats + referrer info."""
+    db = request.app.state.db
+    u = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0},
+    )
+    if not u:
+        raise HTTPException(404, "User not found")
+    u["has_withdrawal_pin"] = bool(u.pop("withdrawal_pin_hash", None))
+    u["withdrawal_pin_locked"] = bool(u.get("withdrawal_pin_locked_until"))
+
+    # Aggregate stats
+    dep = await db.deposits.aggregate([
+        {"$match": {"user_id": user_id, "status": "success"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_deposited = float(dep[0]["total"]) if dep else 0.0
+    deposits_count = int(dep[0]["count"]) if dep else 0
+
+    inv = await db.investments.aggregate([
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$status", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(20)
+    total_invested = sum(float(r["total"]) for r in inv)
+    active_plans = next((r for r in inv if r["_id"] == "active"), None)
+    active_plans_count = int(active_plans["count"]) if active_plans else 0
+    total_invested_count = sum(int(r["count"]) for r in inv)
+
+    profit_earned = await db.transactions.aggregate([
+        {"$match": {"user_id": user_id, "type": "profit", "amount": {"$gt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    profit_total = float(profit_earned[0]["total"]) if profit_earned else 0.0
+
+    wdr = await db.withdrawals.aggregate([
+        {"$match": {"user_id": user_id, "status": {"$in": ["paid", "approved"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_withdrawn = float(wdr[0]["total"]) if wdr else 0.0
+    withdrawals_count = int(wdr[0]["count"]) if wdr else 0
+
+    # Referrals
+    referred_users_count = await db.users.count_documents({"referred_by_code": u.get("referral_code")})
+    invested_referrals = await db.users.count_documents({
+        "referred_by_code": u.get("referral_code"),
+        "wallet_balance": {"$gt": 0},  # cheap proxy
+    })
+    referral_bonus = await db.transactions.aggregate([
+        {"$match": {"user_id": user_id, "type": "referral", "amount": {"$gt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    referral_bonus_total = float(referral_bonus[0]["total"]) if referral_bonus else 0.0
+
+    # Referrer info
+    referrer = None
+    if u.get("referred_by_code"):
+        r = await db.users.find_one(
+            {"referral_code": u["referred_by_code"]},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "referral_code": 1},
+        )
+        if r:
+            referrer = r
+
+    # Counts for the tab badges (cheap)
+    tx_count = await db.transactions.count_documents({"user_id": user_id})
+
+    return {
+        "user": u,
+        "referrer": referrer,
+        "stats": {
+            "balance": float(u.get("wallet_balance", 0)),
+            "total_deposited": total_deposited,
+            "deposits_count": deposits_count,
+            "total_invested": total_invested,
+            "total_invested_count": total_invested_count,
+            "active_plans": active_plans_count,
+            "profit_earned": profit_total,
+            "total_withdrawn": total_withdrawn,
+            "withdrawals_count": withdrawals_count,
+            "referrals": referred_users_count,
+            "referrals_invested": invested_referrals,
+            "referral_bonus": referral_bonus_total,
+            "transactions_count": tx_count,
+            "bank_set": bool(u.get("bank_name") and u.get("account_number")),
+        },
+    }
+
+
+@router.get("/admin/users/{user_id}/timeline")
+async def admin_user_timeline(
+    user_id: str,
+    request: Request,
+    tab: str = Query("transactions"),
+    limit: int = Query(100, ge=1, le=500),
+    _admin=Depends(get_current_admin),
+):
+    """Return one paginated tab of the user's detail page.
+
+    tab ∈ {investments, deposits, withdrawals, referrals, transactions, bank}
+    """
+    db = request.app.state.db
+    if tab == "investments":
+        items = await db.investments.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    elif tab == "deposits":
+        items = await db.deposits.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    elif tab == "withdrawals":
+        items = await db.withdrawals.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    elif tab == "transactions":
+        items = await db.transactions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    elif tab == "referrals":
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "referral_code": 1})
+        code = (user or {}).get("referral_code")
+        items = []
+        if code:
+            items = await db.users.find(
+                {"referred_by_code": code},
+                {"_id": 0, "id": 1, "name": 1, "phone": 1, "created_at": 1, "wallet_balance": 1},
+            ).sort("created_at", -1).to_list(limit)
+    elif tab == "bank":
+        u = await db.users.find_one(
+            {"id": user_id},
+            {"_id": 0, "bank_name": 1, "account_number": 1, "account_name": 1, "bank_code": 1},
+        )
+        items = [u] if u and u.get("bank_name") else []
+    else:
+        raise HTTPException(400, f"Unknown tab '{tab}'")
+    return {"tab": tab, "items": items, "count": len(items)}
+
+
+@router.post("/admin/users/{user_id}/reset-password")
+async def admin_reset_password(user_id: str, payload: dict, request: Request, _admin=Depends(get_current_admin)):
+    """Set a new account password for a user. Body: {new_password: str}.
+    Returns the new password so the admin can hand it over (logged in audit trail without the plaintext)."""
+    from auth import hash_password
+    db = request.app.state.db
+    new_pwd = (payload or {}).get("new_password", "").strip()
+    if len(new_pwd) < 6:
+        raise HTTPException(400, "New password must be at least 6 characters")
+    res = await db.users.update_one(
+        {"id": user_id, "is_admin": {"$ne": True}},
+        {"$set": {"password_hash": hash_password(new_pwd)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "User not found (or target is an admin)")
+    await _log_admin_activity(
+        db, _admin, "user.password_reset",
+        target_type="user", target_id=user_id,
+        description="Reset user account password",
+    )
+    return {"status": "ok", "message": "Password updated"}
+
+
+@router.post("/admin/users/{user_id}/change-phone")
+async def admin_change_phone(user_id: str, payload: dict, request: Request, _admin=Depends(get_current_admin)):
+    """Update a user's phone number. Body: {new_phone: str (11 digits)}."""
+    db = request.app.state.db
+    new_phone = (payload or {}).get("new_phone", "").strip()
+    if not new_phone.isdigit() or len(new_phone) != 11:
+        raise HTTPException(400, "Phone must be exactly 11 digits")
+    exists = await db.users.find_one({"phone": new_phone, "id": {"$ne": user_id}}, {"_id": 0, "id": 1})
+    if exists:
+        raise HTTPException(409, "Another user already has that phone number")
+    res = await db.users.update_one(
+        {"id": user_id, "is_admin": {"$ne": True}},
+        {"$set": {"phone": new_phone}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "User not found (or target is an admin)")
+    await _log_admin_activity(
+        db, _admin, "user.phone_changed",
+        target_type="user", target_id=user_id,
+        description=f"Changed phone to {new_phone}",
+    )
+    return {"status": "ok", "phone": new_phone}
+
+
+@router.post("/admin/users/{user_id}/login-as")
+async def admin_login_as(user_id: str, request: Request, _admin=Depends(get_current_admin)):
+    """Issue a short-lived JWT for the target user so the admin can troubleshoot from their POV.
+    All actions performed under this token are audited as the user — admin attribution is in the log row.
+    """
+    from auth import create_token
+    db = request.app.state.db
+    u = await db.users.find_one({"id": user_id, "is_admin": {"$ne": True}}, {"_id": 0, "id": 1, "phone": 1, "name": 1})
+    if not u:
+        raise HTTPException(404, "User not found (or target is an admin)")
+    token = create_token(u["id"], is_admin=False)
+    await _log_admin_activity(
+        db, _admin, "user.impersonated",
+        target_type="user", target_id=user_id,
+        description=f"Issued login-as token for {u.get('name','—')} ({u.get('phone','—')})",
+    )
+    return {"token": token, "user_id": u["id"], "phone": u["phone"], "name": u["name"]}
 
 
 @router.post("/admin/users/{user_id}/block")

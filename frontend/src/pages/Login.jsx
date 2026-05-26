@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +12,23 @@ export default function Login() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Admin "Login as user" — token passed via ?_token=<JWT>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("_token");
+    if (!t) return;
+    (async () => {
+      try {
+        const { data } = await api.get("/auth/me", { headers: { Authorization: `Bearer ${t}` } });
+        if (data.is_admin) { toast.error("Cannot impersonate admin"); return; }
+        setSession(t, data);
+        toast.success(`Impersonating ${data.name}`);
+        navigate("/dashboard", { replace: true });
+      } catch { toast.error("Impersonation token invalid or expired"); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();

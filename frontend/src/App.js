@@ -37,6 +37,7 @@ import AdminFinancialReport from "@/pages/admin/AdminFinancialReport";
 import AdminActivityLog from "@/pages/admin/AdminActivityLog";
 import AdminProfitBreakdown from "@/pages/admin/AdminProfitBreakdown";
 import AdminPayoutProjection from "@/pages/admin/AdminPayoutProjection";
+import AdminUserDetail from "@/pages/admin/AdminUserDetail";
 import MyPackages from "@/pages/MyPackages";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -68,6 +69,7 @@ function App() {
 
               <Route path="/admin" element={<Protected admin><AdminDashboard /></Protected>} />
               <Route path="/admin/users" element={<Protected admin><AdminUsers /></Protected>} />
+              <Route path="/admin/users/:id" element={<Protected admin><AdminUserDetail /></Protected>} />
               <Route path="/admin/products" element={<Protected admin><AdminProducts /></Protected>} />
               <Route path="/admin/deposits" element={<Protected admin><AdminDeposits /></Protected>} />
               <Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals /></Protected>} />
