@@ -1,5 +1,22 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 22)
+
+### Marasoft in-app bank-transfer checkout (no more external redirect)
+- **Backend `marasoft.py`**:
+  - Fixed broken module — previous edit had spliced `create_reserved_account` inside `verify_transaction`, leaving an orphan `elif/else/return` block and breaking module import (only hot-reload cache had been keeping it alive).
+  - Replaced reserved-account integration with **Dynamic Accounts** endpoint (`POST https://api.marasoftpay.live/generate_dynamic_account/`) which only needs `{enc_key, amount, transaction_ref}` — no merchant BVN/KYC required, much cleaner reconciliation.
+  - New `create_dynamic_account()` function returns `{account_name, account_number, bank, amount_to_pay}`.
+- **Backend `routes_user.py`**:
+  - `/deposit/initialize` now returns `{mode:'live', gateway:'marasoft', type:'bank_transfer', reference, amount, account_number, account_name, bank_name, expires_in_minutes}` — no `authorization_url`.
+  - Deposit document is enriched with the virtual account details for re-display.
+- **Frontend `Deposit.jsx`** (already done in previous fork, syntax-fixed here):
+  - When response carries `type==='bank_transfer'`, render an in-app bank-transfer card with copyable Bank, Account name, Account number, and Amount tiles, plus an "I have paid — check status" button that re-verifies via `/deposit/verify/<ref>`. "Start over" button discards the pending state.
+- **Verified live**: Marasoft returned Wema Bank account `9021207332` for amount ₦3,000. Page renders the inline card; no redirect to external URL.
+
+### Tests
+- iter 22: 8/8 backend pytest (`backend/tests/test_deposit_marasoft.py`) + 9/9 frontend Playwright. No issues.
+
 ## Original Problem Statement
 Build a Nigerian investment web app with features: deposits, withdrawals, referrals, profile, coupon bonuses, transaction history. Users invest in products and profit returns every 24 hours. Phone+password registration with optional referral code. Admin panel to customize products/packages, profit %, images, view users/withdrawals/deposits/referrals/investments. **2-generation referral program** with customizable percentages. Admin caters for all user-side features. No landing/about page.
 
