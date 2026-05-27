@@ -175,26 +175,22 @@ export default function AdminDeposits() {
       </div>
 
       {/* Table */}
-      <div className="card-soft overflow-hidden mt-5" data-testid="deposits-table">
+      <div className="card-soft mt-5" data-testid="deposits-table">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] border-b border-[color:var(--border-default)]">
                 <th className="text-left p-4">User</th>
-                <th className="text-left p-4">Initiated</th>
-                <th className="text-left p-4">Paid</th>
+                <th className="text-left p-4">Amount</th>
                 <th className="text-left p-4">Gateway</th>
-                <th className="text-left p-4">Gateway ID</th>
-                <th className="text-left p-4">Account generated</th>
-                <th className="text-left p-4">Our ref</th>
                 <th className="text-left p-4">Status</th>
-                <th className="text-left p-4">Date</th>
+                <th className="text-left p-4 hidden md:table-cell">Date</th>
                 <th className="text-right p-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="p-12 text-center text-[color:var(--text-tertiary)]">
+                <tr><td colSpan={6} className="p-12 text-center text-[color:var(--text-tertiary)]">
                   {q || filter !== "All" ? "No deposits match this filter." : "No deposits yet."}
                 </td></tr>
               )}
@@ -203,53 +199,37 @@ export default function AdminDeposits() {
                 return (
                   <tr key={d.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`deposit-row-${d.id}`}>
                     <td className="p-4">
-                      <Link to={`/admin/users/${d.user_id}`} className="flex items-center gap-2.5 group">
+                      <Link to={`/admin/users/${d.user_id}`} className="flex items-center gap-2.5 group min-w-0">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: avatarColor(d.user_id) }}>
                           {(d.user_name || "?").trim()[0]?.toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-[color:var(--accent-main)] group-hover:underline truncate max-w-[140px]">{d.user_name || "—"}</div>
-                          <div className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{d.user_phone}</div>
+                          <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] truncate">{d.user_phone}</div>
                         </div>
                       </Link>
                     </td>
-                    <td className="p-4 font-display font-bold tabular-nums">{formatNaira(d.amount)}</td>
-                    <td className="p-4 font-display font-bold tabular-nums">
-                      {d.status === "success" ? <span className="text-[color:var(--success)]">{formatNaira(d.amount)}</span> : <span className="text-[color:var(--text-tertiary)]">—</span>}
+                    <td className="p-4">
+                      <div className="font-display font-bold tabular-nums leading-tight">{formatNaira(d.amount)}</div>
+                      <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5">
+                        {d.status === "success"
+                          ? <span className="text-[color:var(--success)] font-semibold">Paid in full</span>
+                          : "Pending settle"}
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]">{d.method}</span>
                     </td>
-                    <td className="p-4"><CopyChip value={d.gateway_id || d.meta?.gateway_ref} testid={`copy-gid-${d.id}`} /></td>
-                    <td className="p-4 text-xs">
-                      {d.account_number ? (
-                        <div>
-                          <div className="font-mono">{d.account_number}</div>
-                          {d.bank_name && <div className="text-[10px] text-[color:var(--text-tertiary)]">{d.bank_name}</div>}
-                        </div>
-                      ) : (
-                        <span className="text-[color:var(--text-tertiary)]">—</span>
-                      )}
-                    </td>
-                    <td className="p-4"><CopyChip value={d.reference} testid={`copy-ref-${d.id}`} /></td>
                     <td className="p-4">
                       <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${pill.cls}`}>{pill.label}</span>
                     </td>
-                    <td className="p-4 text-xs text-[color:var(--text-tertiary)] whitespace-nowrap">{formatDate(d.created_at)}</td>
+                    <td className="p-4 text-xs text-[color:var(--text-tertiary)] whitespace-nowrap hidden md:table-cell">{formatDate(d.created_at)}</td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2 justify-end">
+                      <div className="flex items-center gap-2 justify-end flex-wrap">
                         <button onClick={() => setViewing(d)} data-testid={`view-deposit-${d.id}`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--accent-main)]/30 text-[color:var(--accent-main)] hover:bg-[color:var(--accent-soft)]">
                           <Eye className="w-3 h-3" /> View
                         </button>
-                        {d.status === "pending" && (d.method === "marasoft" || d.method === "paystack") && (
-                          <button onClick={() => refreshOne(d)} disabled={refreshingId === d.id}
-                            data-testid={`refresh-deposit-${d.id}`}
-                            title="Re-verify with the payment gateway"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-[color:var(--brand-soft)] text-[color:var(--brand)]">
-                            <RefreshCw className={`w-3 h-3 ${refreshingId === d.id ? "animate-spin" : ""}`} /> Refresh
-                          </button>
-                        )}
                         {d.status !== "success" && (
                           <button onClick={() => setCreditAmt({ open: true, deposit: d })}
                             data-testid={`credit-deposit-${d.id}`}
