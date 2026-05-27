@@ -9,6 +9,7 @@ import {
   ArrowLeft, Phone, Mail, Sparkles, Copy, CheckCircle2, Ban, Plus, Minus,
   KeyRound, Lock, LogIn, Wallet, ArrowDownToLine, TrendingUp, Layers,
   ArrowUpRight, ArrowUpFromLine, Share2, Gift, FileText, Building2,
+  History, ChevronRight, Coins, Settings as SettingsIcon, UserCheck,
 } from "lucide-react";
 
 function avatarColor(seed = "") {
@@ -91,20 +92,29 @@ export default function AdminUserDetail() {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("investments");
   const [tabData, setTabData] = useState({ items: [], loading: false });
-  const [modal, setModal] = useState(null); // 'add' | 'deduct' | 'pwd' | 'phone'
+  const [modal, setModal] = useState(null); // 'add' | 'deduct' | 'pwd' | 'phone' | 'activity'
   const [adjust, setAdjust] = useState({ amount: "", note: "" });
   const [pwd, setPwd] = useState({ new_password: "" });
   const [phoneForm, setPhoneForm] = useState({ new_phone: "" });
+  const [activity, setActivity] = useState({ items: [], loading: false, count: 0 });
 
   const load = () => api.get(`/admin/users/${id}/details`).then(({ data }) => setData(data)).catch(() => toast.error("Failed to load user"));
+  const loadActivity = () => {
+    setActivity((a) => ({ ...a, loading: true }));
+    return api.get(`/admin/users/${id}/activity?limit=500`)
+      .then(({ data }) => setActivity({ items: data.items || [], count: data.count || 0, loading: false }))
+      .catch(() => setActivity({ items: [], count: 0, loading: false }));
+  };
   const loadTab = (t) => {
     setTabData({ items: [], loading: true });
     api.get(`/admin/users/${id}/timeline?tab=${t}&limit=100`)
       .then(({ data }) => setTabData({ items: data.items || [], loading: false }))
       .catch(() => setTabData({ items: [], loading: false }));
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { load(); loadActivity(); /* eslint-disable-next-line */ }, [id]);
   useEffect(() => { loadTab(tab); /* eslint-disable-next-line */ }, [tab, id]);
+
+  const openActivityModal = () => { setModal("activity"); loadActivity(); };
 
   const u = data?.user;
   const s = data?.stats || {};
@@ -235,6 +245,25 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
+      {/* Activity Log card */}
+      <button onClick={openActivityModal}
+        data-testid="activity-log-card"
+        className="w-full card-soft p-5 mt-5 flex items-center gap-4 hover:shadow-lg hover:scale-[1.005] transition-all text-left">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[color:var(--brand)] to-[color:var(--accent-main)] text-white flex items-center justify-center shrink-0">
+          <History className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-display font-bold text-[color:var(--text-primary)]">Activity log</div>
+          <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+            {activity.count > 0
+              ? `${activity.count} admin action${activity.count === 1 ? "" : "s"} recorded on this account`
+              : "No admin actions recorded yet — click to view"}
+          </div>
+        </div>
+        <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] hidden md:block">View full audit trail</div>
+        <ChevronRight className="w-5 h-5 text-[color:var(--text-tertiary)] shrink-0" />
+      </button>
+
       {/* Tabs */}
       <div className="card-soft mt-5" data-testid="user-tabs">
         <div className="flex flex-wrap gap-1 border-b border-[color:var(--border-default)] p-2">
@@ -312,6 +341,91 @@ export default function AdminUserDetail() {
               <button type="submit" data-testid="pwd-submit" className="px-4 py-2 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white">Reset password</button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Activity log modal */}
+      <Dialog open={modal === "activity"} onOpenChange={(o) => !o && setModal(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="w-5 h-5" /> Activity log — {u?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto -mx-6 px-6" data-testid="activity-modal-body">
+            {activity.loading && (
+              <div className="text-center text-[color:var(--text-tertiary)] py-12">Loading…</div>
+            )}
+            {!activity.loading && activity.items.length === 0 && (
+              <div className="text-center text-[color:var(--text-tertiary)] py-12">
+                <History className="w-10 h-10 mx-auto opacity-30" />
+                <div className="mt-3 text-sm">No admin actions have been recorded on this account yet.</div>
+              </div>
+            )}
+            {!activity.loading && activity.items.length > 0 && (
+              <ol className="relative border-l-2 border-[color:var(--border-default)] ml-2 space-y-4 py-2">
+                {activity.items.map((it) => {
+                  const ICONS = {
+                    "pin.cleared": KeyRound,
+                    "user.balance_adjusted": Coins,
+                    "user.blocked": Ban,
+                    "user.unblocked": UserCheck,
+                    "user.password_reset": KeyRound,
+                    "user.phone_changed": Phone,
+                    "user.impersonated": LogIn,
+                  };
+                  const Icon = ICONS[it.action] || SettingsIcon;
+                  const colorMap = {
+                    "pin.cleared": "bg-[color:var(--gold-soft)] text-[color:var(--warning)]",
+                    "user.balance_adjusted": "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
+                    "user.blocked": "bg-[color:var(--error-soft)] text-[color:var(--error)]",
+                    "user.unblocked": "bg-[color:var(--success-soft)] text-[color:var(--success)]",
+                    "user.password_reset": "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
+                    "user.phone_changed": "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
+                    "user.impersonated": "bg-[color:var(--surface-alt)] text-[color:var(--accent-main)]",
+                  };
+                  const tone = colorMap[it.action] || "bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]";
+                  return (
+                    <li key={it.id} className="ml-6 relative" data-testid={`activity-item-${it.id}`}>
+                      <span className={`absolute -left-9 top-0.5 w-7 h-7 rounded-full flex items-center justify-center ring-4 ring-[color:var(--surface)] ${tone}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </span>
+                      <div className="card-soft p-3">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-[color:var(--text-primary)]">{it.description || it.action}</div>
+                            <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] mt-0.5">{it.action}</div>
+                          </div>
+                          <div className="text-[11px] text-[color:var(--text-tertiary)] whitespace-nowrap">{formatDate(it.created_at)}</div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 text-[11px] text-[color:var(--text-secondary)]">
+                          <span className="opacity-60">by</span>
+                          <span className="font-semibold text-[color:var(--text-primary)]">{it.admin_name || "—"}</span>
+                          <span className="font-mono text-[10px] text-[color:var(--text-tertiary)]">· {it.admin_phone}</span>
+                        </div>
+                        {it.meta && Object.keys(it.meta).length > 0 && (
+                          <details className="mt-2">
+                            <summary className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] cursor-pointer hover:text-[color:var(--brand)]">Metadata</summary>
+                            <pre className="text-[10px] mt-1.5 bg-[color:var(--surface-alt)] p-2 rounded-md overflow-x-auto font-mono">{JSON.stringify(it.meta, null, 2)}</pre>
+                          </details>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+          <DialogFooter className="border-t border-[color:var(--border-default)] pt-3">
+            <div className="text-[11px] text-[color:var(--text-tertiary)] flex-1">
+              {activity.count > 0 && <>Showing {activity.items.length} of {activity.count} · All actions are immutable</>}
+            </div>
+            <button type="button" onClick={loadActivity} disabled={activity.loading}
+              data-testid="activity-refresh"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]">
+              Refresh
+            </button>
+            <button type="button" onClick={() => setModal(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white">Close</button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

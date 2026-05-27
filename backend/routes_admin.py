@@ -642,6 +642,23 @@ async def admin_users_export(request: Request, q: Optional[str] = Query(None), _
     return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=users-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.csv"})
 
 
+@router.get("/admin/users/{user_id}/activity")
+async def admin_user_activity(
+    user_id: str, request: Request, limit: int = Query(200, ge=1, le=1000),
+    _admin=Depends(get_current_admin),
+):
+    """Audit feed for a specific user — every admin action that targeted this user.
+
+    Pulls from the `admin_activity` collection where target_type='user' and target_id=user_id.
+    """
+    db = request.app.state.db
+    items = await db.admin_activity.find(
+        {"target_type": "user", "target_id": user_id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(limit)
+    return {"items": items, "count": len(items)}
+
+
 @router.get("/admin/users/{user_id}/details")
 async def admin_user_details(user_id: str, request: Request, _admin=Depends(get_current_admin)):
     """Full user detail page: profile + aggregated stats + referrer info."""
