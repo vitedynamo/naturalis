@@ -103,35 +103,35 @@ async def verify_transaction(*, public_key: str, secret_key: str, merchant_tx_re
     raw_status = (data.get("data", {}).get("status") or data.get("status") or "").lower()
     if raw_status in ("success", "successful", "paid", "completed"):
         norm = "success"
+    elif raw_status in ("failed", "failure", "reversed", "rejected", "cancelled"):
+        norm = "failed"
+    else:
+        norm = "pending"
+    return {"status": norm, "raw_status": raw_status, "raw": data}
 
 
-async def create_reserved_account(
-    *, enc_key: str, first_name: str, last_name: str, tag: str,
-    bvn: str, dob: str, phone_number: str,
+async def create_dynamic_account(
+    *, enc_key: str, amount_naira: float, transaction_ref: str,
 ) -> dict:
-    """Create a Marasoft reserved (virtual) account for a one-time deposit.
+    """Create a Marasoft Pay dynamic (one-time) virtual account.
 
-    Endpoint: POST https://api.marasoftpay.live/reserved_account/create
-    Returns dict with {account_name, account_number, bank, reference}.
+    Endpoint: POST https://api.marasoftpay.live/generate_dynamic_account/
+    Docs: https://developers.marasoftpay.live/collections/dynamic-accounts.php
 
-    Notes:
-    - Marasoft requires form-data, not JSON.
-    - `tag` is the unique identifier you'll use to reconcile inflows later.
-    - The merchant's KYC (first_name/last_name/bvn/dob) is used to OWN the account;
-      every customer deposit account is technically in the merchant's name.
+    Dynamic accounts are tied to a single amount and payment reference; once paid,
+    they can no longer be used. No KYC fields are required — only the merchant's
+    encryption key, the amount, and our reconciliation reference.
+
+    Returns: {account_name, account_number, bank, amount_to_pay, raw}.
     """
     payload = {
         "enc_key": enc_key,
-        "first_name": first_name,
-        "last_name": last_name,
-        "tag": tag,
-        "bvn": bvn,
-        "dob": dob,
-        "phone_number": phone_number,
+        "amount": str(int(round(float(amount_naira)))),  # whole naira per Marasoft sample
+        "transaction_ref": transaction_ref,
     }
     async with _ms_client(timeout=30) as client:
         resp = await client.post(
-            f"{MARASOFT_API_BASE}/reserved_account/create",
+            f"{MARASOFT_API_BASE}/generate_dynamic_account/",
             data=payload,  # FORM-DATA per Marasoft docs
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
@@ -139,23 +139,16 @@ async def create_reserved_account(
             data = resp.json()
         except Exception:
             data = {"raw": resp.text}
-    if not data.get("success") and (data.get("status") or "").lower() != "success":
+    # Marasoft signals success via {"status": true, ...} on this endpoint
+    ok = bool(data.get("status")) and data.get("account_number")
+    if not ok:
         raise RuntimeError(
-            data.get("message") or data.get("description") or f"Reserved account creation failed (HTTP {resp.status_code})"
+            data.get("message") or data.get("description") or f"Dynamic account creation failed (HTTP {resp.status_code})"
         )
-    d = data.get("data") or {}
-    if not d.get("account_number"):
-        raise RuntimeError(data.get("message") or "Marasoft did not return an account number")
     return {
-        "account_name": d.get("account_name"),
-        "account_number": d.get("account_number"),
-        "bank": d.get("bank"),
-        "reference": d.get("reference"),
+        "account_name": data.get("account_name"),
+        "account_number": data.get("account_number"),
+        "bank": data.get("bank_name"),
+        "amount_to_pay": data.get("amount_to_pay"),
         "raw": data,
     }
-
-    elif raw_status in ("failed", "failure", "reversed", "rejected", "cancelled"):
-        norm = "failed"
-    else:
-        norm = "pending"
-    return {"status": norm, "raw_status": raw_status, "raw": data}

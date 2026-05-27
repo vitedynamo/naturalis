@@ -166,12 +166,13 @@ export default function Deposit() {
             <p className="mt-3 text-xs text-[color:var(--text-tertiary)]">Mock mode: deposits are credited instantly for testing.</p>
           )}
         </form>
+        )}
 
         <div className="card-soft p-6">
           <div className="text-label">How it works</div>
           <ol className="mt-3 text-sm text-[color:var(--text-secondary)] space-y-3">
             <li>1. Enter the amount you want to deposit.</li>
-            <li>2. Get redirected to a secure checkout page to pay with card, bank or USSD.</li>
+            <li>2. Copy the bank transfer details and pay from your banking app.</li>
             <li>3. Your wallet is credited automatically once payment is confirmed.</li>
           </ol>
         </div>

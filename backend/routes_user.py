@@ -636,25 +636,19 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     callback_url = data.callback_url or "https://example.com/deposit/callback"
 
     if use_marasoft:
-        from marasoft import create_reserved_account as ms_create_account
-        # Marasoft requires merchant KYC fields to create reserved accounts
-        required_kyc = ["marasoft_first_name", "marasoft_last_name", "marasoft_bvn", "marasoft_dob", "marasoft_encryption_key"]
-        missing = [k for k in required_kyc if not settings.get(k)]
-        if missing:
+        from marasoft import create_dynamic_account as ms_create_account
+        # Dynamic accounts only need the encryption key — no merchant KYC required.
+        if not settings.get("marasoft_encryption_key"):
             await db.deposits.update_one(
                 {"reference": reference},
-                {"$set": {"status": "failed", "admin_note": f"Marasoft KYC missing: {', '.join(missing)}", "updated_at": _now_iso()}},
+                {"$set": {"status": "failed", "admin_note": "Marasoft encryption key missing", "updated_at": _now_iso()}},
             )
             raise HTTPException(503, "Marasoft is not fully configured. Please contact support.")
         try:
             acct = await ms_create_account(
                 enc_key=settings["marasoft_encryption_key"],
-                first_name=settings["marasoft_first_name"],
-                last_name=settings["marasoft_last_name"],
-                tag=reference,  # we'll use our reference as the reconciliation tag
-                bvn=settings["marasoft_bvn"],
-                dob=settings["marasoft_dob"],
-                phone_number=user["phone"],
+                amount_naira=float(data.amount),
+                transaction_ref=reference,
             )
             # Persist account details on the deposit row so we can show them again
             await db.deposits.update_one(
@@ -663,7 +657,6 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                     "account_number": acct["account_number"],
                     "account_name": acct["account_name"],
                     "bank_name": acct["bank"],
-                    "gateway_id": acct["reference"],
                     "updated_at": _now_iso(),
                 }},
             )
