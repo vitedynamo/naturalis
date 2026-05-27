@@ -289,6 +289,12 @@ class Settings(BaseModel):
     marasoft_public_key: str = ""
     marasoft_secret_key: str = ""
     marasoft_encryption_key: str = ""
+    # Merchant identity used to create Marasoft reserved (virtual) accounts.
+    # Required by Marasoft KYC — every reserved account is opened in the merchant's name.
+    marasoft_first_name: str = ""
+    marasoft_last_name: str = ""
+    marasoft_bvn: str = ""
+    marasoft_dob: str = ""  # format: '01 September 1998'
     deposit_gateway: str = "paystack"  # paystack | nomba | marasoft
     payout_gateway: str = "paystack"   # paystack | nomba
     payment_mode: str = "mock"  # mock | live
@@ -321,6 +327,10 @@ class SettingsUpdate(BaseModel):
     marasoft_public_key: Optional[str] = None
     marasoft_secret_key: Optional[str] = None
     marasoft_encryption_key: Optional[str] = None
+    marasoft_first_name: Optional[str] = None
+    marasoft_last_name: Optional[str] = None
+    marasoft_bvn: Optional[str] = None
+    marasoft_dob: Optional[str] = None
     deposit_gateway: Optional[str] = None
     payout_gateway: Optional[str] = None
     payment_mode: Optional[str] = None

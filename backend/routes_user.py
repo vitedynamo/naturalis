@@ -636,23 +636,47 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     callback_url = data.callback_url or "https://example.com/deposit/callback"
 
     if use_marasoft:
-        from marasoft import initiate_transaction as ms_init
+        from marasoft import create_reserved_account as ms_create_account
+        # Marasoft requires merchant KYC fields to create reserved accounts
+        required_kyc = ["marasoft_first_name", "marasoft_last_name", "marasoft_bvn", "marasoft_dob", "marasoft_encryption_key"]
+        missing = [k for k in required_kyc if not settings.get(k)]
+        if missing:
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {"status": "failed", "admin_note": f"Marasoft KYC missing: {', '.join(missing)}", "updated_at": _now_iso()}},
+            )
+            raise HTTPException(503, "Marasoft is not fully configured. Please contact support.")
         try:
-            res = await ms_init(
-                public_key=settings["marasoft_public_key"],
-                merchant_tx_ref=reference,
-                redirect_url=callback_url,
-                name=user.get("name") or "Customer",
-                email_address=user.get("email") or f"{user['phone']}@naijainvest.local",
+            acct = await ms_create_account(
+                enc_key=settings["marasoft_encryption_key"],
+                first_name=settings["marasoft_first_name"],
+                last_name=settings["marasoft_last_name"],
+                tag=reference,  # we'll use our reference as the reconciliation tag
+                bvn=settings["marasoft_bvn"],
+                dob=settings["marasoft_dob"],
                 phone_number=user["phone"],
-                amount_naira=float(data.amount),
-                description=f"Wallet funding · {user['phone']}",
+            )
+            # Persist account details on the deposit row so we can show them again
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {
+                    "account_number": acct["account_number"],
+                    "account_name": acct["account_name"],
+                    "bank_name": acct["bank"],
+                    "gateway_id": acct["reference"],
+                    "updated_at": _now_iso(),
+                }},
             )
             return {
                 "mode": "live",
                 "gateway": "marasoft",
+                "type": "bank_transfer",
                 "reference": reference,
-                "authorization_url": res["authorization_url"],
+                "amount": float(data.amount),
+                "account_number": acct["account_number"],
+                "account_name": acct["account_name"],
+                "bank_name": acct["bank"],
+                "expires_in_minutes": 60,
             }
         except Exception as e:
             await db.deposits.update_one(
