@@ -286,7 +286,10 @@ class Settings(BaseModel):
     nomba_client_secret: str = ""
     nomba_account_id: str = ""
     nomba_environment: str = "sandbox"  # sandbox | production
-    deposit_gateway: str = "paystack"  # paystack | nomba
+    marasoft_public_key: str = ""
+    marasoft_secret_key: str = ""
+    marasoft_encryption_key: str = ""
+    deposit_gateway: str = "paystack"  # paystack | nomba | marasoft
     payout_gateway: str = "paystack"   # paystack | nomba
     payment_mode: str = "mock"  # mock | live
     featured_product_id: Optional[str] = None
@@ -315,6 +318,9 @@ class SettingsUpdate(BaseModel):
     nomba_client_secret: Optional[str] = None
     nomba_account_id: Optional[str] = None
     nomba_environment: Optional[str] = None  # sandbox | production
+    marasoft_public_key: Optional[str] = None
+    marasoft_secret_key: Optional[str] = None
+    marasoft_encryption_key: Optional[str] = None
     deposit_gateway: Optional[str] = None
     payout_gateway: Optional[str] = None
     payment_mode: Optional[str] = None

@@ -613,24 +613,57 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
 
     reference = gen_reference("dep")
     mode = settings.get("payment_mode", "mock")
-    secret = settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", "")
+    gateway = settings.get("deposit_gateway", "paystack")
+
+    # Decide which gateway to use based on settings
+    use_marasoft = gateway == "marasoft" and bool(settings.get("marasoft_public_key"))
+    use_paystack = gateway == "paystack" and mode == "live" and bool(settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", ""))
+
+    method = "marasoft" if use_marasoft else ("paystack" if use_paystack else "mock")
 
     deposit_doc = {
         "id": gen_reference("d"),
         "user_id": user["id"],
         "amount": float(data.amount),
         "reference": reference,
-        "method": "paystack" if mode == "live" else "mock",
+        "method": method,
         "status": "pending",
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
     await db.deposits.insert_one(deposit_doc)
 
-    if mode == "live" and secret:
-        # Real Paystack call
+    callback_url = data.callback_url or "https://example.com/deposit/callback"
+
+    if use_marasoft:
+        from marasoft import initiate_transaction as ms_init
+        try:
+            res = await ms_init(
+                public_key=settings["marasoft_public_key"],
+                merchant_tx_ref=reference,
+                redirect_url=callback_url,
+                name=user.get("name") or "Customer",
+                email_address=user.get("email") or f"{user['phone']}@naijainvest.local",
+                phone_number=user["phone"],
+                amount_naira=float(data.amount),
+                description=f"Wallet funding · {user['phone']}",
+            )
+            return {
+                "mode": "live",
+                "gateway": "marasoft",
+                "reference": reference,
+                "authorization_url": res["authorization_url"],
+            }
+        except Exception as e:
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {"status": "failed", "admin_note": f"Marasoft init failed: {e}", "updated_at": _now_iso()}},
+            )
+            raise HTTPException(502, f"Marasoft request failed: {e}")
+
+    if use_paystack:
+        secret = settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", "")
         amount_kobo = int(float(data.amount) * 100)
-        callback_url = data.callback_url or "https://example.com/deposit/callback"
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.post(
@@ -649,14 +682,15 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 raise HTTPException(400, result.get("message", "Paystack error"))
             return {
                 "mode": "live",
+                "gateway": "paystack",
                 "reference": reference,
                 "authorization_url": result["data"]["authorization_url"],
             }
         except httpx.HTTPError as e:
             raise HTTPException(502, f"Paystack request failed: {e}")
-    else:
-        # Mock mode: front-end will call verify to credit
-        return {"mode": "mock", "reference": reference, "amount": data.amount}
+
+    # Mock mode: front-end will call verify to credit
+    return {"mode": "mock", "gateway": "mock", "reference": reference, "amount": data.amount}
 
 
 @router.get("/deposit/verify/{reference}")
@@ -671,9 +705,22 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
     settings = await _settings(db)
     mode = settings.get("payment_mode", "mock")
     secret = settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", "")
+    gateway_used = deposit.get("method", "mock")
 
     success = False
-    if mode == "live" and secret:
+    if gateway_used == "marasoft" and settings.get("marasoft_public_key"):
+        try:
+            from marasoft import verify_transaction as ms_verify
+            res = await ms_verify(
+                public_key=settings["marasoft_public_key"],
+                secret_key=settings.get("marasoft_secret_key", ""),
+                merchant_tx_ref=reference,
+            )
+            success = res["status"] == "success"
+        except Exception as e:
+            logger.warning(f"Marasoft verify failed for {reference}: {e}")
+            success = False
+    elif gateway_used == "paystack" and mode == "live" and secret:
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.get(
@@ -757,6 +804,71 @@ async def paystack_webhook(request: Request):
                 "created_at": _now_iso(),
             })
     return {"status": "ok"}
+
+
+@router.post("/deposit/webhook/marasoft")
+async def marasoft_webhook(request: Request):
+    """Inbound webhook from Marasoft Pay. We trust nothing in the payload — we
+    re-verify with Marasoft's server using the merchant_tx_ref and our stored
+    secret_key before crediting the wallet. This protects against spoofed webhook
+    POSTs since Marasoft does not document a signed-payload scheme.
+    """
+    db = request.app.state.db
+    try:
+        event = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    data = event.get("data") if isinstance(event, dict) else None
+    if not data:
+        # Some gateways pass fields at top level
+        data = event
+    reference = (data or {}).get("merchant_tx_ref") or (data or {}).get("reference") or (data or {}).get("tx_ref")
+    if not reference:
+        raise HTTPException(400, "merchant_tx_ref missing")
+    deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
+    if not deposit:
+        # Unknown reference — silently 200 to avoid info leak
+        return {"status": "ignored", "reason": "unknown_reference"}
+    if deposit["status"] == "success":
+        return {"status": "ok", "already": True}
+    settings = await _settings(db)
+    if not settings.get("marasoft_public_key"):
+        raise HTTPException(503, "Marasoft not configured")
+    # Independent re-verification
+    try:
+        from marasoft import verify_transaction as ms_verify
+        res = await ms_verify(
+            public_key=settings["marasoft_public_key"],
+            secret_key=settings.get("marasoft_secret_key", ""),
+            merchant_tx_ref=reference,
+        )
+    except Exception as e:
+        raise HTTPException(502, f"Marasoft re-verify failed: {e}")
+    if res["status"] != "success":
+        return {"status": "ignored", "reason": f"gateway_status_{res['status']}"}
+    # Credit wallet (idempotent — checked status=success above)
+    await db.deposits.update_one(
+        {"reference": reference},
+        {"$set": {"status": "success", "updated_at": _now_iso()}},
+    )
+    new_user = await db.users.find_one_and_update(
+        {"id": deposit["user_id"]},
+        {"$inc": {"wallet_balance": deposit["amount"]}},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    await db.transactions.insert_one({
+        "id": gen_reference("tx"),
+        "user_id": deposit["user_id"],
+        "type": "deposit",
+        "amount": deposit["amount"],
+        "description": "Deposit via marasoft (webhook)",
+        "balance_after": new_user["wallet_balance"],
+        "meta": {"reference": reference, "gateway": "marasoft"},
+        "created_at": _now_iso(),
+    })
+    return {"status": "ok"}
+
 
 
 @router.get("/deposits")

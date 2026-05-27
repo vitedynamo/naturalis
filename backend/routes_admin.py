@@ -1424,8 +1424,8 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             description=f"Updated {len(payload)} setting(s): {', '.join(payload.keys())}",
             meta={"changed_keys": list(payload.keys()), "values": redacted},
         )
-    # If Paystack/Nomba creds were changed, bust the banks cache + Nomba token so the next call uses fresh creds
-    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload or "nomba_environment" in payload:
+    # If Paystack/Nomba/Marasoft creds were changed, bust the banks cache + Nomba token so the next call uses fresh creds
+    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload or "nomba_environment" in payload or "marasoft_public_key" in payload or "marasoft_secret_key" in payload:
         _banks_cache["items"] = []
         _banks_cache["at"] = 0
         try:

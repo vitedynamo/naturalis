@@ -61,6 +61,9 @@ export default function AdminSettings() {
         nomba_client_secret: s.nomba_client_secret || "",
         nomba_account_id: s.nomba_account_id || "",
         nomba_environment: s.nomba_environment || "sandbox",
+        marasoft_public_key: s.marasoft_public_key || "",
+        marasoft_secret_key: s.marasoft_secret_key || "",
+        marasoft_encryption_key: s.marasoft_encryption_key || "",
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -221,6 +224,7 @@ export default function AdminSettings() {
                 className="w-full mt-1 px-3 py-2.5 input-base">
                 <option value="paystack">Paystack</option>
                 <option value="nomba">Nomba</option>
+                <option value="marasoft">Marasoft Pay</option>
               </select>
             </label>
             <label className="text-xs">
@@ -327,6 +331,27 @@ export default function AdminSettings() {
                 data-testid="nomba-client-secret-input"
                 className="w-full mt-1 input-base font-mono text-sm" />
             </label>
+          </div>
+        </div>
+
+        <div className="card-soft p-6">
+          <div className="text-label">Marasoft Pay credentials</div>
+          <p className="text-xs text-[color:var(--text-secondary)] mt-1">
+            Used when <code>deposit_gateway = marasoft</code>. The key prefix (<code>MSFT_Live_</code> vs <code>MSFT_Test_</code>) determines sandbox vs production automatically.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <Field label="Public key" value={s.marasoft_public_key} text onChange={(v)=>setS({...s, marasoft_public_key: v})} testid="marasoft-public-key" />
+            <Field label="Encryption key" value={s.marasoft_encryption_key} text onChange={(v)=>setS({...s, marasoft_encryption_key: v})} testid="marasoft-encryption-key" />
+            <label className="md:col-span-2 text-xs">
+              <span>Secret key</span>
+              <input type="password" value={s.marasoft_secret_key || ""} onChange={(e)=>setS({...s, marasoft_secret_key: e.target.value})}
+                data-testid="marasoft-secret-key-input"
+                className="w-full mt-1 input-base font-mono text-sm" />
+            </label>
+          </div>
+          <div className="mt-3 text-[11px] text-[color:var(--text-tertiary)] bg-[color:var(--surface-alt)] rounded-md p-2">
+            <strong>Webhook URL:</strong> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/marasoft</code>
+            <div className="mt-1">Add this URL in your Marasoft dashboard so credit events reach the platform.</div>
           </div>
         </div>
 
