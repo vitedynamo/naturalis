@@ -1,5 +1,30 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 28)
+
+### Keyboard shortcuts on all admin tables
+- `Pagination.jsx` now binds a page-wide `keydown` listener:
+  - `←` previous page · `→` next page (skipped while typing in any input/textarea/select)
+  - `g g` (double-tap within 500ms) focuses & selects the jump-to-page input
+- A subtle inline keyboard hint renders next to "Showing X – Y of N" on `md+` viewports.
+- Verified live: arrow keys flip pages, g+g focuses the jump input on Admin Deposits.
+
+### Withdrawals page redesign (matches reference)
+- Pink/red gradient hero header with up-arrow icon and "N total · approve, reject and track payouts via Nomba & Paystack" subtitle.
+- 4 stat cards: **Pending**, **Paid today** (Lagos midnight cutoff), **Paid · all time**, **All withdrawals**.
+- Toolbar with status filter (All / pending / processing / paid / rejected), search across name/phone/account/refs, and Refresh-all-pending button.
+- 2 gateway status cards (NOMBA + PAYSTACK) showing last successful payout relative-time, pending and done counts. Nomba card also surfaces live float.
+- Quick row-size selector: 5 / 20 / 50 / 100 / All (sets pagination page size or shows everything).
+- Redesigned table: `User | Amount | Bank | Status | Gateway ref | Date | Action`. Status pill renames `paid → disbursed` to match design language. Action column collapsed to a single **Toolkit** button.
+- New **`ToolkitModal`** (drill-in detail) with:
+  - Gradient header — green for paid, red for rejected, amber for pending — showing amount, net, status badge, Profile link and close button.
+  - Customer card with avatar + View → link.
+  - Payout destination card with bank label, account number (large), account holder name.
+  - References (Our reference + Provider reference, both with one-click Copy).
+  - Timeline (Requested · Status updated · Disbursed/Rejected) and admin note display.
+  - Resolution Tools (still-pending only): Check Nomba/Paystack status · Pay via Nomba · Pay via Paystack · Mark disbursed · Refund to wallet.
+- Existing Pay dialog (bank-picker + verified name + insufficient-float guard) preserved exactly — Toolkit "Pay via …" buttons open it.
+
 ## Recent Changes (Feb 2026 — iteration 27)
 
 ### Shared pagination component + "Jump to page" input

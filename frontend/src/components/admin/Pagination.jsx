@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 /**
  * Reusable admin table pagination footer.
@@ -8,6 +8,10 @@ import React, { useState, useEffect } from "react";
  * - Self-clamps `page` to the valid range whenever totalPages shrinks.
  * - Jump-to-page input commits on Enter, on blur, or on the "Go" button.
  * - Hidden when there are zero items.
+ *
+ * Keyboard shortcuts (active page-wide when no input/textarea focused):
+ *   ←  /  →   — previous / next page
+ *   g g       — focus the jump-to-page input
  */
 export default function Pagination({
   page,
@@ -19,11 +23,52 @@ export default function Pagination({
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const [jump, setJump] = useState("");
+  const jumpInputRef = useRef(null);
+  const lastGRef = useRef(0);
 
   // Keep page within bounds if list shrinks/grows.
   useEffect(() => {
     if (page !== safePage) setPage(safePage);
   }, [page, safePage, setPage]);
+
+  // Keyboard shortcuts.
+  useEffect(() => {
+    if (!totalItems) return undefined;
+    const handler = (e) => {
+      // Ignore when typing in any editable element.
+      const t = e.target;
+      const tag = (t?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || t?.isContentEditable) {
+        return;
+      }
+      // Ignore when a modifier key is pressed — we don't want to fight browser shortcuts.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === "ArrowLeft") {
+        if (safePage > 1) {
+          e.preventDefault();
+          setPage((p) => Math.max(1, p - 1));
+        }
+      } else if (e.key === "ArrowRight") {
+        if (safePage < totalPages) {
+          e.preventDefault();
+          setPage((p) => Math.min(totalPages, p + 1));
+        }
+      } else if (e.key === "g" || e.key === "G") {
+        const now = Date.now();
+        if (now - lastGRef.current < 500 && totalPages > 1) {
+          lastGRef.current = 0;
+          e.preventDefault();
+          jumpInputRef.current?.focus();
+          jumpInputRef.current?.select();
+        } else {
+          lastGRef.current = now;
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [totalItems, totalPages, safePage, setPage]);
 
   if (!totalItems) return null;
 
@@ -46,6 +91,15 @@ export default function Pagination({
         <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * pageSize, totalItems)}</span>
         {" of "}
         <span className="font-bold text-[color:var(--text-primary)]">{totalItems}</span>
+        {totalPages > 1 && (
+          <span className="hidden md:inline ml-3 text-[10px] tracking-wider uppercase text-[color:var(--text-tertiary)]/70">
+            <kbd className="px-1.5 py-0.5 rounded border border-[color:var(--border-default)] font-mono text-[10px]">←</kbd>
+            <kbd className="px-1.5 py-0.5 rounded border border-[color:var(--border-default)] font-mono text-[10px] ml-1">→</kbd>
+            <span className="mx-1.5">flip</span>
+            <kbd className="px-1.5 py-0.5 rounded border border-[color:var(--border-default)] font-mono text-[10px]">g g</kbd>
+            <span className="ml-1.5">jump</span>
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -75,6 +129,7 @@ export default function Pagination({
             </label>
             <input
               id={`${testidPrefix}-jump-input`}
+              ref={jumpInputRef}
               type="number"
               min={1}
               max={totalPages}
