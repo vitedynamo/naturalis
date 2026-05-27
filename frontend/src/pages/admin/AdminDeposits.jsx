@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet, RefreshCw, X, ExternalLink, User as UserIcon, Activity, TrendingUp, Code2, Clock } from "lucide-react";
+import Pagination from "@/components/admin/Pagination";
 
 function avatarColor(seed = "") {
   const palette = ["#E5097F", "#5B5BD6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
@@ -261,36 +262,13 @@ export default function AdminDeposits() {
           </table>
         </div>
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between gap-3 p-4 border-t border-[color:var(--border-default)] flex-wrap" data-testid="deposits-pagination">
-            <div className="text-[11px] text-[color:var(--text-tertiary)] tabular-nums">
-              Showing <span className="font-bold text-[color:var(--text-primary)]">{(safePage - 1) * PAGE_SIZE + 1}</span>
-              {" – "}
-              <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * PAGE_SIZE, filtered.length)}</span>
-              {" of "}
-              <span className="font-bold text-[color:var(--text-primary)]">{filtered.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1}
-                data-testid="deposits-page-prev"
-                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <span className="text-xs font-bold text-[color:var(--text-primary)] tabular-nums px-2" data-testid="deposits-page-indicator">
-                Page {safePage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage >= totalPages}
-                data-testid="deposits-page-next"
-                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={safePage}
+            setPage={setPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            testidPrefix="deposits-page"
+          />
         )}
       </div>
 

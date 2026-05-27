@@ -3,6 +3,7 @@ import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { History, Search, X, ShieldCheck, KeyRound, Coins, ArrowUpFromLine, ArrowDownToLine, Settings as SettingsIcon, Ban, UserCheck } from "lucide-react";
+import Pagination from "@/components/admin/Pagination";
 
 const ICONS = {
   "pin.cleared": KeyRound,
@@ -45,6 +46,8 @@ export default function AdminActivityLog() {
   const [actions, setActions] = useState([]);
   const [filter, setFilter] = useState({ action: "", q: "" });
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const load = async () => {
     setLoading(true);
@@ -58,6 +61,7 @@ export default function AdminActivityLog() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter.action]);
+  useEffect(() => { setPage(1); }, [filter.action, filter.q]);
 
   const filtered = useMemo(() => {
     const q = filter.q.trim().toLowerCase();
@@ -69,6 +73,12 @@ export default function AdminActivityLog() {
       || (it.description || "").toLowerCase().includes(q)
     );
   }, [items, filter.q]);
+
+  const safePage = Math.min(Math.max(1, page), Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+  const pageItems = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   return (
     <AdminLayout title="Activity Log">
@@ -126,7 +136,7 @@ export default function AdminActivityLog() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((it) => (
+              {pageItems.map((it) => (
                 <tr key={it.id} className="border-t border-[color:var(--border-default)] align-top" data-testid={`activity-row-${it.id}`}>
                   <td className="p-3 text-[color:var(--text-secondary)] whitespace-nowrap text-xs">{formatDate(it.created_at)}</td>
                   <td className="p-3">
@@ -156,6 +166,15 @@ export default function AdminActivityLog() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <Pagination
+            page={page}
+            setPage={setPage}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            testidPrefix="activity-page"
+          />
+        )}
       </div>
     </AdminLayout>
   );

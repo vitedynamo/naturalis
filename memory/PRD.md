@@ -1,5 +1,12 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 27)
+
+### Shared pagination component + "Jump to page" input
+- New shared component **`/app/frontend/src/components/admin/Pagination.jsx`** — single source of truth for paginated admin tables. Renders `Showing X – Y of N` · `Previous` · `Page X of Y` · `Go to [__] Go` · `Next`. Self-clamps out-of-range state. Jump input commits on Enter, blur, or Go button. Hidden when only 1 page exists.
+- Wired into **AdminDeposits**, **AdminWithdrawals**, **AdminInvestments** (replaced inline footers); newly added to **AdminReferrals** (with `filtered` reset on generation filter change) and **AdminActivityLog** (with reset on `action`/`q` filter change).
+- Tested live: jumping to a valid page works, Enter key works, out-of-range (999) clamps to max page correctly.
+
 ## Recent Changes (Feb 2026 — iteration 26)
 
 ### Pagination + column trim on Admin Withdrawals & Admin Investments

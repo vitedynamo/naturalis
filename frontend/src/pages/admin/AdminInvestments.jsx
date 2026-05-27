@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
 import { formatNaira, formatDate } from "@/lib/format";
+import Pagination from "@/components/admin/Pagination";
 
 export default function AdminInvestments() {
   const [items, setItems] = useState([]);
@@ -57,30 +58,13 @@ export default function AdminInvestments() {
           </table>
         </div>
         {items.length > 0 && (
-          <div className="flex items-center justify-between gap-3 p-4 border-t border-[color:var(--border-default)] flex-wrap" data-testid="investments-pagination">
-            <div className="text-[11px] text-[color:var(--text-tertiary)] tabular-nums">
-              Showing <span className="font-bold text-[color:var(--text-primary)]">{(safePage - 1) * PAGE_SIZE + 1}</span>
-              {" – "}
-              <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * PAGE_SIZE, items.length)}</span>
-              {" of "}
-              <span className="font-bold text-[color:var(--text-primary)]">{items.length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}
-                data-testid="investments-page-prev"
-                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
-                Previous
-              </button>
-              <span className="text-xs font-bold text-[color:var(--text-primary)] tabular-nums px-2" data-testid="investments-page-indicator">
-                Page {safePage} of {totalPages}
-              </span>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}
-                data-testid="investments-page-next"
-                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
-                Next
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            setPage={setPage}
+            totalItems={items.length}
+            pageSize={PAGE_SIZE}
+            testidPrefix="investments-page"
+          />
         )}
       </div>
     </AdminLayout>

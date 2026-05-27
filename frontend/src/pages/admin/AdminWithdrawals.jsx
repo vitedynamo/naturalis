@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Banknote, Send, Smartphone, Search, ChevronDown, Check, Loader2, BadgeCheck, AlertTriangle, RefreshCw, Wallet } from "lucide-react";
+import Pagination from "@/components/admin/Pagination";
 
 function AdminBankPicker({ value, banks, onSelect }) {
   const [open, setOpen] = useState(false);
@@ -92,6 +93,13 @@ export default function AdminWithdrawals() {
   const [refreshingId, setRefreshingId] = useState(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const pageItems = useMemo(
+    () => items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [items, safePage],
+  );
 
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
   const loadFloat = () => api.get("/admin/nomba/balance").then(({ data }) => setNombaFloat(data)).catch(() => setNombaFloat(null));
@@ -240,7 +248,7 @@ export default function AdminWithdrawals() {
               </tr>
             </thead>
             <tbody>
-              {items.slice((Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) - 1) * PAGE_SIZE, Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) * PAGE_SIZE).map(w => (
+              {pageItems.map(w => (
                 <tr key={w.id} className="border-t border-[color:var(--border-default)]">
                   <td className="p-3 max-w-[180px]">
                     <div className="font-medium text-[color:var(--text-primary)] truncate">{w.user_name}</div>
@@ -297,36 +305,15 @@ export default function AdminWithdrawals() {
             </tbody>
           </table>
         </div>
-        {items.length > 0 && (() => {
-          const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-          const safePage = Math.min(page, totalPages);
-          return (
-            <div className="flex items-center justify-between gap-3 p-4 border-t border-[color:var(--border-default)] flex-wrap" data-testid="withdrawals-pagination">
-              <div className="text-[11px] text-[color:var(--text-tertiary)] tabular-nums">
-                Showing <span className="font-bold text-[color:var(--text-primary)]">{(safePage - 1) * PAGE_SIZE + 1}</span>
-                {" – "}
-                <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * PAGE_SIZE, items.length)}</span>
-                {" of "}
-                <span className="font-bold text-[color:var(--text-primary)]">{items.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}
-                  data-testid="withdrawals-page-prev"
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
-                  Previous
-                </button>
-                <span className="text-xs font-bold text-[color:var(--text-primary)] tabular-nums px-2" data-testid="withdrawals-page-indicator">
-                  Page {safePage} of {totalPages}
-                </span>
-                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}
-                  data-testid="withdrawals-page-next"
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
-                  Next
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+        {items.length > 0 && (
+          <Pagination
+            page={page}
+            setPage={setPage}
+            totalItems={items.length}
+            pageSize={PAGE_SIZE}
+            testidPrefix="withdrawals-page"
+          />
+        )}
       </div>
 
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
