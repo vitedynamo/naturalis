@@ -57,7 +57,7 @@ export default function Deposit() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <form onSubmit={submit} className="card-soft p-6 lg:col-span-2" data-testid="deposit-form">
           <div className="flex items-center gap-2 pill pill-neutral w-fit">
-            <ShieldCheck className="w-3.5 h-3.5" /> {settings.payment_mode === "live" ? "Paystack secure checkout" : "Test / Mock mode"}
+            <ShieldCheck className="w-3.5 h-3.5" /> {settings.payment_mode === "live" ? "Secure checkout" : "Test / Mock mode"}
           </div>
           <label className="block mt-5 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
           <input
@@ -80,7 +80,7 @@ export default function Deposit() {
             <ArrowDownToLine className="w-4 h-4" /> {busy ? "Processing…" : "Proceed to pay"}
           </button>
           {settings.payment_mode !== "live" && (
-            <p className="mt-3 text-xs text-[color:var(--text-tertiary)]">Mock mode: deposits are credited instantly for testing. Configure Paystack keys in admin → settings.</p>
+            <p className="mt-3 text-xs text-[color:var(--text-tertiary)]">Mock mode: deposits are credited instantly for testing.</p>
           )}
         </form>
 
@@ -88,7 +88,7 @@ export default function Deposit() {
           <div className="text-label">How it works</div>
           <ol className="mt-3 text-sm text-[color:var(--text-secondary)] space-y-3">
             <li>1. Enter the amount you want to deposit.</li>
-            <li>2. Get redirected to Paystack to pay securely with card, bank or USSD.</li>
+            <li>2. Get redirected to a secure checkout page to pay with card, bank or USSD.</li>
             <li>3. Your wallet is credited automatically once payment is confirmed.</li>
           </ol>
         </div>
