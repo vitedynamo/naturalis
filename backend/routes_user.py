@@ -895,6 +895,20 @@ async def my_deposits(request: Request, user=Depends(get_current_user)):
     return items
 
 
+@router.get("/deposits/{reference}")
+async def deposit_by_reference(reference: str, request: Request, user=Depends(get_current_user)):
+    """Return a single deposit (with bank-transfer details) by reference.
+
+    Used by the Deposit Transfer page to load the active virtual account when
+    the user lands there directly (e.g. after a page refresh).
+    """
+    db = request.app.state.db
+    d = await db.deposits.find_one({"reference": reference, "user_id": user["id"]}, {"_id": 0})
+    if not d:
+        raise HTTPException(404, "Deposit not found")
+    return d
+
+
 # =========== WITHDRAWAL ===========
 def _lagos_now():
     from datetime import timedelta

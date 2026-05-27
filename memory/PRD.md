@@ -1,5 +1,19 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 23)
+
+### Dedicated bank-transfer page with countdown timer
+- **New page `/deposit/transfer/:reference`** (`DepositTransfer.jsx`): replaces the inline bank-card on `/deposit`. Renders a full-screen flow with:
+  - Live 60-minute MM:SS countdown (Marasoft dynamic-account validity window) with gradient progress bar
+  - "Account expires in" → switches to "Window expired" red state at 00:00
+  - Copyable Bank / Account name / Account number / Amount tiles
+  - "I have paid — check status" button + background auto-poll every 12s while pending
+  - Success overlay with checkmark + auto-redirect once Marasoft confirms
+  - Expired state replaces the verify button with "Start a new deposit"
+- **`/deposit`**: simplified — on successful init, `navigate('/deposit/transfer/<ref>')`. Also shows a "Pending transfer" banner if user has an unfinished bank transfer (one-tap resume).
+- **Backend**: new `GET /api/deposits/{reference}` returns one deposit by reference (used by the transfer page on direct nav / refresh).
+- **Routing**: added `/deposit/transfer/:reference` protected route in `App.js`.
+
 ## Recent Changes (Feb 2026 — iteration 22)
 
 ### Marasoft in-app bank-transfer checkout (no more external redirect)

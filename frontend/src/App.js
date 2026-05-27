@@ -11,6 +11,7 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Invest from "@/pages/Invest";
 import Deposit from "@/pages/Deposit";
+import DepositTransfer from "@/pages/DepositTransfer";
 import Withdraw from "@/pages/Withdraw";
 import Referrals from "@/pages/Referrals";
 import Coupons from "@/pages/Coupons";
@@ -61,6 +62,7 @@ function App() {
               <Route path="/my-packages" element={<Protected><MyPackages /></Protected>} />
               <Route path="/team" element={<Protected><Referrals /></Protected>} />
               <Route path="/deposit" element={<Protected><Deposit /></Protected>} />
+              <Route path="/deposit/transfer/:reference" element={<Protected><DepositTransfer /></Protected>} />
               <Route path="/withdraw" element={<Protected><Withdraw /></Protected>} />
               <Route path="/referrals" element={<Protected><Referrals /></Protected>} />
               <Route path="/coupons" element={<Protected><Coupons /></Protected>} />
