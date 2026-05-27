@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import axios from "axios";
+import { api, API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Phone, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -14,18 +15,30 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   // Admin "Login as user" — token passed via ?_token=<JWT>
+  // We MUST bypass the api interceptor (which always injects the admin's localStorage token)
+  // and clear the admin session before establishing the user session.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("_token");
     if (!t) return;
     (async () => {
       try {
-        const { data } = await api.get("/auth/me", { headers: { Authorization: `Bearer ${t}` } });
+        // Clear admin session first so the interceptor can't poison subsequent calls
+        localStorage.removeItem("ni_token");
+        localStorage.removeItem("ni_user");
+        // Use raw axios to avoid the interceptor entirely
+        const { data } = await axios.get(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${t}` },
+        });
         if (data.is_admin) { toast.error("Cannot impersonate admin"); return; }
         setSession(t, data);
         toast.success(`Impersonating ${data.name}`);
+        // Strip the token from the URL so refreshing the page is safe
+        window.history.replaceState({}, "", "/dashboard");
         navigate("/dashboard", { replace: true });
-      } catch { toast.error("Impersonation token invalid or expired"); }
+      } catch (err) {
+        toast.error(err?.response?.data?.detail || "Impersonation token invalid or expired");
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
