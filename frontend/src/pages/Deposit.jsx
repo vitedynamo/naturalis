@@ -4,7 +4,7 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira, formatDate } from "@/lib/format";
-import { ArrowDownToLine, ShieldCheck } from "lucide-react";
+import { ArrowDownToLine, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Deposit() {
@@ -16,6 +16,7 @@ export default function Deposit() {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock" });
   const [highlightRef, setHighlightRef] = useState(null);
+  const [rechecking, setRechecking] = useState({}); // { [reference]: true }
   const cardRefs = useRef({});
 
   const load = async () => {
@@ -73,6 +74,27 @@ export default function Deposit() {
 
   // Quickly resume a still-pending bank transfer
   const pendingBankTransfer = history.find((d) => d.status === "pending" && d.method === "marasoft" && d.account_number);
+
+  // Re-verify a single deposit (used by the Recheck button on failed/pending rows)
+  const recheck = async (reference) => {
+    setRechecking((m) => ({ ...m, [reference]: true }));
+    try {
+      const { data } = await api.get(`/deposit/verify/${reference}`);
+      if (data.status === "success") {
+        toast.success("Deposit confirmed and credited!");
+        await refresh();
+        await load();
+      } else if (data.status === "pending") {
+        toast.info("Still waiting on the bank — try again in a moment.");
+      } else {
+        toast.error("This transaction is still marked failed by Marasoft. If you actually paid, contact support to credit it manually.");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Recheck failed");
+    } finally {
+      setRechecking((m) => ({ ...m, [reference]: false }));
+    }
+  };
 
   return (
     <UserLayout>
@@ -142,6 +164,10 @@ export default function Deposit() {
           {history.map((d) => {
             const tone = d.status === "success" ? "success" : d.status === "failed" ? "error" : "warn";
             const isHighlighted = highlightRef === d.reference;
+            const isPending = d.status === "pending";
+            const isFailed = d.status === "failed";
+            const isMarasoft = d.method === "marasoft";
+            const isBusy = !!rechecking[d.reference];
             return (
               <div
                 key={d.id}
@@ -159,12 +185,29 @@ export default function Deposit() {
                       <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Amount</div>
                       <div className="font-display font-bold text-2xl text-[color:var(--text-primary)] leading-tight mt-0.5">{formatNaira(d.amount)}</div>
                     </div>
-                    <span className={`pill ${tone === "success" ? "pill-success" : tone === "error" ? "pill-error" : "pill-warn"}`}>{d.status}</span>
+                    {isPending ? (
+                      <span className="pill pill-warn inline-flex items-center gap-1.5" data-testid={`dep-pill-checking-${d.id}`}>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        checking…
+                      </span>
+                    ) : (
+                      <span className={`pill ${tone === "success" ? "pill-success" : "pill-error"}`}>{d.status}</span>
+                    )}
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
                     <span className="font-mono text-[color:var(--text-tertiary)] truncate" title={d.reference}>{d.reference}</span>
                     <span className="shrink-0 text-[color:var(--text-secondary)]">{formatDate(d.created_at)}</span>
                   </div>
+                  {(isFailed || isPending) && isMarasoft && (
+                    <button
+                      onClick={() => recheck(d.reference)}
+                      disabled={isBusy}
+                      data-testid={`dep-recheck-${d.id}`}
+                      className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-md border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors disabled:opacity-60">
+                      <RefreshCw className={`w-3 h-3 ${isBusy ? "animate-spin" : ""}`} />
+                      {isBusy ? "Rechecking…" : isFailed ? "Recheck — I actually paid" : "Recheck status"}
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -5,7 +5,7 @@ import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet, RefreshCw } from "lucide-react";
+import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet, RefreshCw, X, ExternalLink, User as UserIcon, Activity, TrendingUp, Code2, Clock } from "lucide-react";
 
 function avatarColor(seed = "") {
   const palette = ["#E5097F", "#5B5BD6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
@@ -84,9 +84,10 @@ export default function AdminDeposits() {
     setPolling(true);
     try {
       const { data } = await api.post("/admin/deposits/poll-pending");
-      toast.success(`Polled ${data.refreshed} · credited ${data.credited} · failed ${data.marked_failed} · still pending ${data.still_pending}`);
+      const scanned = data.scanned ?? data.refreshed;
+      toast.success(`Rechecked ${scanned} · credited ${data.credited} · still pending ${data.still_pending} · failed ${data.marked_failed}`);
       load();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Poll failed"); }
+    } catch (e) { toast.error(e?.response?.data?.detail || "Recheck failed"); }
     finally { setPolling(false); }
   };
 
@@ -167,9 +168,9 @@ export default function AdminDeposits() {
         </div>
         <button onClick={pollAll} disabled={polling}
           data-testid="deposits-poll-all"
-          title="Re-verify every pending deposit with its payment gateway"
+          title="Re-verify every pending and failed deposit with its payment gateway. Credits any that the gateway now confirms."
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Polling…" : "Poll pending"}
+          <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Rechecking…" : "Bulk recheck"}
         </button>
       </div>
 
@@ -266,35 +267,212 @@ export default function AdminDeposits() {
         </div>
       </div>
 
-      {/* View modal */}
+      {/* View modal — redesigned to match BLMSCapital reference */}
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Deposit details</DialogTitle>
-          </DialogHeader>
-          {viewing && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="card-soft p-3"><div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">User</div><div className="font-semibold mt-1">{viewing.user_name}</div><div className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{viewing.user_phone}</div></div>
-                <div className="card-soft p-3"><div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Initiated</div><div className="font-display font-bold mt-1 tabular-nums">{formatNaira(viewing.amount)}</div></div>
-                <div className="card-soft p-3"><div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Status</div><div className={`inline-flex mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${(STATUS_PILL[viewing.status] || STATUS_PILL.pending).cls}`}>{(STATUS_PILL[viewing.status] || STATUS_PILL.pending).label}</div></div>
-                <div className="card-soft p-3"><div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Gateway</div><div className="font-semibold mt-1 uppercase">{viewing.method}</div></div>
-              </div>
-              <div className="card-soft p-3">
-                <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Reference</div>
-                <div className="font-mono text-xs mt-1 break-all">{viewing.reference}</div>
-              </div>
-              {viewing.account_number && (
-                <div className="card-soft p-3">
-                  <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Account generated</div>
-                  <div className="font-mono text-xs mt-1">{viewing.account_number} · {viewing.bank_name || "—"}</div>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden border-0 bg-[color:var(--surface)]" data-testid="deposit-view-modal">
+          {viewing && (() => {
+            const pill = STATUS_PILL[viewing.status] || STATUS_PILL.pending;
+            const isFunded = viewing.status === "success";
+            const gradient = isFunded
+              ? "from-[#065F46] via-[#047857] to-[#10B981]"
+              : viewing.status === "failed"
+                ? "from-[#7F1D1D] via-[#991B1B] to-[#DC2626]"
+                : "from-[#92400E] via-[#B45309] to-[#F59E0B]";
+            const ourRef = viewing.reference || "—";
+            const gatewayId = viewing.gateway_id || viewing.meta?.gateway_ref || viewing.nomba_order_ref || "—";
+            const narration = viewing.narration || `NaijaInvest ${ourRef}`;
+            const rawJson = JSON.stringify(
+              {
+                reference: ourRef,
+                gateway_id: gatewayId,
+                status: viewing.status,
+                method: viewing.method,
+                amount: viewing.amount,
+                account_number: viewing.account_number,
+                bank_name: viewing.bank_name,
+                account_name: viewing.account_name,
+                admin_note: viewing.admin_note,
+                created_at: viewing.created_at,
+                updated_at: viewing.updated_at,
+                ...(viewing.meta || {}),
+              },
+              null,
+              2,
+            );
+            return (
+              <>
+                {/* Hero header */}
+                <div className={`relative bg-gradient-to-br ${gradient} text-white p-6`}>
+                  <button
+                    onClick={() => setViewing(null)}
+                    data-testid="deposit-view-close"
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur flex items-center justify-center transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <Link
+                    to={`/admin/users/${viewing.user_id}`}
+                    data-testid="deposit-view-profile"
+                    className="absolute top-4 right-16 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur text-xs font-semibold"
+                  >
+                    <UserIcon className="w-3.5 h-3.5" /> Profile
+                  </Link>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+                      <ArrowDownToLine className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">Deposit</div>
+                      <div className="font-display font-extrabold text-3xl md:text-4xl mt-1 tabular-nums truncate">{formatNaira(viewing.amount)}</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <span className="px-3 py-1 rounded-full bg-white/25 backdrop-blur text-[10px] font-bold uppercase tracking-wider">
+                          {isFunded ? "Completed" : pill.label}
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-white/15 text-[10px] font-bold uppercase tracking-wider">
+                          {viewing.method || "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="text-[11px] text-[color:var(--text-tertiary)]">
-                Created {formatDate(viewing.created_at)} · Updated {formatDate(viewing.updated_at)}
-              </div>
-            </div>
-          )}
+
+                {/* Scrollable body */}
+                <div className="max-h-[60vh] overflow-y-auto p-5 space-y-5">
+                  {/* Customer */}
+                  <section>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] flex items-center gap-1.5 mb-2">
+                      <UserIcon className="w-3 h-3" /> Customer
+                    </div>
+                    <Link
+                      to={`/admin/users/${viewing.user_id}`}
+                      data-testid="deposit-view-customer-link"
+                      className="flex items-center gap-3 p-3 rounded-2xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shrink-0" style={{ backgroundColor: avatarColor(viewing.user_id) }}>
+                        {(viewing.user_name || "?").trim()[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display font-bold text-base text-[color:var(--text-primary)] truncate">{viewing.user_name || "—"}</div>
+                        <div className="font-mono text-xs text-[color:var(--text-tertiary)] truncate">{viewing.user_phone || "—"}</div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--brand)] shrink-0">
+                        View <ExternalLink className="w-3 h-3" />
+                      </span>
+                    </Link>
+                  </section>
+
+                  {/* Gateway & identifiers */}
+                  <section>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] flex items-center gap-1.5 mb-2">
+                      <CheckCircle2 className="w-3 h-3" /> Gateway & identifiers
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <ModalField label="Gateway ID (trace)" value={gatewayId} testid="modal-gateway-id" />
+                      <ModalField label="Our reference" value={ourRef} testid="modal-our-ref" />
+                      <ModalField label="User narration" value={narration} testid="modal-narration" />
+                      <ModalField
+                        label="Virtual account"
+                        value={viewing.account_number || "—"}
+                        sub={viewing.bank_name || (viewing.account_number ? null : "Not generated")}
+                        testid="modal-virtual-acct"
+                      />
+                    </div>
+                  </section>
+
+                  {/* Amounts */}
+                  <section>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] flex items-center gap-1.5 mb-2">
+                      <TrendingUp className="w-3 h-3" /> Amounts
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="p-4 rounded-2xl bg-[color:var(--surface-alt)]">
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Amount initiated</div>
+                        <div className="font-display font-extrabold text-xl tabular-nums mt-1 text-[color:var(--text-primary)] truncate">{formatNaira(viewing.amount)}</div>
+                      </div>
+                      <div className={`p-4 rounded-2xl ${isFunded ? "bg-[color:var(--success-soft)] ring-1 ring-[color:var(--success)]/30" : "bg-[color:var(--surface-alt)]"}`}>
+                        <div className={`text-[10px] uppercase tracking-wider font-bold ${isFunded ? "text-[color:var(--success)]" : "text-[color:var(--text-tertiary)]"}`}>Paid amount</div>
+                        <div className={`font-display font-extrabold text-xl tabular-nums mt-1 truncate ${isFunded ? "text-[color:var(--success)]" : "text-[color:var(--text-tertiary)]"}`}>
+                          {isFunded ? formatNaira(viewing.amount) : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Timeline */}
+                  <section>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] flex items-center gap-1.5 mb-2">
+                      <Clock className="w-3 h-3" /> Timeline
+                    </div>
+                    <ul className="space-y-2.5">
+                      <TimelineRow
+                        color="var(--accent-main)"
+                        label="Initiated"
+                        time={formatDate(viewing.created_at)}
+                      />
+                      {viewing.updated_at && viewing.updated_at !== viewing.created_at && (
+                        <TimelineRow
+                          color="var(--accent-main)"
+                          label="Status updated"
+                          time={formatDate(viewing.updated_at)}
+                        />
+                      )}
+                      {isFunded && (
+                        <TimelineRow
+                          color="var(--success)"
+                          label="Funded"
+                          time={formatDate(viewing.updated_at || viewing.created_at)}
+                        />
+                      )}
+                      {viewing.status === "failed" && (
+                        <TimelineRow
+                          color="var(--error)"
+                          label="Marked failed"
+                          time={formatDate(viewing.updated_at || viewing.created_at)}
+                        />
+                      )}
+                    </ul>
+                    {viewing.admin_note && (
+                      <p className="mt-3 text-[11px] text-[color:var(--text-tertiary)] italic break-words">Note: {viewing.admin_note}</p>
+                    )}
+                  </section>
+
+                  {/* Raw gateway response */}
+                  <section>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] flex items-center gap-1.5 mb-2">
+                      <Code2 className="w-3 h-3" /> Raw gateway response
+                    </div>
+                    <pre className="rounded-2xl bg-[#0F172A] text-[#86EFAC] p-4 text-[11px] font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all" data-testid="modal-raw-json">
+{rawJson}
+                    </pre>
+                  </section>
+                </div>
+
+                {/* Footer actions */}
+                <div className="border-t border-[color:var(--border-default)] p-4 flex items-center justify-end gap-2 bg-[color:var(--surface-alt)]/40">
+                  {viewing.status === "pending" && (viewing.method === "marasoft" || viewing.method === "paystack") && (
+                    <button
+                      onClick={() => { refreshOne(viewing); }}
+                      disabled={refreshingId === viewing.id}
+                      data-testid="modal-refresh-btn"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-[color:var(--brand-soft)] text-[color:var(--brand)] hover:bg-[color:var(--brand)] hover:text-white transition-colors disabled:opacity-60"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${refreshingId === viewing.id ? "animate-spin" : ""}`} /> Refresh status
+                    </button>
+                  )}
+                  {!isFunded && (
+                    <button
+                      onClick={() => { setCreditAmt({ open: true, deposit: viewing }); setViewing(null); }}
+                      data-testid="modal-credit-btn"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-[color:var(--success)] text-white hover:opacity-90"
+                    >
+                      <BadgeCheck className="w-3.5 h-3.5" /> Credit deposit
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -318,5 +496,42 @@ export default function AdminDeposits() {
         </DialogContent>
       </Dialog>
     </AdminLayout>
+  );
+}
+
+function ModalField({ label, value, sub, testid }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    if (!value || value === "—") return;
+    try { await navigator.clipboard.writeText(String(value)); setCopied(true); setTimeout(() => setCopied(false), 1300); } catch {}
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      data-testid={testid}
+      className="text-left p-3 rounded-2xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] transition-colors group w-full overflow-hidden"
+    >
+      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">{label}</div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <div className="font-mono text-xs text-[color:var(--text-primary)] truncate">{value || "—"}</div>
+        {value && value !== "—" && (
+          copied
+            ? <CheckCircle2 className="w-3.5 h-3.5 text-[color:var(--success)] shrink-0" />
+            : <Copy className="w-3.5 h-3.5 text-[color:var(--text-tertiary)] group-hover:text-[color:var(--brand)] shrink-0" />
+        )}
+      </div>
+      {sub && <div className="mt-1 text-[10px] text-[color:var(--text-tertiary)] truncate">{sub}</div>}
+    </button>
+  );
+}
+
+function TimelineRow({ color, label, time }) {
+  return (
+    <li className="flex items-center gap-3 text-sm">
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+      <span className="font-semibold text-[color:var(--text-primary)] flex-1 truncate">{label}</span>
+      <span className="text-[11px] text-[color:var(--text-tertiary)] shrink-0">{time}</span>
+    </li>
   );
 }

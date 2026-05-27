@@ -1333,10 +1333,13 @@ async def admin_refresh_deposit(deposit_id: str, request: Request, _admin=Depend
 
 @router.post("/admin/deposits/poll-pending")
 async def admin_poll_pending_deposits(request: Request, _admin=Depends(get_current_admin)):
-    """Admin trigger: poll provider status for every pending deposit (Marasoft + Paystack)."""
+    """Admin trigger: re-verify every non-final deposit (pending OR failed) with its
+    gateway. Failed-but-actually-paid deposits get credited automatically if the
+    gateway now confirms them.
+    """
     db = request.app.state.db
-    items = await db.deposits.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(500)
-    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0}
+    items = await db.deposits.find({"status": {"$in": ["pending", "failed"]}}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0, "scanned": len(items)}
     for d in items:
         try:
             r = await _refresh_pending_deposit(db, d)
