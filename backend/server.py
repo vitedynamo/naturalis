@@ -173,7 +173,7 @@ async def on_startup():
     POLL_INTERVAL_SEC = int(os.environ.get("WITHDRAWAL_POLL_INTERVAL", "300"))
 
     async def _withdrawal_status_poller():
-        from routes_admin import _refresh_one_withdrawal
+        from routes_admin import _refresh_one_withdrawal, _refresh_pending_deposit
         while True:
             try:
                 await asyncio.sleep(POLL_INTERVAL_SEC)
@@ -181,7 +181,6 @@ async def on_startup():
                     {"status": {"$in": ["pending", "processing"]}},
                     {"_id": 0},
                 ).to_list(500)
-                # Only refresh ones that actually have a provider transfer ref
                 touched = 0
                 for w in pendings:
                     if w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"):
@@ -189,13 +188,25 @@ async def on_startup():
                             await _refresh_one_withdrawal(db, w)
                             touched += 1
                         except Exception as inner:
-                            logger.warning(f"Poller: refresh {w.get('id')} failed: {inner}")
-                if touched:
-                    logger.info(f"Withdrawal poller: refreshed {touched} non-final transfer(s)")
+                            logger.warning(f"Poller: withdrawal refresh {w.get('id')} failed: {inner}")
+                # Also poll pending deposits (Marasoft / Paystack — same cycle)
+                pending_deps = await db.deposits.find(
+                    {"status": "pending"}, {"_id": 0},
+                ).to_list(500)
+                dep_touched = 0
+                for d in pending_deps:
+                    if d.get("method") in ("marasoft", "paystack"):
+                        try:
+                            await _refresh_pending_deposit(db, d)
+                            dep_touched += 1
+                        except Exception as inner:
+                            logger.warning(f"Poller: deposit refresh {d.get('id')} failed: {inner}")
+                if touched or dep_touched:
+                    logger.info(f"Status poller: refreshed {touched} withdrawal(s) + {dep_touched} deposit(s)")
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.warning(f"Withdrawal poller crashed (will retry): {e}")
+                logger.warning(f"Status poller crashed (will retry): {e}")
 
     app.state._withdrawal_poller_task = asyncio.create_task(_withdrawal_status_poller())
     logger.info(f"Withdrawal status poller scheduled every {POLL_INTERVAL_SEC}s")

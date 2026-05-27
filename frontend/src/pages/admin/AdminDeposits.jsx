@@ -5,7 +5,7 @@ import { formatNaira, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet } from "lucide-react";
+import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet, RefreshCw } from "lucide-react";
 
 function avatarColor(seed = "") {
   const palette = ["#E5097F", "#5B5BD6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
@@ -58,9 +58,37 @@ export default function AdminDeposits() {
   const [q, setQ] = useState("");
   const [viewing, setViewing] = useState(null);
   const [creditAmt, setCreditAmt] = useState({ open: false, deposit: null });
+  const [polling, setPolling] = useState(false);
+  const [refreshingId, setRefreshingId] = useState(null);
 
   const load = () => api.get("/admin/deposits").then(({ data }) => setItems(data));
   useEffect(() => { load(); }, []);
+
+  const refreshOne = async (d) => {
+    setRefreshingId(d.id);
+    try {
+      const { data } = await api.post(`/admin/deposits/${d.id}/refresh-status`);
+      const act = data?._refresh || "no_op";
+      if (act === "credited") toast.success("Confirmed and credited");
+      else if (act === "marked_failed") toast.warning("Gateway reports FAILED");
+      else if (act === "still_pending") toast.info("Still pending at gateway");
+      else if (act === "no_provider") toast.info("No supported provider — manual credit only");
+      else if (act === "already_final") toast.info("Already finalised");
+      else toast.info(`Refresh: ${act}`);
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Refresh failed"); }
+    finally { setRefreshingId(null); }
+  };
+
+  const pollAll = async () => {
+    setPolling(true);
+    try {
+      const { data } = await api.post("/admin/deposits/poll-pending");
+      toast.success(`Polled ${data.refreshed} · credited ${data.credited} · failed ${data.marked_failed} · still pending ${data.still_pending}`);
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Poll failed"); }
+    finally { setPolling(false); }
+  };
 
   const filtered = useMemo(() => {
     let r = items;
@@ -118,7 +146,7 @@ export default function AdminDeposits() {
       </div>
 
       {/* Search + filter */}
-      <div className="card-soft p-3 md:p-4 mt-5 flex items-center gap-3" data-testid="deposits-toolbar">
+      <div className="card-soft p-3 md:p-4 mt-5 flex items-center gap-3 flex-wrap" data-testid="deposits-toolbar">
         <select value={filter} onChange={(e) => setFilter(e.target.value)}
           data-testid="deposits-filter"
           className="shrink-0 input-base text-sm font-semibold">
@@ -127,7 +155,7 @@ export default function AdminDeposits() {
           <option value="pending">Pending</option>
           <option value="failed">Failed</option>
         </select>
-        <div className="flex-1 relative">
+        <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-tertiary)]" />
           <input
             value={q}
@@ -137,6 +165,12 @@ export default function AdminDeposits() {
             className="w-full pl-10 input-base"
           />
         </div>
+        <button onClick={pollAll} disabled={polling}
+          data-testid="deposits-poll-all"
+          title="Re-verify every pending deposit with its payment gateway"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Polling…" : "Poll pending"}
+        </button>
       </div>
 
       {/* Table */}
@@ -207,6 +241,14 @@ export default function AdminDeposits() {
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--accent-main)]/30 text-[color:var(--accent-main)] hover:bg-[color:var(--accent-soft)]">
                           <Eye className="w-3 h-3" /> View
                         </button>
+                        {d.status === "pending" && (d.method === "marasoft" || d.method === "paystack") && (
+                          <button onClick={() => refreshOne(d)} disabled={refreshingId === d.id}
+                            data-testid={`refresh-deposit-${d.id}`}
+                            title="Re-verify with the payment gateway"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-[color:var(--brand-soft)] text-[color:var(--brand)]">
+                            <RefreshCw className={`w-3 h-3 ${refreshingId === d.id ? "animate-spin" : ""}`} /> Refresh
+                          </button>
+                        )}
                         {d.status !== "success" && (
                           <button onClick={() => setCreditAmt({ open: true, deposit: d })}
                             data-testid={`credit-deposit-${d.id}`}

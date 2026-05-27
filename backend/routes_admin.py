@@ -1228,6 +1228,136 @@ async def reject_password_reset(rid: str, payload: PasswordResetActionRequest, r
     return {"status": "ok"}
 
 
+async def _refresh_pending_deposit(db, d: dict) -> dict:
+    """Query the deposit's gateway for actual status and credit wallet if confirmed.
+
+    Returns the deposit dict with a `_refresh` field describing the action taken.
+    Currently supports Marasoft and Paystack.
+    """
+    if d.get("status") == "success":
+        return {**d, "_refresh": "already_final"}
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    gateway = d.get("method", "")
+    reference = d.get("reference", "")
+    action = "no_op"
+    note_extra = None
+    new_status = d.get("status")
+
+    if gateway == "marasoft" and s.get("marasoft_public_key"):
+        try:
+            from marasoft import verify_transaction as ms_verify
+            res = await ms_verify(
+                public_key=s["marasoft_public_key"],
+                secret_key=s.get("marasoft_secret_key", ""),
+                merchant_tx_ref=reference,
+            )
+            if res["status"] == "success":
+                new_status = "success"
+                action = "credited"
+                note_extra = f"Confirmed via Marasoft poll · {res.get('raw_status') or 'success'}"
+            elif res["status"] == "failed":
+                new_status = "failed"
+                action = "marked_failed"
+                note_extra = f"Marasoft reports {res.get('raw_status') or 'failed'}"
+            else:
+                action = "still_pending"
+                note_extra = f"Marasoft status: {res.get('raw_status') or 'pending'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Poll error: {e}"
+    elif gateway == "paystack" and s.get("paystack_secret_key"):
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(
+                    f"https://api.paystack.co/transaction/verify/{reference}",
+                    headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
+                )
+                data = resp.json()
+            ddata = data.get("data") or {}
+            ps_status = (ddata.get("status") or "").lower()
+            if ps_status == "success":
+                new_status = "success"
+                action = "credited"
+                note_extra = "Confirmed via Paystack verify"
+            elif ps_status in ("failed", "abandoned"):
+                new_status = "failed"
+                action = "marked_failed"
+                note_extra = f"Paystack reports {ps_status}"
+            else:
+                action = "still_pending"
+                note_extra = f"Paystack status: {ps_status or 'unknown'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Poll error: {e}"
+    else:
+        action = "no_provider"
+
+    # Apply mutations
+    update = {"updated_at": _now_iso()}
+    if new_status != d.get("status"):
+        update["status"] = new_status
+        if note_extra:
+            update["admin_note"] = note_extra
+    if new_status == "success" and d.get("status") != "success":
+        # Credit user wallet idempotently
+        new_user = await db.users.find_one_and_update(
+            {"id": d["user_id"]},
+            {"$inc": {"wallet_balance": float(d["amount"])}},
+            return_document=True,
+            projection={"_id": 0},
+        )
+        if new_user:
+            await db.transactions.insert_one({
+                "id": gen_reference("tx"),
+                "user_id": d["user_id"],
+                "type": "deposit",
+                "amount": float(d["amount"]),
+                "description": f"Deposit credited via {gateway} status poll",
+                "balance_after": new_user["wallet_balance"],
+                "meta": {"reference": reference, "gateway": gateway, "by": "poll"},
+                "created_at": _now_iso(),
+            })
+    await db.deposits.update_one({"id": d["id"]}, {"$set": update})
+    fresh = await db.deposits.find_one({"id": d["id"]}, {"_id": 0})
+    fresh["_refresh"] = action
+    return fresh
+
+
+@router.post("/admin/deposits/{deposit_id}/refresh-status")
+async def admin_refresh_deposit(deposit_id: str, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    d = await db.deposits.find_one({"id": deposit_id}, {"_id": 0})
+    if not d:
+        raise HTTPException(404, "Deposit not found")
+    return await _refresh_pending_deposit(db, d)
+
+
+@router.post("/admin/deposits/poll-pending")
+async def admin_poll_pending_deposits(request: Request, _admin=Depends(get_current_admin)):
+    """Admin trigger: poll provider status for every pending deposit (Marasoft + Paystack)."""
+    db = request.app.state.db
+    items = await db.deposits.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0}
+    for d in items:
+        try:
+            r = await _refresh_pending_deposit(db, d)
+            results["refreshed"] += 1
+            act = r.get("_refresh")
+            if act == "credited":
+                results["credited"] += 1
+            elif act == "marked_failed":
+                results["marked_failed"] += 1
+            elif act == "still_pending":
+                results["still_pending"] += 1
+            elif act == "no_provider":
+                results["no_provider"] += 1
+            elif act == "error":
+                results["errors"] += 1
+        except Exception:
+            results["errors"] += 1
+    return results
+
+
 # ===== Nomba float balance + transfer status =====
 @router.get("/admin/nomba/balance")
 async def admin_nomba_balance(request: Request, _admin=Depends(get_current_admin)):
