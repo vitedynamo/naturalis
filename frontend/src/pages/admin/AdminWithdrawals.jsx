@@ -154,7 +154,7 @@ function StatCard({ tone = "brand", icon: Icon, label, value, sub, testid }) {
   );
 }
 
-function GatewayStatusCard({ name, last, pendingCount, doneCount, tone, balance, balanceLive, balanceError, onRefreshBalance }) {
+function GatewayStatusCard({ name, last, pendingCount, doneCount, tone, balance, balanceLive, balanceError, onRefreshBalance, refreshing }) {
   const tones = {
     nomba: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
     paystack: "bg-[color:var(--gold-soft)] text-[color:var(--warning)]",
@@ -178,22 +178,30 @@ function GatewayStatusCard({ name, last, pendingCount, doneCount, tone, balance,
           <span className="text-[11px] text-[color:var(--text-tertiary)]">· {pendingCount} pending · {doneCount} done</span>
         </div>
         {balance !== undefined && (
-          <div className="mt-1 text-[10px] flex items-center gap-1.5">
-            <Wallet className="w-3 h-3 text-[color:var(--text-tertiary)]" />
+          <div className="mt-1.5 text-xs flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5 text-[color:var(--text-tertiary)] shrink-0" />
             <span className="text-[color:var(--text-tertiary)] font-medium">Float:</span>
             <span className="font-mono font-bold tabular-nums text-[color:var(--text-primary)]">
-              {balanceLive === false ? "Live off"
+              {refreshing ? "…"
+                : balanceLive === false ? "Live off"
                 : balance == null ? (balanceError ? "Unavailable" : "—")
                 : formatNaira(balance)}
             </span>
-            {onRefreshBalance && (
-              <button onClick={onRefreshBalance} className="ml-1 p-0.5 rounded hover:bg-[color:var(--surface-alt)]" title="Refresh balance" data-testid="refresh-float-btn">
-                <RefreshCw className="w-3 h-3 text-[color:var(--text-tertiary)]" />
-              </button>
-            )}
           </div>
         )}
       </div>
+      {onRefreshBalance && (
+        <button
+          onClick={onRefreshBalance}
+          disabled={refreshing}
+          className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] hover:text-[color:var(--brand)] text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Refresh balance"
+          data-testid="refresh-float-btn"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          {refreshing ? "Checking…" : "Refresh"}
+        </button>
+      )}
     </div>
   );
 }
@@ -221,6 +229,7 @@ export default function AdminWithdrawals() {
   const [items, setItems] = useState([]);
   const [banks, setBanks] = useState([]);
   const [nombaFloat, setNombaFloat] = useState(null);
+  const [floatRefreshing, setFloatRefreshing] = useState(false);
   const [polling, setPolling] = useState(false);
   const [refreshingId, setRefreshingId] = useState(null);
 
@@ -243,8 +252,30 @@ export default function AdminWithdrawals() {
   const [pageSize, setPageSize] = useState(20);
 
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
-  const loadFloat = () => api.get("/admin/nomba/balance").then(({ data }) => setNombaFloat(data)).catch(() => setNombaFloat(null));
-  useEffect(() => { load(); loadFloat(); }, []);
+  const loadFloat = async ({ silent = false } = {}) => {
+    setFloatRefreshing(true);
+    try {
+      const { data } = await api.get("/admin/nomba/balance");
+      setNombaFloat(data);
+      if (!silent) {
+        if (data?.live === false) {
+          toast.info("Nomba live mode is OFF — settings need a live API key");
+        } else if (data?.error) {
+          toast.error(`Nomba balance unavailable: ${data.error}`);
+        } else if (data?.balance != null) {
+          toast.success(`Nomba float: ${formatNaira(data.balance)}`);
+        } else {
+          toast.info("Nomba balance returned no data");
+        }
+      }
+    } catch (e) {
+      setNombaFloat(null);
+      if (!silent) toast.error(e?.response?.data?.detail || "Could not fetch Nomba balance");
+    } finally {
+      setFloatRefreshing(false);
+    }
+  };
+  useEffect(() => { load(); loadFloat({ silent: true }); }, []);
 
   /* ----- derived stats ----- */
   const stats = useMemo(() => {
@@ -327,7 +358,7 @@ export default function AdminWithdrawals() {
       const { data } = await api.post("/admin/withdrawals/poll-pending");
       toast.success(`Polled ${data.refreshed} · paid ${data.marked_paid} · rejected ${data.marked_rejected}`);
       load();
-      loadFloat();
+      loadFloat({ silent: true });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Poll failed");
     } finally { setPolling(false); }
@@ -462,7 +493,8 @@ export default function AdminWithdrawals() {
           balance={nombaFloat?.balance}
           balanceLive={nombaFloat?.live}
           balanceError={nombaFloat?.error}
-          onRefreshBalance={loadFloat}
+          onRefreshBalance={() => loadFloat()}
+          refreshing={floatRefreshing}
         />
         <GatewayStatusCard
           name="PAYSTACK"
