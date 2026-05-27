@@ -1,5 +1,12 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 26)
+
+### Pagination + column trim on Admin Withdrawals & Admin Investments
+- **AdminWithdrawals.jsx**: removed forced `min-w-[850px]`; user/bank cells now truncate; Bank column hides on <md, Date column hides on <lg. Added 20/page client-side pagination (`Showing X – Y of N`, Page X of Y, Previous/Next). Verified live with 12 rows (page 1 of 1).
+- **AdminInvestments.jsx**: rewrote with 20/page pagination + responsive column trim — User/Product truncate, Daily%/Paid-Days hide on <md, Total Profit/Started hide on <lg. Verified live with 14 rows.
+- **AdminUsers.jsx**: already had server-side pagination (20/page, ChevronLeft/Right), so no change required.
+
 ## Recent Changes (Feb 2026 — iteration 25)
 
 ### Admin user profile — gateway columns on deposits & withdrawals

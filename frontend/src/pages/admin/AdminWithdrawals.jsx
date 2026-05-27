@@ -90,6 +90,8 @@ export default function AdminWithdrawals() {
   const [nombaFloat, setNombaFloat] = useState(null); // {balance, live, ...}
   const [polling, setPolling] = useState(false);
   const [refreshingId, setRefreshingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const load = () => api.get("/admin/withdrawals").then(({ data }) => setItems(data));
   const loadFloat = () => api.get("/admin/nomba/balance").then(({ data }) => setNombaFloat(data)).catch(() => setNombaFloat(null));
@@ -226,36 +228,36 @@ export default function AdminWithdrawals() {
 
       <div className="card-soft overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[850px]" data-testid="admin-withdrawals-table">
+          <table className="w-full text-sm" data-testid="admin-withdrawals-table">
             <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
               <tr>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">User</th>
                 <th className="text-right p-3 text-xs uppercase tracking-wider">Amount</th>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Bank</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider hidden md:table-cell">Bank</th>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">Status</th>
-                <th className="text-left p-3 text-xs uppercase tracking-wider">Date</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider hidden lg:table-cell">Date</th>
                 <th className="text-right p-3 text-xs uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {items.map(w => (
+              {items.slice((Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) - 1) * PAGE_SIZE, Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) * PAGE_SIZE).map(w => (
                 <tr key={w.id} className="border-t border-[color:var(--border-default)]">
-                  <td className="p-3">
-                    <div className="font-medium text-[color:var(--text-primary)]">{w.user_name}</div>
-                    <div className="font-mono text-xs text-[color:var(--text-tertiary)]">{w.user_phone}</div>
+                  <td className="p-3 max-w-[180px]">
+                    <div className="font-medium text-[color:var(--text-primary)] truncate">{w.user_name}</div>
+                    <div className="font-mono text-xs text-[color:var(--text-tertiary)] truncate">{w.user_phone}</div>
                   </td>
-                  <td className="p-3 text-right font-semibold text-[color:var(--text-primary)]">{formatNaira(w.amount)}</td>
-                  <td className="p-3">
-                    <div className="text-[color:var(--text-primary)]">{w.bank_name}</div>
-                    <div className="font-mono text-xs text-[color:var(--text-primary)]">{w.account_number}</div>
-                    <div className="text-xs text-[color:var(--text-tertiary)]">{w.account_name}</div>
+                  <td className="p-3 text-right font-semibold text-[color:var(--text-primary)] whitespace-nowrap tabular-nums">{formatNaira(w.amount)}</td>
+                  <td className="p-3 hidden md:table-cell max-w-[220px]">
+                    <div className="text-[color:var(--text-primary)] truncate">{w.bank_name}</div>
+                    <div className="font-mono text-xs text-[color:var(--text-primary)] truncate">{w.account_number}</div>
+                    <div className="text-xs text-[color:var(--text-tertiary)] truncate">{w.account_name}</div>
                   </td>
                   <td className="p-3">
                     <span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : w.status === "processing" ? "pill-warn" : w.insufficient_float ? "pill-error" : "pill-warn"}`}>
                       {w.insufficient_float && w.status === "pending" ? "insufficient float" : w.status}
                     </span>
                   </td>
-                  <td className="p-3 text-[color:var(--text-secondary)] whitespace-nowrap">{formatDate(w.created_at)}</td>
+                  <td className="p-3 text-[color:var(--text-secondary)] whitespace-nowrap hidden lg:table-cell">{formatDate(w.created_at)}</td>
                   <td className="p-3 text-right">
                     {(w.status === "pending" || w.status === "processing") && (
                       <div className="flex flex-wrap gap-2 justify-end">
@@ -287,7 +289,7 @@ export default function AdminWithdrawals() {
                         )}
                       </div>
                     )}
-                    {w.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic">{w.admin_note}</div>}
+                    {w.admin_note && <div className="text-xs text-[color:var(--text-tertiary)] mt-1 italic line-clamp-2">{w.admin_note}</div>}
                   </td>
                 </tr>
               ))}
@@ -295,6 +297,36 @@ export default function AdminWithdrawals() {
             </tbody>
           </table>
         </div>
+        {items.length > 0 && (() => {
+          const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+          const safePage = Math.min(page, totalPages);
+          return (
+            <div className="flex items-center justify-between gap-3 p-4 border-t border-[color:var(--border-default)] flex-wrap" data-testid="withdrawals-pagination">
+              <div className="text-[11px] text-[color:var(--text-tertiary)] tabular-nums">
+                Showing <span className="font-bold text-[color:var(--text-primary)]">{(safePage - 1) * PAGE_SIZE + 1}</span>
+                {" – "}
+                <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * PAGE_SIZE, items.length)}</span>
+                {" of "}
+                <span className="font-bold text-[color:var(--text-primary)]">{items.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage <= 1}
+                  data-testid="withdrawals-page-prev"
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
+                  Previous
+                </button>
+                <span className="text-xs font-bold text-[color:var(--text-primary)] tabular-nums px-2" data-testid="withdrawals-page-indicator">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages}
+                  data-testid="withdrawals-page-next"
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed">
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
