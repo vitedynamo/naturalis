@@ -724,19 +724,19 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
     secret = settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", "")
     gateway_used = deposit.get("method", "mock")
 
-    success = False
-    if gateway_used == "marasoft" and settings.get("marasoft_public_key"):
+    # gateway_status: "success" | "failed" | "pending"
+    gateway_status = None
+    if gateway_used == "marasoft" and settings.get("marasoft_encryption_key"):
         try:
-            from marasoft import verify_transaction as ms_verify
-            res = await ms_verify(
-                public_key=settings["marasoft_public_key"],
-                secret_key=settings.get("marasoft_secret_key", ""),
-                merchant_tx_ref=reference,
+            from marasoft import check_transaction_status as ms_check
+            res = await ms_check(
+                enc_key=settings["marasoft_encryption_key"],
+                transaction_ref=reference,
             )
-            success = res["status"] == "success"
+            gateway_status = res["status"]  # success | failed | pending
         except Exception as e:
-            logger.warning(f"Marasoft verify failed for {reference}: {e}")
-            success = False
+            logger.warning(f"Marasoft check failed for {reference}: {e}")
+            gateway_status = "pending"  # treat transient errors as still-pending
     elif gateway_used == "paystack" and mode == "live" and secret:
         try:
             async with httpx.AsyncClient(timeout=20) as client:
@@ -745,15 +745,20 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
                     headers={"Authorization": f"Bearer {secret}"},
                 )
                 result = resp.json()
-            if result.get("status") and result["data"]["status"] == "success":
-                success = True
+            ps = ((result.get("data") or {}).get("status") or "").lower()
+            if ps == "success":
+                gateway_status = "success"
+            elif ps in ("failed", "abandoned", "reversed"):
+                gateway_status = "failed"
+            else:
+                gateway_status = "pending"
         except httpx.HTTPError:
-            success = False
+            gateway_status = "pending"
     else:
         # Mock auto-success
-        success = True
+        gateway_status = "success"
 
-    if success:
+    if gateway_status == "success":
         await db.deposits.update_one(
             {"reference": reference},
             {"$set": {"status": "success", "updated_at": _now_iso()}},
@@ -776,12 +781,15 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
         })
         deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
         return {"status": "success", "deposit": deposit, "wallet_balance": new_user["wallet_balance"]}
-    else:
+    elif gateway_status == "failed":
         await db.deposits.update_one(
             {"reference": reference},
             {"$set": {"status": "failed", "updated_at": _now_iso()}},
         )
         return {"status": "failed"}
+    else:
+        # pending — do NOT mutate deposit; let the user keep waiting / re-checking
+        return {"status": "pending"}
 
 
 @router.post("/deposit/webhook")
@@ -825,10 +833,14 @@ async def paystack_webhook(request: Request):
 
 @router.post("/deposit/webhook/marasoft")
 async def marasoft_webhook(request: Request):
-    """Inbound webhook from Marasoft Pay. We trust nothing in the payload — we
-    re-verify with Marasoft's server using the merchant_tx_ref and our stored
-    secret_key before crediting the wallet. This protects against spoofed webhook
-    POSTs since Marasoft does not document a signed-payload scheme.
+    """Inbound webhook from Marasoft Pay.
+
+    Authentication:
+      1. If admin has set a `marasoft_secret_hash`, we require it to match the
+         secret_hash field in the JSON payload (Marasoft docs: Secret Hash).
+      2. Even after the hash check, we re-verify the transaction server-side
+         with Marasoft's checktransaction API before crediting the wallet —
+         belt and braces.
     """
     db = request.app.state.db
     try:
@@ -837,32 +849,73 @@ async def marasoft_webhook(request: Request):
         raise HTTPException(400, "Invalid JSON")
     data = event.get("data") if isinstance(event, dict) else None
     if not data:
-        # Some gateways pass fields at top level
         data = event
-    reference = (data or {}).get("merchant_tx_ref") or (data or {}).get("reference") or (data or {}).get("tx_ref")
+
+    settings = await _settings(db)
+
+    # Step 1 — secret hash verification (if configured)
+    expected_hash = (settings.get("marasoft_secret_hash") or "").strip()
+    if expected_hash:
+        received_hash = (
+            (data or {}).get("secret_hash")
+            or (event or {}).get("secret_hash")
+            or request.headers.get("x-secret-hash", "")
+            or request.headers.get("secret-hash", "")
+        )
+        if not received_hash or str(received_hash).strip() != expected_hash:
+            logger.warning("Marasoft webhook rejected: secret_hash mismatch")
+            raise HTTPException(401, "Invalid secret hash")
+
+    # Marasoft webhook fields: merchant_ref is the value we passed as transaction_ref
+    reference = (
+        (data or {}).get("merchant_ref")
+        or (data or {}).get("merchant_tx_ref")
+        or (data or {}).get("transaction_ref")
+        or (data or {}).get("reference")
+        or (data or {}).get("tx_ref")
+    )
     if not reference:
-        raise HTTPException(400, "merchant_tx_ref missing")
+        raise HTTPException(400, "transaction reference missing")
     deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
     if not deposit:
         # Unknown reference — silently 200 to avoid info leak
         return {"status": "ignored", "reason": "unknown_reference"}
     if deposit["status"] == "success":
         return {"status": "ok", "already": True}
-    settings = await _settings(db)
-    if not settings.get("marasoft_public_key"):
+    if not settings.get("marasoft_encryption_key"):
         raise HTTPException(503, "Marasoft not configured")
-    # Independent re-verification
-    try:
-        from marasoft import verify_transaction as ms_verify
-        res = await ms_verify(
-            public_key=settings["marasoft_public_key"],
-            secret_key=settings.get("marasoft_secret_key", ""),
-            merchant_tx_ref=reference,
-        )
-    except Exception as e:
-        raise HTTPException(502, f"Marasoft re-verify failed: {e}")
-    if res["status"] != "success":
-        return {"status": "ignored", "reason": f"gateway_status_{res['status']}"}
+
+    # Step 2 — confirm success.
+    # If `marasoft_secret_hash` is configured AND matched in step 1, we trust the
+    # payload's reported status directly (Marasoft signed it). Otherwise, fall
+    # back to an independent API re-verify with check_transaction_status.
+    payload_status_raw = str((data or {}).get("status") or "").lower()
+    payload_says_success = payload_status_raw in ("success", "successful", "paid", "completed", "true")
+    payload_says_failed = payload_status_raw in ("failed", "failure", "reversed", "rejected", "cancelled")
+
+    if expected_hash and payload_says_success:
+        # Trusted payload — skip the re-verify call (Marasoft checktransaction is
+        # often gated behind IP whitelist; the secret_hash IS the auth proof).
+        confirmed_success = True
+    elif expected_hash and payload_says_failed:
+        return {"status": "ignored", "reason": "payload_status_failed"}
+    else:
+        # No secret hash configured (or payload status ambiguous) — re-verify.
+        try:
+            from marasoft import check_transaction_status as ms_check
+            res = await ms_check(
+                enc_key=settings["marasoft_encryption_key"],
+                transaction_ref=reference,
+            )
+        except Exception as e:
+            raise HTTPException(502, f"Marasoft re-verify failed: {e}")
+        if res["status"] != "success":
+            return {"status": "ignored", "reason": f"gateway_status_{res['status']}"}
+        confirmed_success = True
+
+    if not confirmed_success:
+        return {"status": "ignored", "reason": "unconfirmed"}
+
     # Credit wallet (idempotent — checked status=success above)
     await db.deposits.update_one(
         {"reference": reference},

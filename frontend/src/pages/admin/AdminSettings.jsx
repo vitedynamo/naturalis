@@ -64,6 +64,7 @@ export default function AdminSettings() {
         marasoft_public_key: s.marasoft_public_key || "",
         marasoft_secret_key: s.marasoft_secret_key || "",
         marasoft_encryption_key: s.marasoft_encryption_key || "",
+        marasoft_secret_hash: s.marasoft_secret_hash || "",
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -347,6 +348,14 @@ export default function AdminSettings() {
               <input type="password" value={s.marasoft_secret_key || ""} onChange={(e)=>setS({...s, marasoft_secret_key: e.target.value})}
                 data-testid="marasoft-secret-key-input"
                 className="w-full mt-1 input-base font-mono text-sm" />
+            </label>
+            <label className="md:col-span-2 text-xs">
+              <span>Webhook secret hash</span>
+              <input type="password" value={s.marasoft_secret_hash || ""} onChange={(e)=>setS({...s, marasoft_secret_hash: e.target.value})}
+                data-testid="marasoft-secret-hash-input"
+                placeholder="Paste the same value you set in Marasoft dashboard → Settings → Secret Hash"
+                className="w-full mt-1 input-base font-mono text-sm" />
+              <span className="block mt-1 text-[10px] text-[color:var(--text-tertiary)]">Optional but recommended. When set, the webhook rejects requests whose <code>secret_hash</code> field does not match.</span>
             </label>
           </div>
           <div className="mt-3 text-[11px] text-[color:var(--text-tertiary)] bg-[color:var(--surface-alt)] rounded-md p-2">

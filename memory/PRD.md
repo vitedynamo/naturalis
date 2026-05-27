@@ -1,5 +1,14 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 24)
+
+### Marasoft verify endpoint + webhook secret-hash + pending state
+- **Bug**: every "I have paid" tap on production returned "Marasoft reported this transaction as failed" because we were calling the **wrong** verify endpoint (`POST https://checkout.marasoftpay.live/verify_transaction`, the WEB CHECKOUT verifier) for transactions created via Dynamic Accounts.
+- **Fix in `marasoft.py`**: added `check_transaction_status(enc_key, transaction_ref)` → POST `https://api.marasoftpay.live/checktransaction` (the correct endpoint for dynamic & reserved account flows). Normalises Marasoft's odd response shape (`{status: "true"/"false", transaction_ref: "Successful"|"…"}`) to `success | failed | pending`.
+- **Fix in `routes_user.py`**: rewrote `/deposit/verify/{ref}` to distinguish `success` (credit wallet, mark success), `failed` (mark failed), and `pending` (do NOT mutate row — let user keep re-checking). Stops the false "failed" message that production users were seeing.
+- **Webhook hardening — secret hash**: new `marasoft_secret_hash` setting + admin UI field. When configured, the webhook (`POST /api/deposit/webhook/marasoft`) requires the incoming `secret_hash` field/header to match before processing. If hash matches **and** payload claims success, we trust the payload directly (no extra API roundtrip) — important because Marasoft's `checktransaction` endpoint is gated behind IP-whitelist in some merchant configs.
+- **All Marasoft re-verify call sites** (`/deposit/verify/{ref}`, admin poll-pending, background poller) switched to the new `check_transaction_status()`.
+
 ## Recent Changes (Feb 2026 — iteration 23)
 
 ### Dedicated bank-transfer page with countdown timer

@@ -1243,13 +1243,12 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
     note_extra = None
     new_status = d.get("status")
 
-    if gateway == "marasoft" and s.get("marasoft_public_key"):
+    if gateway == "marasoft" and s.get("marasoft_encryption_key"):
         try:
-            from marasoft import verify_transaction as ms_verify
-            res = await ms_verify(
-                public_key=s["marasoft_public_key"],
-                secret_key=s.get("marasoft_secret_key", ""),
-                merchant_tx_ref=reference,
+            from marasoft import check_transaction_status as ms_check
+            res = await ms_check(
+                enc_key=s["marasoft_encryption_key"],
+                transaction_ref=reference,
             )
             if res["status"] == "success":
                 new_status = "success"
@@ -1555,7 +1554,7 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
             meta={"changed_keys": list(payload.keys()), "values": redacted},
         )
     # If Paystack/Nomba/Marasoft creds were changed, bust the banks cache + Nomba token so the next call uses fresh creds
-    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload or "nomba_environment" in payload or "marasoft_public_key" in payload or "marasoft_secret_key" in payload:
+    if "paystack_secret_key" in payload or "nomba_client_id" in payload or "nomba_client_secret" in payload or "nomba_account_id" in payload or "nomba_environment" in payload or "marasoft_public_key" in payload or "marasoft_secret_key" in payload or "marasoft_secret_hash" in payload:
         _banks_cache["items"] = []
         _banks_cache["at"] = 0
         try:

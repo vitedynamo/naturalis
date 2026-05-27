@@ -289,6 +289,7 @@ class Settings(BaseModel):
     marasoft_public_key: str = ""
     marasoft_secret_key: str = ""
     marasoft_encryption_key: str = ""
+    marasoft_secret_hash: str = ""  # webhook auth — set in Marasoft dashboard + here
     # Merchant identity used to create Marasoft reserved (virtual) accounts.
     # Required by Marasoft KYC — every reserved account is opened in the merchant's name.
     marasoft_first_name: str = ""
@@ -327,6 +328,7 @@ class SettingsUpdate(BaseModel):
     marasoft_public_key: Optional[str] = None
     marasoft_secret_key: Optional[str] = None
     marasoft_encryption_key: Optional[str] = None
+    marasoft_secret_hash: Optional[str] = None
     marasoft_first_name: Optional[str] = None
     marasoft_last_name: Optional[str] = None
     marasoft_bvn: Optional[str] = None

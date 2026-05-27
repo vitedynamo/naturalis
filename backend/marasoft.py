@@ -110,6 +110,51 @@ async def verify_transaction(*, public_key: str, secret_key: str, merchant_tx_re
     return {"status": norm, "raw_status": raw_status, "raw": data}
 
 
+async def check_transaction_status(*, enc_key: str, transaction_ref: str) -> dict:
+    """Check status of a transaction made via a dynamic / reserved account.
+
+    Endpoint per docs: POST https://api.marasoftpay.live/checktransaction
+    Docs: https://developers.marasoftpay.live/tools/check-transaction-status.php
+
+    Marasoft returns weird response shape:
+      success -> {"status": "true", "transaction_ref": "Successful", ...}
+      pending -> {"status": "false", "message": "Transaction not found" / similar}
+      failed  -> rare; transaction_ref will be set to a failure word
+
+    Returns normalised {status: 'success'|'failed'|'pending', amount_received, raw}.
+    """
+    payload = {"enc_key": enc_key, "transaction_ref": transaction_ref}
+    async with _ms_client(timeout=20) as client:
+        resp = await client.post(
+            f"{MARASOFT_API_BASE}/checktransaction",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        try:
+            data = resp.json()
+        except Exception:
+            data = {"raw": resp.text}
+    # Marasoft returns "status": "true"/"false" (strings) on this endpoint
+    status_field = str(data.get("status") or "").lower()
+    tx_ref_field = str(data.get("transaction_ref") or "").lower()
+    ok = status_field in ("true", "1", "success", "successful") and (
+        not tx_ref_field or "success" in tx_ref_field or "paid" in tx_ref_field or "completed" in tx_ref_field
+    )
+    if ok:
+        norm = "success"
+    elif tx_ref_field in ("failed", "failure", "reversed", "rejected", "cancelled"):
+        norm = "failed"
+    else:
+        # status=false / pending / "transaction not found" → still pending
+        norm = "pending"
+    return {
+        "status": norm,
+        "raw_status": status_field,
+        "amount_received": data.get("amount_received") or data.get("settled_amount"),
+        "raw": data,
+    }
+
+
 async def create_dynamic_account(
     *, enc_key: str, amount_naira: float, transaction_ref: str,
 ) -> dict:
