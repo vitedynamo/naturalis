@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -10,10 +10,13 @@ import { toast } from "sonner";
 export default function Deposit() {
   const { refresh } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [amount, setAmount] = useState("3000");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock" });
+  const [highlightRef, setHighlightRef] = useState(null);
+  const cardRefs = useRef({});
 
   const load = async () => {
     const [{ data: h }, { data: s }] = await Promise.all([
@@ -25,6 +28,19 @@ export default function Deposit() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // After history loads, if we arrived with state.highlightRef, scroll to that card and pulse it briefly
+  useEffect(() => {
+    const target = location.state?.highlightRef;
+    if (!target || history.length === 0) return;
+    setHighlightRef(target);
+    setTimeout(() => {
+      const el = cardRefs.current[target];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    const t = setTimeout(() => setHighlightRef(null), 3500);
+    return () => clearTimeout(t);
+  }, [history, location.state]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -125,8 +141,13 @@ export default function Deposit() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="deposit-history-list">
           {history.map((d) => {
             const tone = d.status === "success" ? "success" : d.status === "failed" ? "error" : "warn";
+            const isHighlighted = highlightRef === d.reference;
             return (
-              <div key={d.id} className="card-soft p-4 relative overflow-hidden" data-testid={`dep-${d.id}`}>
+              <div
+                key={d.id}
+                ref={(el) => { if (el) cardRefs.current[d.reference] = el; }}
+                className={`card-soft p-4 relative overflow-hidden transition-all ${isHighlighted ? "ring-2 ring-[color:var(--accent-main)] shadow-xl shadow-[color:var(--accent-main)]/20 scale-[1.02]" : ""}`}
+                data-testid={`dep-${d.id}`}>
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                   tone === "success" ? "bg-[color:var(--success)]"
                   : tone === "error" ? "bg-[color:var(--error)]"

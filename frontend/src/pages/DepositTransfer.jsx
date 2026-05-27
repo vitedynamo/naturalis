@@ -86,15 +86,28 @@ export default function DepositTransfer() {
     try {
       const { data } = await api.get(`/deposit/verify/${reference}`);
       if (data.status === "success") {
-        toast.success(`Deposit of ${formatNaira(deposit.amount)} credited!`);
+        if (!silent) toast.success(`Deposit of ${formatNaira(deposit.amount)} credited!`);
         await refresh();
         setDeposit((d) => ({ ...d, status: "success" }));
-        setTimeout(() => navigate("/deposit"), 1800);
+        if (!silent) {
+          // User-initiated success → go straight to deposits list highlighted
+          navigate("/deposit", { state: { highlightRef: reference } });
+        } else {
+          // Silent poll success → show overlay briefly then redirect
+          setTimeout(() => navigate("/deposit", { state: { highlightRef: reference } }), 1500);
+        }
       } else if (data.status === "failed") {
-        if (!silent) toast.error("Marasoft reports this transaction as failed.");
+        if (!silent) {
+          toast.info("Payment not confirmed yet. We'll keep watching.");
+          navigate("/deposit", { state: { highlightRef: reference } });
+        }
         setDeposit((d) => ({ ...d, status: "failed" }));
-      } else if (!silent) {
-        toast.info("Payment not yet received. We'll keep checking.");
+      } else {
+        // pending
+        if (!silent) {
+          toast.info("Payment not confirmed yet — we'll keep checking in the background.");
+          navigate("/deposit", { state: { highlightRef: reference } });
+        }
       }
     } catch (e) {
       if (!silent) toast.error(e?.response?.data?.detail || "Verification failed");
