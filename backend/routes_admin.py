@@ -27,6 +27,27 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _expire_stale_pending_deposits(db) -> int:
+    """Mark Marasoft pending deposits older than 60 minutes as failed (timer expired).
+
+    Returns number of deposits expired. Idempotent — safe to call on every list/poll.
+    """
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(minutes=60)).isoformat()
+    res = await db.deposits.update_many(
+        {
+            "status": "pending",
+            "method": "marasoft",
+            "created_at": {"$lt": cutoff_iso},
+        },
+        {"$set": {
+            "status": "failed",
+            "admin_note": "Auto-expired: 60-minute transfer window elapsed without payment",
+            "updated_at": _now_iso(),
+        }},
+    )
+    return res.modified_count or 0
+
+
 async def _log_admin_activity(db, admin: dict, action: str, *, target_type: str = None, target_id: str = None, description: str = "", meta: dict = None):
     """Append a row to the admin activity log. Best-effort — failures swallowed so they
     never break the actual admin action being audited.
@@ -765,6 +786,7 @@ async def admin_user_timeline(
     if tab == "investments":
         items = await db.investments.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
     elif tab == "deposits":
+        await _expire_stale_pending_deposits(db)
         items = await db.deposits.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
     elif tab == "withdrawals":
         items = await db.withdrawals.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
@@ -989,6 +1011,7 @@ async def delete_product(product_id: str, request: Request, _admin=Depends(get_c
 @router.get("/admin/deposits")
 async def list_deposits(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
+    await _expire_stale_pending_deposits(db)
     items = await db.deposits.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)
     for it in items:
         u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
@@ -1338,8 +1361,9 @@ async def admin_poll_pending_deposits(request: Request, _admin=Depends(get_curre
     gateway now confirms them.
     """
     db = request.app.state.db
+    expired = await _expire_stale_pending_deposits(db)
     items = await db.deposits.find({"status": {"$in": ["pending", "failed"]}}, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0, "scanned": len(items)}
+    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0, "scanned": len(items), "auto_expired": expired}
     for d in items:
         try:
             r = await _refresh_pending_deposit(db, d)

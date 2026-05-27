@@ -2,7 +2,7 @@ import os
 import hmac
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import httpx
@@ -718,6 +718,27 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
         raise HTTPException(404, "Deposit not found")
     if deposit["status"] == "success":
         return {"status": "success", "deposit": deposit}
+
+    # Auto-expire Marasoft pending deposits whose 60-minute window has elapsed.
+    if (
+        deposit.get("status") == "pending"
+        and deposit.get("method") == "marasoft"
+        and deposit.get("created_at")
+    ):
+        try:
+            created_dt = datetime.fromisoformat(deposit["created_at"].replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - created_dt > timedelta(minutes=60):
+                await db.deposits.update_one(
+                    {"reference": reference},
+                    {"$set": {
+                        "status": "failed",
+                        "admin_note": "Auto-expired: 60-minute transfer window elapsed without payment",
+                        "updated_at": _now_iso(),
+                    }},
+                )
+                return {"status": "failed"}
+        except Exception:
+            pass
 
     settings = await _settings(db)
     mode = settings.get("payment_mode", "mock")

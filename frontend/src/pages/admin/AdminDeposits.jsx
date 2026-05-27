@@ -60,6 +60,8 @@ export default function AdminDeposits() {
   const [creditAmt, setCreditAmt] = useState({ open: false, deposit: null });
   const [polling, setPolling] = useState(false);
   const [refreshingId, setRefreshingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const load = () => api.get("/admin/deposits").then(({ data }) => setItems(data));
   useEffect(() => { load(); }, []);
@@ -103,6 +105,16 @@ export default function AdminDeposits() {
     );
     return r;
   }, [items, filter, q]);
+
+  // Reset to page 1 whenever filter/search changes
+  useEffect(() => { setPage(1); }, [filter, q]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
 
   const stats = useMemo(() => ({
     total: items.length,
@@ -189,13 +201,18 @@ export default function AdminDeposits() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {pageItems.length === 0 && (
                 <tr><td colSpan={6} className="p-12 text-center text-[color:var(--text-tertiary)]">
                   {q || filter !== "All" ? "No deposits match this filter." : "No deposits yet."}
                 </td></tr>
               )}
-              {filtered.map((d) => {
+              {pageItems.map((d) => {
                 const pill = STATUS_PILL[d.status] || STATUS_PILL.pending;
+                const subLabel = d.status === "success"
+                  ? <span className="text-[color:var(--success)] font-semibold">Paid in full</span>
+                  : d.status === "failed"
+                    ? <span className="text-[color:var(--error)] font-semibold">Failed</span>
+                    : "Pending settle";
                 return (
                   <tr key={d.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`deposit-row-${d.id}`}>
                     <td className="p-4">
@@ -212,9 +229,7 @@ export default function AdminDeposits() {
                     <td className="p-4">
                       <div className="font-display font-bold tabular-nums leading-tight">{formatNaira(d.amount)}</div>
                       <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5">
-                        {d.status === "success"
-                          ? <span className="text-[color:var(--success)] font-semibold">Paid in full</span>
-                          : "Pending settle"}
+                        {subLabel}
                       </div>
                     </td>
                     <td className="p-4">
@@ -245,6 +260,38 @@ export default function AdminDeposits() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between gap-3 p-4 border-t border-[color:var(--border-default)] flex-wrap" data-testid="deposits-pagination">
+            <div className="text-[11px] text-[color:var(--text-tertiary)] tabular-nums">
+              Showing <span className="font-bold text-[color:var(--text-primary)]">{(safePage - 1) * PAGE_SIZE + 1}</span>
+              {" – "}
+              <span className="font-bold text-[color:var(--text-primary)]">{Math.min(safePage * PAGE_SIZE, filtered.length)}</span>
+              {" of "}
+              <span className="font-bold text-[color:var(--text-primary)]">{filtered.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                data-testid="deposits-page-prev"
+                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-xs font-bold text-[color:var(--text-primary)] tabular-nums px-2" data-testid="deposits-page-indicator">
+                Page {safePage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                data-testid="deposits-page-next"
+                className="px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View modal — redesigned to match BLMSCapital reference */}

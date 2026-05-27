@@ -1,5 +1,15 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 25)
+
+### Admin user profile — gateway columns on deposits & withdrawals
+- `AdminUserDetail.jsx`: the **Deposits** tab now has a `Gateway` column showing the payment method pill (`marasoft` / `paystack` / `mock`). The **Withdrawals** tab now has a `Gateway` column derived from the stored transfer refs (`paystack_transfer_ref` → paystack, `nomba_transfer_ref` → nomba, otherwise `manual` once paid).
+
+### Admin deposits — auto-expire, accurate status copy, pagination
+- **Auto-expire stale Marasoft pending deposits**: new helper `_expire_stale_pending_deposits(db)` in `routes_admin.py` marks any `status="pending" + method="marasoft"` deposit older than 60 minutes as `failed` with note "Auto-expired: 60-minute transfer window elapsed without payment". Called in `GET /admin/deposits`, the deposits tab of `GET /admin/users/{id}/timeline`, and `POST /admin/deposits/poll-pending`. The user-facing `GET /deposit/verify/{ref}` mirrors the same logic.
+- **Sublabel under amount on Admin Deposits**: `Pending settle` → now reads `Failed` (red, bold) when `status === "failed"`. Funded rows still read `Paid in full`.
+- **Pagination**: 20 rows per page, `Showing X – Y of N`, Page X of Y indicator, Previous/Next buttons. Resets to page 1 when filter or search query changes.
+
 ## Recent Changes (Feb 2026 — iteration 24)
 
 ### Marasoft verify endpoint + webhook secret-hash + pending state

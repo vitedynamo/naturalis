@@ -465,10 +465,15 @@ function TabBody({ tab, items }) {
     </Table>
   );
   if (tab === "deposits") return (
-    <Table cols={["Amount", "Status", "Reference", "Created"]}>
+    <Table cols={["Amount", "Gateway", "Status", "Reference", "Created"]}>
       {items.map((d) => (
         <tr key={d.id} className="border-t border-[color:var(--border-default)]">
           <td className="p-3 tabular-nums font-bold">{formatNaira(d.amount)}</td>
+          <td className="p-3">
+            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]">
+              {d.method || "—"}
+            </span>
+          </td>
           <td className="p-3"><span className={`pill ${d.status === "success" ? "pill-success" : d.status === "failed" ? "pill-error" : "pill-warn"}`}>{d.status}</span></td>
           <td className="p-3 font-mono text-xs text-[color:var(--text-tertiary)]">{d.reference}</td>
           <td className="p-3 text-xs text-[color:var(--text-tertiary)]">{formatDate(d.created_at)}</td>
@@ -477,15 +482,29 @@ function TabBody({ tab, items }) {
     </Table>
   );
   if (tab === "withdrawals") return (
-    <Table cols={["Amount", "Status", "Bank", "Created"]}>
-      {items.map((w) => (
-        <tr key={w.id} className="border-t border-[color:var(--border-default)]">
-          <td className="p-3 tabular-nums font-bold">{formatNaira(w.amount)}</td>
-          <td className="p-3"><span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span></td>
-          <td className="p-3 text-xs">{w.bank_name} · <span className="font-mono">{w.account_number}</span></td>
-          <td className="p-3 text-xs text-[color:var(--text-tertiary)]">{formatDate(w.created_at)}</td>
-        </tr>
-      ))}
+    <Table cols={["Amount", "Gateway", "Status", "Bank", "Created"]}>
+      {items.map((w) => {
+        const gateway = w.paystack_transfer_ref
+          ? "paystack"
+          : w.nomba_transfer_ref
+            ? "nomba"
+            : w.status === "paid"
+              ? "manual"
+              : "—";
+        return (
+          <tr key={w.id} className="border-t border-[color:var(--border-default)]">
+            <td className="p-3 tabular-nums font-bold">{formatNaira(w.amount)}</td>
+            <td className="p-3">
+              <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--brand-soft)] text-[color:var(--brand)]">
+                {gateway}
+              </span>
+            </td>
+            <td className="p-3"><span className={`pill ${w.status === "paid" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span></td>
+            <td className="p-3 text-xs">{w.bank_name} · <span className="font-mono">{w.account_number}</span></td>
+            <td className="p-3 text-xs text-[color:var(--text-tertiary)]">{formatDate(w.created_at)}</td>
+          </tr>
+        );
+      })}
     </Table>
   );
   if (tab === "referrals") return (
