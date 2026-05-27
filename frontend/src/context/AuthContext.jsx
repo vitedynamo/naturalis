@@ -3,35 +3,46 @@ import { api } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
+// Helper: which storage currently holds the session for THIS tab?
+// sessionStorage takes precedence (used for admin "Login as user" impersonation tabs).
+function activeStorage() {
+  return sessionStorage.getItem("ni_token") ? sessionStorage : localStorage;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
-      const raw = localStorage.getItem("ni_user");
+      const raw = sessionStorage.getItem("ni_user") || localStorage.getItem("ni_user");
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   });
   const [loading, setLoading] = useState(true);
 
-  const setSession = useCallback((token, u) => {
-    if (token) localStorage.setItem("ni_token", token);
+  // setSession honors a per-tab "scope" flag — pass scope="session" for impersonation,
+  // default "local" for normal sign-ins.
+  const setSession = useCallback((token, u, scope = "local") => {
+    const store = scope === "session" ? sessionStorage : localStorage;
+    if (token) store.setItem("ni_token", token);
     if (u) {
-      localStorage.setItem("ni_user", JSON.stringify(u));
+      store.setItem("ni_user", JSON.stringify(u));
       setUser(u);
     }
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("ni_token");
-    localStorage.removeItem("ni_user");
+    // Clear from whichever storage holds this tab's session
+    const s = activeStorage();
+    s.removeItem("ni_token");
+    s.removeItem("ni_user");
     setUser(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    const token = localStorage.getItem("ni_token");
+    const token = sessionStorage.getItem("ni_token") || localStorage.getItem("ni_token");
     if (!token) { setUser(null); setLoading(false); return; }
     try {
       const { data } = await api.get("/auth/me");
-      localStorage.setItem("ni_user", JSON.stringify(data));
+      activeStorage().setItem("ni_user", JSON.stringify(data));
       setUser(data);
     } catch {
       logout();

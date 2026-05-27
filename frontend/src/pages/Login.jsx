@@ -15,23 +15,21 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   // Admin "Login as user" — token passed via ?_token=<JWT>
-  // We MUST bypass the api interceptor (which always injects the admin's localStorage token)
-  // and clear the admin session before establishing the user session.
+  // Strategy: store the impersonation session in sessionStorage (per-tab) so the
+  // admin's localStorage (in the original tab + any other tab) is untouched.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("_token");
     if (!t) return;
     (async () => {
       try {
-        // Clear admin session first so the interceptor can't poison subsequent calls
-        localStorage.removeItem("ni_token");
-        localStorage.removeItem("ni_user");
-        // Use raw axios to avoid the interceptor entirely
+        // Use raw axios (bypass interceptor) to verify the token belongs to a user
         const { data } = await axios.get(`${API_BASE}/auth/me`, {
           headers: { Authorization: `Bearer ${t}` },
         });
         if (data.is_admin) { toast.error("Cannot impersonate admin"); return; }
-        setSession(t, data);
+        // Scope to this tab only — DO NOT touch localStorage (admin session lives there)
+        setSession(t, data, "session");
         toast.success(`Impersonating ${data.name}`);
         // Strip the token from the URL so refreshing the page is safe
         window.history.replaceState({}, "", "/dashboard");
