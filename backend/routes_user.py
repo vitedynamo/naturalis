@@ -1391,3 +1391,78 @@ async def public_settings(request: Request):
         "withdrawal_end_time": s.get("withdrawal_end_time", "23:59"),
         "auto_payout_enabled": s.get("auto_payout_enabled", False),
     }
+
+
+# ============================================================================
+# In-app Announcements — user-facing endpoints
+# ============================================================================
+
+@router.get("/announcements/next")
+async def user_next_announcement(request: Request, current=Depends(get_current_user)):
+    """Returns the single highest-priority announcement the current user
+    should see right now, or `{"announcement": null}` if none apply.
+    Respects: is_active, starts_at/ends_at window, hide_from_newcomers_hours,
+    and per-user dismissal + reshow_interval_minutes.
+    """
+    db = request.app.state.db
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+
+    # User account age in hours
+    user = current
+    created_iso = user.get("created_at")
+    try:
+        created_dt = datetime.fromisoformat(created_iso) if isinstance(created_iso, str) else created_iso
+        if created_dt and created_dt.tzinfo is None:
+            created_dt = created_dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        created_dt = now
+    account_age_hours = (now - (created_dt or now)).total_seconds() / 3600.0
+
+    cursor = db.announcements.find({"is_active": True}).sort([("priority", -1), ("created_at", -1)])
+    items = await cursor.to_list(200)
+
+    for ann in items:
+        # Window check
+        starts = ann.get("starts_at")
+        ends = ann.get("ends_at")
+        if starts and now_iso < starts:
+            continue
+        if ends and now_iso >= ends:
+            continue
+        if account_age_hours < float(ann.get("hide_from_newcomers_hours") or 0):
+            continue
+        # Dismissal check
+        dis = await db.announcement_dismissals.find_one(
+            {"user_id": user["id"], "announcement_id": ann["id"]},
+            {"_id": 0, "dismissed_at": 1},
+        )
+        if dis:
+            interval = int(ann.get("reshow_interval_minutes") or 0)
+            if interval <= 0:
+                continue  # never show again
+            try:
+                last = datetime.fromisoformat(dis["dismissed_at"])
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
+                if (now - last).total_seconds() / 60.0 < interval:
+                    continue
+            except Exception:
+                continue
+        # Hit
+        out = {k: v for k, v in ann.items() if k != "_id"}
+        return {"announcement": out}
+    return {"announcement": None}
+
+
+@router.post("/announcements/{ann_id}/dismiss")
+async def user_dismiss_announcement(ann_id: str, request: Request, current=Depends(get_current_user)):
+    db = request.app.state.db
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.announcement_dismissals.update_one(
+        {"user_id": current["id"], "announcement_id": ann_id},
+        {"$set": {"user_id": current["id"], "announcement_id": ann_id, "dismissed_at": now_iso}},
+        upsert=True,
+    )
+    return {"status": "ok"}
+

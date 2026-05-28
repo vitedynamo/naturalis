@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira } from "@/lib/format";
 import ThemeToggle from "@/components/ThemeToggle";
+import InAppAnnouncementPopup from "@/components/InAppAnnouncementPopup";
 
 const primaryItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
@@ -196,6 +197,7 @@ export default function UserLayout({ children }) {
           </div>
         </div>
       )}
+      <InAppAnnouncementPopup />
     </div>
   );
 }

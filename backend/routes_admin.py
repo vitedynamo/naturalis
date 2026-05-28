@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFil
 from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
-from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
+from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest, AnnouncementCreate
 from pydantic import BaseModel, Field
 from storage import put_object, get_object
 from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, list_transfers as nomba_list_transfers, invalidate_token_cache as nomba_invalidate_token
@@ -2794,3 +2794,111 @@ async def list_admin_activity(
     # Distinct actions for filter UI
     distinct_actions = await db.admin_activity.distinct("action")
     return {"items": items, "count": len(items), "actions": sorted(distinct_actions)}
+
+
+# ============================================================================
+# In-app Announcements (multi-row pop-ups)
+# ============================================================================
+
+def _announce_doc(d: dict) -> dict:
+    """Strip Mongo internals and coerce datetimes to ISO for JSON."""
+    if not d:
+        return d
+    out = {k: v for k, v in d.items() if k != "_id"}
+    for k in ("starts_at", "ends_at", "created_at", "updated_at"):
+        v = out.get(k)
+        if isinstance(v, datetime):
+            out[k] = v.isoformat()
+    return out
+
+
+@router.get("/admin/announcements")
+async def admin_list_announcements(request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    items = await db.announcements.find({}, {"_id": 0}).sort([
+        ("priority", -1), ("created_at", -1),
+    ]).to_list(500)
+    return items
+
+
+@router.post("/admin/announcements")
+async def admin_create_announcement(payload: AnnouncementCreate, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    if payload.style not in ("info", "success", "warning", "critical"):
+        raise HTTPException(400, "Invalid style")
+    if payload.cta_type not in ("none", "internal", "external"):
+        raise HTTPException(400, "Invalid cta_type")
+    if payload.cta_type != "none" and not (payload.cta_label and payload.cta_url):
+        raise HTTPException(400, "cta_label and cta_url required when cta_type is set")
+    now = _now_iso()
+    doc = {
+        "id": gen_reference("ann"),
+        "title": payload.title.strip(),
+        "message": payload.message.strip(),
+        "style": payload.style,
+        "cta_type": payload.cta_type,
+        "cta_label": (payload.cta_label or "").strip() or None,
+        "cta_url": (payload.cta_url or "").strip() or None,
+        "starts_at": _parse_optional_iso(payload.starts_at),
+        "ends_at": _parse_optional_iso(payload.ends_at),
+        "hide_from_newcomers_hours": max(0, int(payload.hide_from_newcomers_hours or 0)),
+        "reshow_interval_minutes": max(0, int(payload.reshow_interval_minutes or 0)),
+        "priority": int(payload.priority or 0),
+        "is_active": bool(payload.is_active),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.announcements.insert_one(doc)
+    await _log_admin_activity(
+        db, _admin, "announcement.created",
+        target_type="announcement", target_id=doc["id"],
+        description=f"Created announcement '{doc['title']}'",
+        meta={"announcement_id": doc["id"], "style": doc["style"]},
+    )
+    return _announce_doc(doc)
+
+
+@router.put("/admin/announcements/{ann_id}")
+async def admin_update_announcement(ann_id: str, payload: AnnouncementCreate, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    if payload.style not in ("info", "success", "warning", "critical"):
+        raise HTTPException(400, "Invalid style")
+    if payload.cta_type not in ("none", "internal", "external"):
+        raise HTTPException(400, "Invalid cta_type")
+    update = {
+        "title": payload.title.strip(),
+        "message": payload.message.strip(),
+        "style": payload.style,
+        "cta_type": payload.cta_type,
+        "cta_label": (payload.cta_label or "").strip() or None,
+        "cta_url": (payload.cta_url or "").strip() or None,
+        "starts_at": _parse_optional_iso(payload.starts_at),
+        "ends_at": _parse_optional_iso(payload.ends_at),
+        "hide_from_newcomers_hours": max(0, int(payload.hide_from_newcomers_hours or 0)),
+        "reshow_interval_minutes": max(0, int(payload.reshow_interval_minutes or 0)),
+        "priority": int(payload.priority or 0),
+        "is_active": bool(payload.is_active),
+        "updated_at": _now_iso(),
+    }
+    res = await db.announcements.update_one({"id": ann_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Announcement not found")
+    doc = await db.announcements.find_one({"id": ann_id}, {"_id": 0})
+    return _announce_doc(doc)
+
+
+@router.delete("/admin/announcements/{ann_id}")
+async def admin_delete_announcement(ann_id: str, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    res = await db.announcements.delete_one({"id": ann_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Announcement not found")
+    await db.announcement_dismissals.delete_many({"announcement_id": ann_id})
+    await _log_admin_activity(
+        db, _admin, "announcement.deleted",
+        target_type="announcement", target_id=ann_id,
+        description=f"Deleted announcement {ann_id}",
+        meta={"announcement_id": ann_id},
+    )
+    return {"status": "ok"}
+

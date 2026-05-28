@@ -1,5 +1,23 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 48)
+
+### Announcements — full multi-row redesign (replaces single-banner setting)
+Previously the admin "Announcements" page edited a single global home banner + welcome modal in settings. Now it manages a full collection of standalone in-app pop-ups with scheduling, targeting, and per-user dismiss tracking.
+
+**Backend** (`models.py`, `routes_admin.py`, `routes_user.py`):
+- New `Announcement` model + `AnnouncementCreate` payload with: `title`, `message`, `style` (info/success/warning/critical), `cta_type` (none/internal/external) + `cta_label` + `cta_url`, `starts_at`/`ends_at`, `hide_from_newcomers_hours`, `reshow_interval_minutes`, `priority`, `is_active`.
+- Admin CRUD: `GET /api/admin/announcements`, `POST /api/admin/announcements`, `PUT /api/admin/announcements/{id}`, `DELETE /api/admin/announcements/{id}`. All write actions logged to admin activity.
+- User-facing: `GET /api/announcements/next` returns the single highest-priority announcement the current user qualifies for right now (honours window, newcomer-hours, dismissals, reshow interval). `POST /api/announcements/{id}/dismiss` upserts the per-user dismissal timestamp.
+- New collection `announcement_dismissals` `{user_id, announcement_id, dismissed_at}`.
+
+**Frontend** (`AdminAnnouncements.jsx` full rewrite, new `InAppAnnouncementPopup.jsx`):
+- **Brand-magenta hero** with sound-wave SVG decoration on the right + big white "+ New announcement" CTA. Stat strip ("4 total · 4 live · 0 scheduled").
+- **Card list** — each announcement renders as a card with a **coloured side accent strip** per style (blue/green/gold/red), icon well, title with LIVE/style/priority pills, two-line message preview, and schedule / newcomer-hours / creation-relative meta. Eye toggles active state; Edit and Delete on the right.
+- **Two-column modal** — form on the left (Title / Message w/ 0-2000 counter / coloured Style pills / CTA select with label+URL / Starts+Ends / Smart-timing accent card with newcomer hours and reshow interval w/ Min/Hrs/Days unit toggle / Priority + Active card), **Live preview panel on the right** that renders the exact user-facing popup as the admin types — unique signature vs the reference design (which has no preview).
+- User-facing `InAppAnnouncementPopup` is mounted in `UserLayout` so it appears on every authenticated page. Fetches `/announcements/next`, renders the popup with the style-coloured gradient header, internal-vs-external CTA routing, and dismisses to the backend with relative time tracking.
+- Verified e2e via curl + screenshots in light mode.
+
 ## Recent Changes (Feb 2026 — iteration 47)
 
 ### 1. "Pay missing bonuses" safety-net tool on Referrals

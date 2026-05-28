@@ -274,6 +274,42 @@ class ForgotPasswordRequest(BaseModel):
 class PasswordResetActionRequest(BaseModel):
     note: Optional[str] = None
 
+# ----- In-app Announcements (multi-row pop-ups) -----
+class Announcement(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_id)
+    title: str
+    message: str
+    style: str = "info"  # info | success | warning | critical
+    cta_type: str = "none"  # none | internal | external
+    cta_label: Optional[str] = None
+    cta_url: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    hide_from_newcomers_hours: int = 0
+    reshow_interval_minutes: int = 0
+    priority: int = 0
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class AnnouncementCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+    message: str = Field(..., min_length=1, max_length=2000)
+    style: str = "info"
+    cta_type: str = "none"
+    cta_label: Optional[str] = Field(None, max_length=40)
+    cta_url: Optional[str] = Field(None, max_length=400)
+    starts_at: Optional[str] = None  # ISO
+    ends_at: Optional[str] = None    # ISO
+    hide_from_newcomers_hours: int = 0
+    reshow_interval_minutes: int = 0
+    priority: int = 0
+    is_active: bool = True
+
+
+
 
 # ----- Settings -----
 class Settings(BaseModel):
