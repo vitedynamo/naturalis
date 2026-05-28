@@ -1,5 +1,17 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 43)
+
+### Cancel investment from admin modal
+**Backend** (`routes_admin.py`):
+- `POST /api/admin/investments/{inv_id}/cancel` — Pydantic-validated payload `{reason: str (3-500 chars), refund_capital: bool}`. Returns 404 for missing, 400 if not currently `active`, 200 with full receipt otherwise. On `refund_capital=true` it credits the user wallet, writes a `refund`-type transaction, and includes `new_wallet_balance` in the response. Always logs an `investment.cancelled` activity entry with full context.
+
+**Frontend** (`AdminInvestments.jsx`):
+- New **Danger zone** section in the investment detail modal (only rendered for `active` investments).
+- Two-step UX: primary outlined button "Cancel investment" → expands a confirmation card with required reason textarea, "Also refund capital" toggle (with live ₦amount preview), contextual hint that updates based on the refund choice, and a final "Cancel & refund / Cancel investment" red button.
+- Reload + toast on success; explicit error toast on failure.
+- Verified e2e via curl: validation (short reason → 422), success path (status flipped, wallet credited from ₦6,000 → ₦11,000, refund transaction created), re-cancel guard (400 "Cannot cancel a cancelled investment").
+
 ## Recent Changes (Feb 2026 — iteration 42)
 
 ### Investments KPI locale formatting + Deposits bulk gateway-ID backfill

@@ -10,7 +10,7 @@ from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from storage import put_object, get_object
 from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, list_transfers as nomba_list_transfers, invalidate_token_cache as nomba_invalidate_token
 
@@ -1210,6 +1210,91 @@ async def list_all_investments(request: Request, _admin=Depends(get_current_admi
         it["user_name"] = u["name"] if u else "—"
         it["user_phone"] = u["phone"] if u else "—"
     return items
+
+
+class CancelInvestmentPayload(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=500)
+    refund_capital: bool = False
+
+
+@router.post("/admin/investments/{inv_id}/cancel")
+async def admin_cancel_investment(
+    inv_id: str,
+    payload: CancelInvestmentPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    """Cancel an active investment. Optionally refund the original capital to the
+    user's wallet. Already-paid daily profits are NOT clawed back.
+    """
+    db = request.app.state.db
+    inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(404, "Investment not found")
+    if inv.get("status") != "active":
+        raise HTTPException(400, f"Cannot cancel a {inv.get('status')} investment")
+
+    now = _now_iso()
+    update = {
+        "status": "cancelled",
+        "cancelled_at": now,
+        "cancel_reason": payload.reason,
+        "cancelled_by_admin_id": _admin["id"],
+        "refund_capital": bool(payload.refund_capital),
+        "updated_at": now,
+    }
+    refund_amt = 0.0
+    new_balance = None
+    if payload.refund_capital:
+        refund_amt = float(inv.get("amount") or 0)
+        if refund_amt > 0:
+            new_user = await db.users.find_one_and_update(
+                {"id": inv["user_id"]},
+                {"$inc": {"wallet_balance": refund_amt}},
+                return_document=True,
+                projection={"_id": 0, "wallet_balance": 1},
+            )
+            new_balance = new_user["wallet_balance"] if new_user else None
+            await db.transactions.insert_one({
+                "id": gen_reference("tx"),
+                "user_id": inv["user_id"],
+                "type": "refund",
+                "amount": refund_amt,
+                "description": f"Capital refund · investment {inv_id} cancelled · {payload.reason}",
+                "balance_after": new_balance,
+                "meta": {"investment_id": inv_id, "by_admin": True, "reason": payload.reason},
+                "created_at": now,
+            })
+
+    await db.investments.update_one({"id": inv_id}, {"$set": update})
+
+    await _log_admin_activity(
+        db, _admin, "investment.cancelled",
+        target_type="investment", target_id=inv_id,
+        description=(
+            f"Cancelled investment of ₦{float(inv.get('amount') or 0):,.2f} "
+            f"({inv.get('product_name')}) · {payload.reason}"
+            + (f" · refunded ₦{refund_amt:,.2f}" if payload.refund_capital else " · no refund")
+        ),
+        meta={
+            "investment_id": inv_id,
+            "user_id": inv["user_id"],
+            "amount": float(inv.get("amount") or 0),
+            "refund_capital": payload.refund_capital,
+            "refund_amount": refund_amt,
+            "new_wallet_balance": new_balance,
+            "reason": payload.reason,
+        },
+    )
+
+    return {
+        "status": "ok",
+        "investment_id": inv_id,
+        "cancelled_at": now,
+        "refund_capital": payload.refund_capital,
+        "refund_amount": refund_amt,
+        "new_wallet_balance": new_balance,
+    }
 
 
 # ===== Referrals =====

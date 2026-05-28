@@ -6,10 +6,11 @@ import Pagination from "@/components/admin/Pagination";
 import {
   Sparkles, Search, TrendingUp, Wallet, Banknote, Target, Timer,
   ArrowDownRight, ArrowUpRight, Activity, X, ChevronRight, Layers, CalendarRange,
-  CheckCircle2, AlertCircle, ExternalLink, User as UserIcon,
+  CheckCircle2, AlertCircle, ExternalLink, User as UserIcon, Ban, ShieldAlert,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 /* ----------------------------------------------------------------------------
  * Helpers
@@ -210,8 +211,19 @@ function PlanBadge({ name, dailyPct }) {
 /* ----------------------------------------------------------------------------
  * Detail modal
  * --------------------------------------------------------------------------*/
-function InvestmentDetailModal({ inv, onClose }) {
+function InvestmentDetailModal({ inv, onClose, onCancelled }) {
   useTick(1000);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [refundCapital, setRefundCapital] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    // Reset confirm form whenever a different investment is opened.
+    setConfirmOpen(false);
+    setReason("");
+    setRefundCapital(false);
+  }, [inv?.id]);
+
   if (!inv) return null;
   const ms = nextPayoutMs(inv.last_payout_at);
   const due = ms != null && ms <= 0;
@@ -222,6 +234,32 @@ function InvestmentDetailModal({ inv, onClose }) {
     : inv.status === "completed"
       ? "from-[#1E3A8A] via-[#3730A3] to-[#5B5BD6]"
       : "from-[#7c4807] via-[#a36a08] to-[#F59E0B]";
+
+  const submitCancel = async () => {
+    const r = reason.trim();
+    if (r.length < 3) {
+      toast.error("Please give a brief reason (3+ characters)");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/admin/investments/${inv.id}/cancel`, {
+        reason: r,
+        refund_capital: refundCapital,
+      });
+      toast.success(
+        refundCapital
+          ? `Cancelled · refunded ${formatNaira(data.refund_amount)} to wallet`
+          : "Investment cancelled",
+      );
+      onCancelled?.();
+      onClose();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Cancellation failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Dialog open={!!inv} onOpenChange={(o) => !o && onClose()}>
@@ -341,6 +379,86 @@ function InvestmentDetailModal({ inv, onClose }) {
               <KV label="Product ID" value={inv.product_id} />
             </div>
           </section>
+
+          {/* Danger zone — Cancel investment */}
+          {inv.status === "active" && (
+            <section data-testid="cancel-investment-section">
+              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--error)] mb-2 flex items-center gap-1.5">
+                <ShieldAlert className="w-3 h-3" /> Danger zone
+              </div>
+              {!confirmOpen ? (
+                <div className="card-soft p-4 border border-[color:var(--error)]/20 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-[color:var(--text-primary)]">Cancel this investment</div>
+                    <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">
+                      Stops daily drops immediately. Already-paid profits stay with the user.
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setConfirmOpen(true)}
+                    data-testid="cancel-investment-open"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider border border-[color:var(--error)]/40 text-[color:var(--error)] hover:bg-[color:var(--error-soft)] transition-colors"
+                  >
+                    <Ban className="w-3.5 h-3.5" /> Cancel investment
+                  </button>
+                </div>
+              ) : (
+                <div className="card-soft p-4 border border-[color:var(--error)]/30 space-y-3">
+                  <div className="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-[color:var(--error)]" />
+                    Confirm cancellation
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1">Reason (required)</label>
+                    <textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="e.g. duplicate plan, user requested cancellation, fraud check…"
+                      data-testid="cancel-investment-reason"
+                      rows={2}
+                      className="input-base w-full text-sm resize-none"
+                      maxLength={500}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={refundCapital}
+                      onChange={(e) => setRefundCapital(e.target.checked)}
+                      data-testid="cancel-investment-refund-toggle"
+                      className="w-4 h-4 accent-[color:var(--brand)]"
+                    />
+                    <span className="text-xs text-[color:var(--text-primary)]">
+                      Also refund <span className="font-bold tabular-nums">{formatNaira(inv.amount)}</span> capital to the user's wallet
+                    </span>
+                  </label>
+                  <div className="rounded-lg bg-[color:var(--surface-alt)] p-2.5 text-[11px] text-[color:var(--text-tertiary)] leading-snug">
+                    {refundCapital
+                      ? `The user will receive ₦${Number(inv.amount).toLocaleString()} back instantly. This will appear in their transactions as a refund.`
+                      : "No refund will be issued. The user keeps any daily profits already paid, but their capital is not returned."}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => setConfirmOpen(false)}
+                      disabled={submitting}
+                      data-testid="cancel-investment-back"
+                      className="px-3 py-2 rounded-md text-xs font-semibold bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]/70 disabled:opacity-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={submitCancel}
+                      disabled={submitting || reason.trim().length < 3}
+                      data-testid="cancel-investment-confirm"
+                      className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-[color:var(--error)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Ban className="w-3.5 h-3.5" /> {submitting ? "Cancelling…" : refundCapital ? "Cancel & refund" : "Cancel investment"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -397,6 +515,10 @@ export default function AdminInvestments() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  const reload = () => {
+    api.get("/admin/investments").then(({ data }) => setItems(data || []));
+  };
 
   // Plan list for filter
   const plans = useMemo(() => {
@@ -678,7 +800,7 @@ export default function AdminInvestments() {
         )}
       </div>
 
-      <InvestmentDetailModal inv={viewing} onClose={() => setViewing(null)} />
+      <InvestmentDetailModal inv={viewing} onClose={() => setViewing(null)} onCancelled={reload} />
     </AdminLayout>
   );
 }
