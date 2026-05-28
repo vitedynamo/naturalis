@@ -198,18 +198,23 @@ export default function AdminDeposits() {
                 <th className="text-left p-4">Amount</th>
                 <th className="text-left p-4">Gateway</th>
                 <th className="text-left p-4">Status</th>
+                <th className="text-left p-4 hidden xl:table-cell">Gateway ref</th>
                 <th className="text-left p-4 hidden md:table-cell">Date</th>
                 <th className="text-right p-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {pageItems.length === 0 && (
-                <tr><td colSpan={6} className="p-12 text-center text-[color:var(--text-tertiary)]">
+                <tr><td colSpan={7} className="p-12 text-center text-[color:var(--text-tertiary)]">
                   {q || filter !== "All" ? "No deposits match this filter." : "No deposits yet."}
                 </td></tr>
               )}
               {pageItems.map((d) => {
                 const pill = STATUS_PILL[d.status] || STATUS_PILL.pending;
+                // Gateway-side ID only (NOT our internal merchant ref `dep_xxx`).
+                // Marasoft: `gateway_id` (transaction_id / payment_ref).
+                // Paystack: `gateway_id` (numeric id). Legacy fallback: `nomba_order_ref`.
+                const gwRef = d.gateway_id || d.meta?.gateway_ref || d.nomba_order_ref;
                 const subLabel = d.status === "success"
                   ? <span className="text-[color:var(--success)] font-semibold">Paid in full</span>
                   : d.status === "failed"
@@ -244,6 +249,21 @@ export default function AdminDeposits() {
                           <LastPolledBadge iso={d.last_polled_at} testid={`last-polled-${d.id}`} />
                         )}
                       </div>
+                    </td>
+                    <td className="p-4 hidden xl:table-cell max-w-[160px]">
+                      {gwRef ? (
+                        <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] truncate" title={gwRef}>{gwRef}</div>
+                      ) : d.status === "success" ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)] border border-[color:var(--border-default)]"
+                          title={`Gateway-side ID not captured yet. Click “Recheck pending” or open the deposit and use Refresh to fetch it from ${d.method}.`}
+                          data-testid={`deposit-gw-ref-missing-${d.id}`}
+                        >
+                          awaiting
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[color:var(--text-tertiary)]">—</span>
+                      )}
                     </td>
                     <td className="p-4 text-xs text-[color:var(--text-tertiary)] whitespace-nowrap hidden md:table-cell">{formatDate(d.created_at)}</td>
                     <td className="p-4">
@@ -291,6 +311,11 @@ export default function AdminDeposits() {
                 : "from-[#92400E] via-[#B45309] to-[#F59E0B]";
             const ourRef = viewing.reference || "—";
             const gatewayId = viewing.gateway_id || viewing.meta?.gateway_ref || viewing.nomba_order_ref || "—";
+            const gatewayIdLabel = viewing.method === "paystack"
+              ? "Paystack ID (gateway-side)"
+              : viewing.method === "marasoft"
+                ? "Marasoft ID (gateway-side)"
+                : "Gateway ID (gateway-side)";
             const narration = viewing.narration || `NaijaInvest ${ourRef}`;
             const rawJson = JSON.stringify(
               {
@@ -379,8 +404,8 @@ export default function AdminDeposits() {
                       <CheckCircle2 className="w-3 h-3" /> Gateway & identifiers
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <ModalField label="Gateway ID (trace)" value={gatewayId} testid="modal-gateway-id" />
-                      <ModalField label="Our reference" value={ourRef} testid="modal-our-ref" />
+                      <ModalField label={gatewayIdLabel} value={gatewayId} sub={gatewayId === "—" ? "Click Refresh below to fetch from gateway" : null} testid="modal-gateway-id" />
+                      <ModalField label="Our reference (sent to gateway)" value={ourRef} testid="modal-our-ref" />
                       <ModalField label="User narration" value={narration} testid="modal-narration" />
                       <ModalField
                         label="Virtual account"

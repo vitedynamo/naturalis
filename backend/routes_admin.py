@@ -28,6 +28,46 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _extract_marasoft_gateway_id(raw: dict | None) -> str | None:
+    """Pull the gateway-side reference (not our merchant_tx_ref) from a Marasoft
+    checktransaction / verify_transaction response. Marasoft is inconsistent about
+    field names — try several candidates and return the first that doesn't equal
+    our own merchant ref.
+    """
+    if not isinstance(raw, dict):
+        return None
+    candidates = (
+        "transaction_id", "transactionId", "txn_id", "txnId",
+        "payment_ref", "paymentRef", "gateway_ref", "gatewayRef",
+        "session_id", "sessionId", "reference_id", "referenceId",
+        "marasoft_ref", "ms_ref",
+    )
+    for k in candidates:
+        v = raw.get(k)
+        if isinstance(v, (str, int)) and str(v).strip():
+            return str(v).strip()
+    # Some responses nest under "data"
+    inner = raw.get("data")
+    if isinstance(inner, dict):
+        for k in candidates:
+            v = inner.get(k)
+            if isinstance(v, (str, int)) and str(v).strip():
+                return str(v).strip()
+    return None
+
+
+def _extract_paystack_gateway_id(ddata: dict | None) -> str | None:
+    """Paystack's verify response has `id` (numeric) which is the gateway-side ID.
+    `reference` is the one WE sent. Return id only.
+    """
+    if not isinstance(ddata, dict):
+        return None
+    v = ddata.get("id")
+    if isinstance(v, (str, int)) and str(v).strip():
+        return str(v).strip()
+    return None
+
+
 async def _expire_stale_pending_deposits(db) -> int:
     """Mark Marasoft pending deposits older than 60 minutes as failed (timer expired).
 
@@ -1299,6 +1339,7 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
     action = "no_op"
     note_extra = None
     new_status = d.get("status")
+    new_gateway_id: str | None = None
 
     if gateway == "marasoft" and s.get("marasoft_encryption_key"):
         try:
@@ -1307,6 +1348,7 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
                 enc_key=s["marasoft_encryption_key"],
                 transaction_ref=reference,
             )
+            new_gateway_id = _extract_marasoft_gateway_id(res.get("raw"))
             if res["status"] == "success":
                 new_status = "success"
                 action = "credited"
@@ -1330,6 +1372,7 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
                 )
                 data = resp.json()
             ddata = data.get("data") or {}
+            new_gateway_id = _extract_paystack_gateway_id(ddata)
             ps_status = (ddata.get("status") or "").lower()
             if ps_status == "success":
                 new_status = "success"
@@ -1354,6 +1397,9 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
         update["status"] = new_status
         if note_extra:
             update["admin_note"] = note_extra
+    # Persist gateway-side ID once captured (don't overwrite a previously stored one with None).
+    if new_gateway_id and new_gateway_id != d.get("gateway_id"):
+        update["gateway_id"] = new_gateway_id
     if new_status == "success" and d.get("status") != "success":
         # Credit user wallet idempotently
         new_user = await db.users.find_one_and_update(

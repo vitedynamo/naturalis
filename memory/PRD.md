@@ -1,5 +1,18 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 40)
+
+### AdminDeposits gateway-id parity with Withdrawals
+**User request**: apply the same gateway-id treatment to Admin Deposits.
+
+**Backend** (`routes_admin.py`, `routes_user.py`):
+- Added `_extract_marasoft_gateway_id` and `_extract_paystack_gateway_id` helpers that pull the gateway-side reference (Marasoft `transaction_id`/`payment_ref`/`session_id`/etc., Paystack numeric `id`) from each verify response.
+- `_refresh_pending_deposit` and `deposit_verify` now persist this as `gateway_id` on the deposit doc — even on `pending` states — so admins see the canonical gateway ref the moment it's known.
+
+**Frontend** (`AdminDeposits.jsx`):
+- New "Gateway ref" column (xl+ screens) that resolves to `gateway_id` only. Successful deposits without a captured gateway ID show a small `awaiting` pill with a tooltip explaining how to backfill (instead of leaking our internal `dep_xxx`).
+- Modal "Gateway & identifiers" now labels the row contextually (`Paystack ID (gateway-side)` / `Marasoft ID (gateway-side)`) and tells admins to click *Refresh* if the ID hasn't been captured yet. "Our reference" relabeled "Our reference (sent to gateway)" for clarity.
+
 ## Recent Changes (Feb 2026 — iteration 39)
 
 ### Gateway Ref column now shows the actual Nomba/Paystack ID (not our app reference)

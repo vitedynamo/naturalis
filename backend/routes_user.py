@@ -747,26 +747,32 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
 
     # gateway_status: "success" | "failed" | "pending"
     gateway_status = None
+    gateway_id: str | None = None
     if gateway_used == "marasoft" and settings.get("marasoft_encryption_key"):
         try:
             from marasoft import check_transaction_status as ms_check
+            from routes_admin import _extract_marasoft_gateway_id
             res = await ms_check(
                 enc_key=settings["marasoft_encryption_key"],
                 transaction_ref=reference,
             )
             gateway_status = res["status"]  # success | failed | pending
+            gateway_id = _extract_marasoft_gateway_id(res.get("raw"))
         except Exception as e:
             logger.warning(f"Marasoft check failed for {reference}: {e}")
             gateway_status = "pending"  # treat transient errors as still-pending
     elif gateway_used == "paystack" and mode == "live" and secret:
         try:
+            from routes_admin import _extract_paystack_gateway_id
             async with httpx.AsyncClient(timeout=20) as client:
                 resp = await client.get(
                     f"https://api.paystack.co/transaction/verify/{reference}",
                     headers={"Authorization": f"Bearer {secret}"},
                 )
                 result = resp.json()
-            ps = ((result.get("data") or {}).get("status") or "").lower()
+            ddata = (result.get("data") or {})
+            gateway_id = _extract_paystack_gateway_id(ddata)
+            ps = (ddata.get("status") or "").lower()
             if ps == "success":
                 gateway_status = "success"
             elif ps in ("failed", "abandoned", "reversed"):
@@ -778,6 +784,14 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
     else:
         # Mock auto-success
         gateway_status = "success"
+
+    # Persist gateway-side ID the moment we observe it (even on pending), so admins
+    # don't have to wait for the final state to see the Nomba/Paystack ID.
+    if gateway_id and gateway_id != deposit.get("gateway_id"):
+        await db.deposits.update_one(
+            {"reference": reference},
+            {"$set": {"gateway_id": gateway_id, "updated_at": _now_iso()}},
+        )
 
     if gateway_status == "success":
         await db.deposits.update_one(
