@@ -216,12 +216,30 @@ async def transfer_to_bank(
         raise RuntimeError(f"Nomba transfer rejected: {msg}")
 
     # Extract Nomba's transactionId — the canonical key for requery.
+    # Try every common shape Nomba has used across docs/versions.
     nomba_txn_id = (
         inner.get("id")
         or inner.get("transactionId")
         or inner.get("transactionRef")
         or inner.get("transaction_id")
+        or inner.get("nombaTxnId")
+        or inner.get("merchantTxRef")  # last-resort echo from Nomba
+        or (inner.get("transaction") or {}).get("id")
+        or (inner.get("transaction") or {}).get("transactionId")
     )
+
+    # Always log the raw Nomba transfer response so we can audit which fields are populated
+    # in production (different Nomba environments have used slightly different response shapes).
+    try:
+        import logging
+        logging.getLogger("nomba").info(
+            f"transfer_to_bank response: merchantTxRef={merchant_tx_ref} "
+            f"extracted_txn_id={nomba_txn_id!r} inner_status={raw_inner_status!r} "
+            f"inner_keys={list(inner.keys()) if isinstance(inner, dict) else 'non-dict'} "
+            f"top_keys={list(data.keys()) if isinstance(data, dict) else 'non-dict'}"
+        )
+    except Exception:
+        pass
 
     if raw_inner_status in ("SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID"):
         norm_status = "SUCCESS"
@@ -346,6 +364,42 @@ async def get_transfer_status(
                 d = d3
         except Exception:
             pass
+
+    # Fallback 3: scan the recent transaction list filtered by merchantTxRef
+    # (some Nomba environments only index this endpoint, not the requery-single one).
+    if not d and merchant_tx_ref:
+        for query_path, param_name in (
+            ("/v1/transactions/accounts", "merchantTxRef"),
+            ("/v1/transactions/accounts", "transactionRef"),
+            ("/v1/transfers/banks", "merchantTxRef"),
+            ("/v1/transfers/banks", "transactionRef"),
+        ):
+            try:
+                _, data4 = await _call_with_fallback(
+                    client_id=client_id, client_secret=client_secret, account_id=account_id,
+                    environment=environment, method="GET", path=query_path,
+                    params={param_name: merchant_tx_ref, "limit": 1},
+                )
+                d4 = data4.get("data") or {}
+                if isinstance(d4, list):
+                    d4 = next((it for it in d4 if (it.get("merchantTxRef") or it.get("transactionRef") or it.get("merchant_tx_ref")) == merchant_tx_ref), d4[0] if d4 else {})
+                if d4 and (d4.get("status") or d4.get("transactionStatus")):
+                    data = data4
+                    d = d4
+                    break
+            except Exception:
+                continue
+
+    # Always log the raw payload we'll act on — production debugging aid.
+    try:
+        import logging
+        logging.getLogger("nomba").info(
+            f"get_transfer_status: merchantTxRef={merchant_tx_ref} nomba_txn_id={nomba_transaction_id!r} "
+            f"resolved_status={(d.get('status') or d.get('transactionStatus') or '')!r} "
+            f"resolved_keys={list(d.keys()) if isinstance(d, dict) else 'non-dict'}"
+        )
+    except Exception:
+        pass
 
     raw_status = (d.get("status") or d.get("transactionStatus") or "").upper().strip()
     if raw_status in ("SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID"):
