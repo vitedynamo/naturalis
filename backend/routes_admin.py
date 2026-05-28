@@ -1299,6 +1299,7 @@ async def admin_cancel_investment(
 
 class PauseInvestmentPayload(BaseModel):
     reason: Optional[str] = Field(None, max_length=500)
+    auto_resume_at: Optional[str] = Field(None, description="ISO-8601 timestamp at which a background sweep will auto-resume this investment.")
 
 
 class ResumeInvestmentPayload(BaseModel):
@@ -1308,9 +1309,29 @@ class ResumeInvestmentPayload(BaseModel):
 class BulkInvestmentPayload(BaseModel):
     investment_ids: list[str] = Field(..., min_length=1, max_length=500)
     reason: Optional[str] = Field(None, max_length=500)
+    auto_resume_at: Optional[str] = None
 
 
-async def _pause_investment(db, inv_id: str, admin: dict, reason: Optional[str]) -> dict:
+class AutoResumePayload(BaseModel):
+    auto_resume_at: Optional[str] = Field(None, description="ISO-8601 timestamp or null to clear.")
+
+
+def _validate_auto_resume_at(raw: Optional[str]) -> Optional[str]:
+    """Returns a normalised ISO string (UTC) or raises 400. None passes through."""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(400, "auto_resume_at must be ISO-8601 (e.g. 2026-06-01T09:00:00Z)")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if dt <= datetime.now(timezone.utc):
+        raise HTTPException(400, "auto_resume_at must be in the future")
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+async def _pause_investment(db, inv_id: str, admin: dict, reason: Optional[str], auto_resume_at: Optional[str] = None) -> dict:
     """Returns one of: paused, not_found, not_active."""
     inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
     if not inv:
@@ -1318,16 +1339,15 @@ async def _pause_investment(db, inv_id: str, admin: dict, reason: Optional[str])
     if inv.get("status") != "active":
         return {"investment_id": inv_id, "result": "not_active", "status": inv.get("status")}
     now = _now_iso()
-    await db.investments.update_one(
-        {"id": inv_id},
-        {"$set": {
-            "status": "paused",
-            "paused_at": now,
-            "pause_reason": reason,
-            "paused_by_admin_id": admin["id"],
-            "updated_at": now,
-        }},
-    )
+    update = {
+        "status": "paused",
+        "paused_at": now,
+        "pause_reason": reason,
+        "paused_by_admin_id": admin["id"],
+        "auto_resume_at": auto_resume_at,
+        "updated_at": now,
+    }
+    await db.investments.update_one({"id": inv_id}, {"$set": update})
     await _log_admin_activity(
         db, admin, "investment.paused",
         target_type="investment", target_id=inv_id,
@@ -1335,16 +1355,18 @@ async def _pause_investment(db, inv_id: str, admin: dict, reason: Optional[str])
             f"Paused investment of ₦{float(inv.get('amount') or 0):,.2f} "
             f"({inv.get('product_name')})"
             + (f" · {reason}" if reason else "")
+            + (f" · auto-resume {auto_resume_at}" if auto_resume_at else "")
         ),
-        meta={"investment_id": inv_id, "user_id": inv["user_id"], "reason": reason},
+        meta={"investment_id": inv_id, "user_id": inv["user_id"], "reason": reason, "auto_resume_at": auto_resume_at},
     )
-    return {"investment_id": inv_id, "result": "paused", "paused_at": now}
+    return {"investment_id": inv_id, "result": "paused", "paused_at": now, "auto_resume_at": auto_resume_at}
 
 
-async def _resume_investment(db, inv_id: str, admin: dict, note: Optional[str]) -> dict:
+async def _resume_investment(db, inv_id: str, admin: Optional[dict], note: Optional[str], *, automated: bool = False) -> dict:
     """Returns one of: resumed, not_found, not_paused. When resuming, advance
     `last_payout_at` to now so the user doesn't get a backlog of "missed" drops
     during the pause window — payouts continue on a fresh 24h cycle from resume.
+    Also clears `auto_resume_at` so the same row isn't picked up again by the sweep.
     """
     inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
     if not inv:
@@ -1358,23 +1380,49 @@ async def _resume_investment(db, inv_id: str, admin: dict, note: Optional[str]) 
             "status": "active",
             "resumed_at": now,
             "resume_note": note,
-            "resumed_by_admin_id": admin["id"],
+            "resumed_by_admin_id": (admin or {}).get("id") if admin else None,
+            "auto_resumed": automated,
+            "auto_resume_at": None,
             # Reset the 24h cycle so payouts schedule fresh from resume.
             "last_payout_at": now,
             "updated_at": now,
         }},
     )
-    await _log_admin_activity(
-        db, admin, "investment.resumed",
-        target_type="investment", target_id=inv_id,
-        description=(
-            f"Resumed investment of ₦{float(inv.get('amount') or 0):,.2f} "
-            f"({inv.get('product_name')})"
-            + (f" · {note}" if note else "")
-        ),
-        meta={"investment_id": inv_id, "user_id": inv["user_id"], "note": note},
-    )
-    return {"investment_id": inv_id, "result": "resumed", "resumed_at": now}
+    if admin is not None:
+        await _log_admin_activity(
+            db, admin, "investment.resumed" if not automated else "investment.auto_resumed",
+            target_type="investment", target_id=inv_id,
+            description=(
+                f"{'Auto-resumed' if automated else 'Resumed'} investment of ₦{float(inv.get('amount') or 0):,.2f} "
+                f"({inv.get('product_name')})"
+                + (f" · {note}" if note else "")
+            ),
+            meta={"investment_id": inv_id, "user_id": inv["user_id"], "note": note, "automated": automated},
+        )
+    return {"investment_id": inv_id, "result": "resumed", "resumed_at": now, "automated": automated}
+
+
+async def _sweep_due_auto_resumes(db) -> int:
+    """Background sweep: resume any paused investments whose `auto_resume_at`
+    is in the past. Returns the count resumed. Each resumed row gets an
+    `investment.auto_resumed` activity entry attributed to a SYSTEM sentinel.
+    """
+    now_iso = _now_iso()
+    due = await db.investments.find(
+        {"status": "paused", "auto_resume_at": {"$ne": None, "$lte": now_iso}},
+        {"_id": 0, "id": 1},
+    ).to_list(500)
+    if not due:
+        return 0
+    system_admin = {"id": "system_auto_resume", "name": "Auto-resume sweep", "phone": "system"}
+    resumed = 0
+    for d in due:
+        r = await _resume_investment(db, d["id"], system_admin, "Scheduled auto-resume", automated=True)
+        if r.get("result") == "resumed":
+            resumed += 1
+    return resumed
+
+
 
 
 @router.post("/admin/investments/{inv_id}/pause")
@@ -1384,7 +1432,8 @@ async def admin_pause_investment(
     request: Request,
     _admin=Depends(get_current_admin),
 ):
-    res = await _pause_investment(request.app.state.db, inv_id, _admin, payload.reason)
+    auto_iso = _validate_auto_resume_at(payload.auto_resume_at)
+    res = await _pause_investment(request.app.state.db, inv_id, _admin, payload.reason, auto_iso)
     if res["result"] == "not_found":
         raise HTTPException(404, "Investment not found")
     if res["result"] == "not_active":
@@ -1407,6 +1456,38 @@ async def admin_resume_investment(
     return {"status": "ok", **res}
 
 
+@router.patch("/admin/investments/{inv_id}/auto-resume")
+async def admin_set_auto_resume(
+    inv_id: str,
+    payload: AutoResumePayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    """Set or clear the scheduled auto-resume timestamp on an already-paused investment.
+    Pass `auto_resume_at: null` to cancel a previously scheduled auto-resume.
+    """
+    db = request.app.state.db
+    inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
+    if not inv:
+        raise HTTPException(404, "Investment not found")
+    if inv.get("status") != "paused":
+        raise HTTPException(400, f"Cannot schedule auto-resume on a {inv.get('status')} investment")
+    auto_iso = _validate_auto_resume_at(payload.auto_resume_at)
+    await db.investments.update_one(
+        {"id": inv_id},
+        {"$set": {"auto_resume_at": auto_iso, "updated_at": _now_iso()}},
+    )
+    await _log_admin_activity(
+        db, _admin, "investment.auto_resume_set" if auto_iso else "investment.auto_resume_cleared",
+        target_type="investment", target_id=inv_id,
+        description=(
+            f"Set auto-resume to {auto_iso}" if auto_iso else "Cleared scheduled auto-resume"
+        ),
+        meta={"investment_id": inv_id, "auto_resume_at": auto_iso},
+    )
+    return {"status": "ok", "investment_id": inv_id, "auto_resume_at": auto_iso}
+
+
 @router.post("/admin/investments/bulk-pause")
 async def admin_bulk_pause_investments(
     payload: BulkInvestmentPayload,
@@ -1414,13 +1495,14 @@ async def admin_bulk_pause_investments(
     _admin=Depends(get_current_admin),
 ):
     db = request.app.state.db
+    auto_iso = _validate_auto_resume_at(payload.auto_resume_at)
     results = []
     counts = {"paused": 0, "not_active": 0, "not_found": 0}
     for inv_id in payload.investment_ids:
-        r = await _pause_investment(db, inv_id, _admin, payload.reason)
+        r = await _pause_investment(db, inv_id, _admin, payload.reason, auto_iso)
         results.append(r)
         counts[r["result"]] = counts.get(r["result"], 0) + 1
-    return {"status": "ok", "counts": counts, "results": results}
+    return {"status": "ok", "counts": counts, "results": results, "auto_resume_at": auto_iso}
 
 
 @router.post("/admin/investments/bulk-resume")

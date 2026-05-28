@@ -1,5 +1,25 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 45)
+
+### Auto-resume scheduled pauses
+A paused investment can now flip itself back to active at a specific future timestamp without any admin intervention.
+
+**Backend** (`routes_admin.py`, `server.py`):
+- Pause payloads (`PauseInvestmentPayload`, `BulkInvestmentPayload`) now accept an optional `auto_resume_at` ISO-8601 string. `_validate_auto_resume_at` rejects past timestamps with a clear 400.
+- New endpoint `PATCH /api/admin/investments/{id}/auto-resume` to set or clear (`null`) the schedule on an already-paused investment.
+- New helper `_sweep_due_auto_resumes(db)` flips every paused investment whose schedule is past, attributes activity to a SYSTEM sentinel, and logs `investment.auto_resumed`. Each resume advances `last_payout_at` to now and clears `auto_resume_at`.
+- The sweep runs inside the existing background poller loop (every `POLLER_TICK_SEC`, default 30s) — no new infrastructure needed.
+
+**Frontend** (`AdminInvestments.jsx`, `lib/format.js`):
+- Modal Payout-control section now exposes:
+  - When active: optional `datetime-local` picker labelled "Optional · auto-resume at" inside the pause card.
+  - When paused: a dedicated card showing the scheduled time, relative countdown, and **Edit** + **Cancel auto-resume** controls (or a "+ Schedule auto-resume…" CTA when nothing is scheduled).
+- Bulk-pause bar gains an inline "AUTO-RESUME" datetime input when any active rows are selected — applies the same schedule to every paused investment in one call.
+- Table now shows a small hint line under the `PAUSED` pill: `paused 1m ago · auto-resume in 1d` (or `· no schedule`).
+- `relativeTime()` extended to handle future timestamps (returns `in 1d` instead of `0s ago`).
+- Verified e2e via curl: pause-with-future / past-rejected / PATCH-clear / direct mongo past-set + sweep → status flipped to active, `auto_resumed: true`, `auto_resume_at: null`.
+
 ## Recent Changes (Feb 2026 — iteration 44)
 
 ### Pause / Resume investments — single + bulk

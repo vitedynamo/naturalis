@@ -209,7 +209,7 @@ async def on_startup():
         return (now - last) >= cadence
 
     async def _withdrawal_status_poller():
-        from routes_admin import _refresh_one_withdrawal, _refresh_pending_deposit
+        from routes_admin import _refresh_one_withdrawal, _refresh_pending_deposit, _sweep_due_auto_resumes
         sem = asyncio.Semaphore(CONCURRENCY)
 
         async def _refresh_withdrawal(w, now):
@@ -240,6 +240,14 @@ async def on_startup():
             try:
                 await asyncio.sleep(TICK_SEC)
                 now = datetime.now(timezone.utc)
+
+                # ----- Auto-resume sweep (cheap query, runs every tick) -----
+                try:
+                    resumed = await _sweep_due_auto_resumes(db)
+                    if resumed:
+                        logger.info(f"Auto-resume sweep: resumed {resumed} paused investment(s)")
+                except Exception as e:
+                    logger.warning(f"Auto-resume sweep failed: {e}")
 
                 # ----- Withdrawals (FIFO — oldest first) -----
                 pendings = await db.withdrawals.find(

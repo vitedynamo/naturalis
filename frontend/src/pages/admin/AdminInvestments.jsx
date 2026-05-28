@@ -219,10 +219,14 @@ function InvestmentDetailModal({ inv, onClose, onCancelled, onChanged }) {
   const [refundCapital, setRefundCapital] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pauseBusy, setPauseBusy] = useState(false);
+  const [autoResumeAt, setAutoResumeAt] = useState(""); // datetime-local string
+  const [editingAutoResume, setEditingAutoResume] = useState(false);
   useEffect(() => {
     setConfirmOpen(false);
     setReason("");
     setRefundCapital(false);
+    setAutoResumeAt("");
+    setEditingAutoResume(false);
   }, [inv?.id]);
 
   if (!inv) return null;
@@ -267,13 +271,36 @@ function InvestmentDetailModal({ inv, onClose, onCancelled, onChanged }) {
     try {
       const isActive = inv.status === "active";
       const path = isActive ? "pause" : "resume";
-      const body = isActive ? { reason: "Paused from admin panel" } : { note: "Resumed from admin panel" };
+      const body = isActive
+        ? {
+            reason: "Paused from admin panel",
+            auto_resume_at: autoResumeAt ? new Date(autoResumeAt).toISOString() : null,
+          }
+        : { note: "Resumed from admin panel" };
       await api.post(`/admin/investments/${inv.id}/${path}`, body);
-      toast.success(isActive ? "Investment paused · daily drops stopped" : "Investment resumed · drops scheduled from now");
+      toast.success(isActive
+        ? `Investment paused${body.auto_resume_at ? " · scheduled to auto-resume" : " · daily drops stopped"}`
+        : "Investment resumed · drops scheduled from now");
       onChanged?.();
       onClose();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Action failed");
+    } finally {
+      setPauseBusy(false);
+    }
+  };
+
+  const saveAutoResume = async () => {
+    setPauseBusy(true);
+    try {
+      const iso = autoResumeAt ? new Date(autoResumeAt).toISOString() : null;
+      await api.patch(`/admin/investments/${inv.id}/auto-resume`, { auto_resume_at: iso });
+      toast.success(iso ? "Auto-resume scheduled" : "Auto-resume cleared");
+      setEditingAutoResume(false);
+      onChanged?.();
+      onClose();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to update");
     } finally {
       setPauseBusy(false);
     }
@@ -405,31 +432,146 @@ function InvestmentDetailModal({ inv, onClose, onCancelled, onChanged }) {
                 {inv.status === "active" ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                 Payout control
               </div>
-              <div className="card-soft p-4 flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <div className="font-semibold text-sm text-[color:var(--text-primary)]">
-                    {inv.status === "active" ? "Pause daily drops" : "Resume daily drops"}
+              <div className="card-soft p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm text-[color:var(--text-primary)]">
+                      {inv.status === "active" ? "Pause daily drops" : "Resume daily drops"}
+                    </div>
+                    <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">
+                      {inv.status === "active"
+                        ? "Halts every future drop until you resume. Nothing is refunded or lost."
+                        : `Paused ${inv.paused_at ? relativeTime(inv.paused_at) : ""}. Resuming restarts the 24h cycle from now.`}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">
+                  <button
+                    onClick={togglePause}
+                    disabled={pauseBusy}
+                    data-testid={inv.status === "active" ? "pause-investment" : "resume-investment"}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                      inv.status === "active"
+                        ? "border border-[color:var(--warning)]/40 text-[color:var(--warning)] hover:bg-[color:var(--gold-soft)]"
+                        : "bg-[color:var(--success)] text-white hover:opacity-90"
+                    }`}
+                  >
                     {inv.status === "active"
-                      ? "Halts every future drop until you resume. Nothing is refunded or lost."
-                      : `Paused ${inv.paused_at ? relativeTime(inv.paused_at) : ""}. Resuming restarts the 24h cycle from now.`}
-                  </div>
+                      ? (<><Pause className="w-3.5 h-3.5" /> {pauseBusy ? "Pausing…" : "Pause"}</>)
+                      : (<><Play className="w-3.5 h-3.5" /> {pauseBusy ? "Resuming…" : "Resume"}</>)}
+                  </button>
                 </div>
-                <button
-                  onClick={togglePause}
-                  disabled={pauseBusy}
-                  data-testid={inv.status === "active" ? "pause-investment" : "resume-investment"}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${
-                    inv.status === "active"
-                      ? "border border-[color:var(--warning)]/40 text-[color:var(--warning)] hover:bg-[color:var(--gold-soft)]"
-                      : "bg-[color:var(--success)] text-white hover:opacity-90"
-                  }`}
-                >
-                  {inv.status === "active"
-                    ? (<><Pause className="w-3.5 h-3.5" /> {pauseBusy ? "Pausing…" : "Pause"}</>)
-                    : (<><Play className="w-3.5 h-3.5" /> {pauseBusy ? "Resuming…" : "Resume"}</>)}
-                </button>
+
+                {/* Auto-resume — when pausing, an optional schedule */}
+                {inv.status === "active" && (
+                  <div className="rounded-lg bg-[color:var(--surface-alt)] p-3 border border-[color:var(--gold-soft)]" data-testid="auto-resume-picker-pause">
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--warning)] mb-1.5">
+                      Optional · auto-resume at
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="datetime-local"
+                        value={autoResumeAt}
+                        onChange={(e) => setAutoResumeAt(e.target.value)}
+                        min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                        data-testid="auto-resume-input-pause"
+                        className="input-base text-sm flex-1 min-w-[180px]"
+                      />
+                      {autoResumeAt && (
+                        <button
+                          onClick={() => setAutoResumeAt("")}
+                          data-testid="auto-resume-clear-pause"
+                          className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)] hover:text-[color:var(--error)]"
+                        >
+                          clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[color:var(--text-tertiary)] mt-1.5">
+                      Leave blank for an open-ended pause. With a date set, the system flips this investment back to active automatically.
+                    </div>
+                  </div>
+                )}
+
+                {/* Auto-resume — when already paused, show / edit / clear the schedule */}
+                {inv.status === "paused" && (
+                  <div className="rounded-lg bg-[color:var(--surface-alt)] p-3" data-testid="auto-resume-paused-card">
+                    {inv.auto_resume_at && !editingAutoResume ? (
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Auto-resume scheduled</div>
+                          <div className="text-sm font-bold text-[color:var(--brand)] mt-0.5 truncate" data-testid="auto-resume-scheduled-at">
+                            {formatDate(inv.auto_resume_at)}
+                          </div>
+                          <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5">
+                            Will flip back to active {relativeTime(inv.auto_resume_at)} from now.
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setAutoResumeAt(
+                                new Date(new Date(inv.auto_resume_at).getTime() - new Date().getTimezoneOffset() * 60000)
+                                  .toISOString()
+                                  .slice(0, 16),
+                              );
+                              setEditingAutoResume(true);
+                            }}
+                            data-testid="auto-resume-edit"
+                            className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--accent-main)] hover:underline"
+                          >
+                            edit
+                          </button>
+                          <button
+                            onClick={() => { setAutoResumeAt(""); saveAutoResume(); }}
+                            disabled={pauseBusy}
+                            data-testid="auto-resume-cancel"
+                            className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--error)] hover:underline disabled:opacity-50"
+                          >
+                            cancel auto-resume
+                          </button>
+                        </div>
+                      </div>
+                    ) : editingAutoResume ? (
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--accent-main)] mb-1.5">
+                          Set auto-resume at
+                        </label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input
+                            type="datetime-local"
+                            value={autoResumeAt}
+                            onChange={(e) => setAutoResumeAt(e.target.value)}
+                            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                            data-testid="auto-resume-input-edit"
+                            className="input-base text-sm flex-1 min-w-[180px]"
+                          />
+                          <button
+                            onClick={saveAutoResume}
+                            disabled={pauseBusy || !autoResumeAt}
+                            data-testid="auto-resume-save"
+                            className="px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-[color:var(--brand)] text-white disabled:opacity-50"
+                          >
+                            {pauseBusy ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => { setEditingAutoResume(false); setAutoResumeAt(""); }}
+                            disabled={pauseBusy}
+                            className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)] hover:text-[color:var(--text-primary)]"
+                          >
+                            cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEditingAutoResume(true)}
+                        data-testid="auto-resume-schedule"
+                        className="text-xs font-semibold text-[color:var(--accent-main)] hover:underline"
+                      >
+                        + Schedule auto-resume…
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -658,23 +800,30 @@ export default function AdminInvestments() {
     return { active: act, paused: pau, total: act + pau };
   }, [items, selected]);
 
+  const [bulkAutoResumeAt, setBulkAutoResumeAt] = useState("");
   const runBulk = async (kind) => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     setBulkBusy(true);
     try {
-      const { data } = await api.post(`/admin/investments/bulk-${kind}`, {
+      const body = {
         investment_ids: ids,
         reason: kind === "pause" ? "Bulk pause from admin panel" : "Bulk resume from admin panel",
-      });
+      };
+      if (kind === "pause" && bulkAutoResumeAt) {
+        body.auto_resume_at = new Date(bulkAutoResumeAt).toISOString();
+      }
+      const { data } = await api.post(`/admin/investments/bulk-${kind}`, body);
       const c = data.counts || {};
       const done = c[kind === "pause" ? "paused" : "resumed"] || 0;
       const skipped = (c.not_active || 0) + (c.not_paused || 0) + (c.not_found || 0);
       toast.success(
         `${kind === "pause" ? "Paused" : "Resumed"} ${done} investment${done === 1 ? "" : "s"}` +
+        (data.auto_resume_at ? " · auto-resume scheduled" : "") +
         (skipped ? ` · ${skipped} skipped` : ""),
       );
       clearSelection();
+      setBulkAutoResumeAt("");
       reload();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Bulk action failed");
@@ -821,6 +970,28 @@ export default function AdminInvestments() {
             <Pause className="w-3.5 h-3.5" />
             {bulkBusy ? "Working…" : `Pause ${selectionBreakdown.active}`}
           </button>
+          {selectionBreakdown.active > 0 && (
+            <div className="inline-flex items-center gap-1.5" title="Optional: schedule when paused investments will auto-resume">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">auto-resume</span>
+              <input
+                type="datetime-local"
+                value={bulkAutoResumeAt}
+                onChange={(e) => setBulkAutoResumeAt(e.target.value)}
+                min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                data-testid="bulk-auto-resume-input"
+                className="input-base !py-1 text-xs w-[180px]"
+              />
+              {bulkAutoResumeAt && (
+                <button
+                  onClick={() => setBulkAutoResumeAt("")}
+                  data-testid="bulk-auto-resume-clear"
+                  className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)] hover:text-[color:var(--error)]"
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
           <button
             onClick={() => runBulk("resume")}
             disabled={bulkBusy || selectionBreakdown.paused === 0}
@@ -957,7 +1128,25 @@ export default function AdminInvestments() {
                       </div>
                     </td>
                     {/* Status */}
-                    <td className="p-4"><StatusPill status={i.status} /></td>
+                    <td className="p-4">
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusPill status={i.status} />
+                        {i.status === "paused" && i.paused_at && (
+                          <div
+                            className="text-[10px] text-[color:var(--text-tertiary)] leading-tight"
+                            data-testid={`paused-hint-${i.id}`}
+                            title={i.auto_resume_at ? `Auto-resume scheduled for ${i.auto_resume_at}` : "No auto-resume scheduled"}
+                          >
+                            <span className="font-mono">paused {relativeTime(i.paused_at)}</span>
+                            {i.auto_resume_at ? (
+                              <span className="text-[color:var(--brand)] font-bold"> · auto-resume {relativeTime(i.auto_resume_at)}</span>
+                            ) : (
+                              <span className="text-[color:var(--text-tertiary)]"> · no schedule</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     {/* Action */}
                     <td className="p-4 text-right">
                       <button

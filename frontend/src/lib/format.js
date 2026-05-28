@@ -19,11 +19,15 @@ export function relativeTime(iso) {
   if (!iso) return null;
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return null;
-  const diff = (Date.now() - t) / 1000;
-  if (diff < 60) return `${Math.max(0, Math.floor(diff))}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  const diffSec = (Date.now() - t) / 1000;
+  const future = diffSec < 0;
+  const abs = Math.abs(diffSec);
+  let body;
+  if (abs < 60) body = `${Math.max(0, Math.floor(abs))}s`;
+  else if (abs < 3600) body = `${Math.floor(abs / 60)}m`;
+  else if (abs < 86400) body = `${Math.floor(abs / 3600)}h`;
+  else body = `${Math.floor(abs / 86400)}d`;
+  return future ? `in ${body}` : `${body} ago`;
 }
 
 
