@@ -1,5 +1,11 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 38)
+
+### Two withdrawal UX fixes
+1. **Bank details required at request-time** — `routes_user.py::request_withdrawal` now explicitly requires `bank_code` in addition to bank_name/account_number/account_name. If any field is missing the request returns HTTP 400 with: *"Please add your complete bank account details (bank, account number, account name) on the Profile page before withdrawing."* Previously a missing `bank_code` silently routed the withdrawal to the admin queue.
+2. **Insufficient Nomba float — no more red warning** — when the float can't cover the payout, the withdrawal is now saved as plain `pending` with a clean `admin_note` ("Auto-payout deferred (Nomba float ₦X < requested ₦Y). Top up Nomba and retry, or pay manually."). The `insufficient_float` / `needs_attention` flags and the red **INSUFFICIENT FLOAT** pill in the admin Withdrawals table are gone. Admin sees a normal pending entry, no special UI noise.
+
 ## Recent Changes (Feb 2026 — iteration 37)
 
 ### Auto-payout enabled by default — withdrawals self-process end-to-end

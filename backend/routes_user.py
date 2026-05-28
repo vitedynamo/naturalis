@@ -1056,8 +1056,8 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         raise HTTPException(400, f"Minimum withdrawal is ₦{min_w:,.2f}")
     if user["wallet_balance"] < data.amount:
         raise HTTPException(400, "Insufficient wallet balance")
-    if not (user.get("bank_name") and user.get("account_number") and user.get("account_name")):
-        raise HTTPException(400, "Please add your bank account details on profile page first")
+    if not (user.get("bank_name") and user.get("account_number") and user.get("account_name") and user.get("bank_code")):
+        raise HTTPException(400, "Please add your complete bank account details (bank, account number, account name) on the Profile page before withdrawing.")
 
     new_user = await db.users.find_one_and_update(
         {"id": user["id"]},
@@ -1114,20 +1114,17 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     logger.warning(f"Nomba balance check failed: {be}")
                     available = None
                 if available is not None and available < float(data.amount):
-                    # Insufficient float — hold the withdrawal for admin attention
+                    # Insufficient float — silently hold the withdrawal as plain pending.
+                    # No special flags / red warning; admin sees it as a normal pending payout.
                     await db.withdrawals.update_one(
                         {"id": wid},
                         {"$set": {
                             "status": "pending",
-                            "needs_attention": True,
-                            "insufficient_float": True,
-                            "float_balance_at_request": available,
-                            "admin_note": f"Insufficient Nomba float (₦{available:,.2f} available). Awaiting admin top-up or manual payout.",
+                            "admin_note": f"Auto-payout deferred (Nomba float ₦{available:,.2f} < requested ₦{float(data.amount):,.2f}). Top up Nomba and retry, or pay manually.",
                             "updated_at": _now_iso(),
                         }},
                     )
                     doc["status"] = "pending"
-                    doc["needs_attention"] = True
                     return doc
                 # Sufficient (or balance check unavailable) — proceed
                 ref = gen_reference("ntr")
