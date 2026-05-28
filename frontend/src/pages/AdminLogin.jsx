@@ -42,7 +42,9 @@ export default function AdminLogin() {
 
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#F472B6] to-[#818CF8] flex items-center justify-center font-display font-extrabold text-white text-xl shadow-xl">NI</div>
+            <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-xl">
+              <img src={`${process.env.PUBLIC_URL || ""}/evoque-nova-logo.png`} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+            </div>
             <div>
               <div className="font-display font-extrabold text-xl tracking-tight">EVOQUE-NOVA</div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/60 mt-0.5">Admin Console</div>
