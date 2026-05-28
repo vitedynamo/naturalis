@@ -463,6 +463,23 @@ export default function AdminWithdrawals() {
   };
 
   const [bulkBackfilling, setBulkBackfilling] = useState(false);
+
+  // Surface count of pending records flagged with insufficient_float so admins can act fast.
+  const insufficientFloatRows = useMemo(
+    () => items.filter((w) => w.status === "pending" && w.insufficient_float),
+    [items],
+  );
+  const scrollToFirstInsufficient = () => {
+    setFilter("pending");
+    setTimeout(() => {
+      const target = insufficientFloatRows[0];
+      if (target) {
+        const el = document.querySelector(`[data-testid="withdrawal-row-${target.id}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 200);
+  };
+
   const bulkBackfillStuck = async () => {
     if (!window.confirm("Scan Nomba's transaction history and link any matching pending withdrawals? This may take a minute.")) return;
     setBulkBackfilling(true);
@@ -557,6 +574,29 @@ export default function AdminWithdrawals() {
           doneCount={stats.paystackDone}
         />
       </div>
+
+      {/* ====== Insufficient Nomba float banner ====== */}
+      {insufficientFloatRows.length > 0 && (
+        <button
+          type="button"
+          onClick={scrollToFirstInsufficient}
+          data-testid="insufficient-float-banner"
+          className="mt-3 w-full text-left rounded-2xl border border-[color:var(--error)]/30 bg-[color:var(--error-soft)] p-4 flex items-center gap-3 hover:bg-[color:var(--error-soft)]/80 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[color:var(--error)]/15 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-[color:var(--error)]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-[color:var(--error)] text-sm">
+              Nomba float warning · {insufficientFloatRows.length} pending payout{insufficientFloatRows.length === 1 ? "" : "s"} blocked
+            </div>
+            <div className="text-[11px] text-[color:var(--text-secondary)] mt-0.5">
+              Top up your Nomba wallet, then click <span className="font-bold">Refresh all pending</span> to retry. Click anywhere on this banner to jump to the affected rows.
+            </div>
+          </div>
+          <span className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[color:var(--error)] underline">View</span>
+        </button>
+      )}
 
       {/* ====== Quick page size ====== */}
       <div className="card-soft p-3 mt-3 flex items-center gap-3 flex-wrap" data-testid="withdrawals-quickrows">
