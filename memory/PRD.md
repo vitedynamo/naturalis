@@ -1,5 +1,32 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 47)
+
+### 1. "Pay missing bonuses" safety-net tool on Referrals
+**Backend** (`routes_admin.py`):
+- New `POST /api/admin/referrals/pay-missing-bonuses` with `{dry_run: bool}` payload.
+- Scans every (referrer, referred user) pair × every investment the referred user made. If no `referral` transaction exists yet for that `(referrer_id, investment_id)`, computes the gen-1/gen-2 commission per current settings and credits the delta. Writes a `referral` transaction tagged `meta.backfill: true`.
+- **Idempotent** — re-running is a no-op because the `(user_id, meta.investment_id)` key is already taken on completed payouts.
+- Logs an `referral.backfill` admin activity entry with aggregate totals + per-referrer breakdown when live-run credits anything.
+
+**Frontend** (`AdminReferrals.jsx`):
+- Pink gradient "**Pay missing bonuses**" button in the toolbar.
+- Opens a brand-magenta confirmation modal that previews `records_to_credit / users_impacted / total_amount` via a server-side `dry_run` call, with a green "nothing to pay" banner when up-to-date OR a gold caution banner when there are credits to issue, and a final disabled-when-zero **PAY ₦X** action.
+- Verified e2e via curl: dry-run, live-run (credited ₦500 across 1 record/user after deleting a test tx), no-op rerun.
+
+### 2. Admin Coupons page — full redesign
+**Backend** (`routes_admin.py`, `models.py`):
+- Coupon model extended with optional `expires_at` (ISO timestamp) and `note` (≤200-char internal label).
+- `list_coupons` enriches each row with `redemption_count` and `total_credited` aggregated from the `coupon_redemptions` collection.
+
+**Frontend** (`AdminCoupons.jsx`, full rewrite):
+- Brand-magenta hero with floating SVG ticket decorations + a big white "New coupon" CTA.
+- 4 KPI cards (Total codes / Live now / Redemptions / Credit given) with per-tone glow blobs.
+- Tab filter (All / Active / Inactive / Expired) + code/note search.
+- Each coupon renders as a **paper-ticket card with side notches and a dashed perforation divider** — uniquely identifiable vs the reference's flat table. Card shows live/expired/redeemed pip in the magenta header, big naira amount, redemption progress bar (when capped), internal note in italics, expires relative-countdown that turns red when overdue, and three actions (On/Off · Edit · Delete).
+- Modal with brand-gradient header, **"Generate"** button (NJ-prefixed unambiguous code), amount, max uses, expires datetime-local, internal note, active toggle row with helper text, and sticky **"Mint coupon"** footer.
+- Verified light + dark via screenshots.
+
 ## Recent Changes (Feb 2026 — iteration 46)
 
 ### Admin Referrals page — full redesign

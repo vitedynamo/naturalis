@@ -236,6 +236,8 @@ class Coupon(BaseModel):
     max_uses: int = 1
     used_count: int = 0
     is_active: bool = True
+    expires_at: Optional[datetime] = None
+    note: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
 
 
@@ -244,6 +246,8 @@ class CouponCreate(BaseModel):
     amount: float
     max_uses: int = 1
     is_active: bool = True
+    expires_at: Optional[str] = None  # ISO-8601 or None
+    note: Optional[str] = Field(None, max_length=200)
 
 
 class CouponRedeemRequest(BaseModel):

@@ -5,8 +5,10 @@ import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import Pagination from "@/components/admin/Pagination";
 import { Link } from "react-router-dom";
 import {
-  Share2, Search, Users, Trophy, Coins, Clock, ArrowUpRight, Crown, TrendingUp,
+  Share2, Search, Users, Trophy, Coins, Clock, ArrowUpRight, Crown, TrendingUp, Wand2, AlertCircle,
 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 /* ----------------------------------------------------------------------------
  * Helpers
@@ -130,7 +132,12 @@ export default function AdminReferrals() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payPreview, setPayPreview] = useState(null);
+  const [payBusy, setPayBusy] = useState(false);
   const PAGE_SIZE = 20;
+
+  const reload = () => api.get("/admin/referrals").then(({ data }) => setItems(data || []));
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +148,39 @@ export default function AdminReferrals() {
   }, []);
 
   useEffect(() => { setPage(1); }, [level, statusFilter, q]);
+
+  const openPayMissing = async () => {
+    setPayOpen(true);
+    setPayPreview(null);
+    setPayBusy(true);
+    try {
+      const { data } = await api.post("/admin/referrals/pay-missing-bonuses", { dry_run: true });
+      setPayPreview(data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Preview failed");
+      setPayOpen(false);
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  const confirmPayMissing = async () => {
+    setPayBusy(true);
+    try {
+      const { data } = await api.post("/admin/referrals/pay-missing-bonuses", { dry_run: false });
+      if (data.credited_transactions > 0) {
+        toast.success(`Paid ${formatNaira(data.total_amount)} across ${data.credited_transactions} record(s) to ${data.credited_users} user(s)`);
+      } else {
+        toast.info("No missing bonuses to pay — everything is up to date");
+      }
+      setPayOpen(false);
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Action failed");
+    } finally {
+      setPayBusy(false);
+    }
+  };
 
   // KPIs
   const kpis = useMemo(() => {
@@ -319,6 +359,14 @@ export default function AdminReferrals() {
             className="w-full pl-10 input-base"
           />
         </div>
+        <button
+          onClick={openPayMissing}
+          data-testid="pay-missing-bonuses-btn"
+          title="Scan referrals where the referred user invested but the commission was never recorded, and credit the delta retroactively."
+          className="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[color:var(--brand)] to-[#FF5BAA] text-white hover:opacity-90 transition-opacity"
+        >
+          <Wand2 className="w-4 h-4" /> Pay missing bonuses
+        </button>
       </div>
 
       {/* ===== Table ===== */}
@@ -434,6 +482,76 @@ export default function AdminReferrals() {
           />
         )}
       </div>
+      {/* Pay-missing-bonuses confirm modal */}
+      <Dialog open={payOpen} onOpenChange={(o) => !o && setPayOpen(false)}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-3xl gap-0" data-testid="pay-missing-modal">
+          <div className="relative bg-gradient-to-br from-[#9F0F50] via-[#C81A6E] to-[#E5097F] text-white p-6">
+            <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
+            <div className="relative flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+                <Wand2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Safety net</div>
+                <div className="font-display font-extrabold text-2xl mt-1">Pay missing bonuses</div>
+                <div className="text-white/85 text-xs mt-1.5 leading-snug">
+                  Scans every referral where the referred user invested but the commission was never recorded, then credits the delta to the referrer.
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-5 bg-[color:var(--surface)]">
+            {payBusy && !payPreview ? (
+              <div className="text-center text-sm text-[color:var(--text-tertiary)] py-6">Scanning…</div>
+            ) : payPreview ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="card-soft p-3">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Records to credit</div>
+                    <div className="font-display font-extrabold text-2xl mt-1 text-[color:var(--brand)] tabular-nums" data-testid="preview-records">{payPreview.credited_transactions}</div>
+                  </div>
+                  <div className="card-soft p-3">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Users impacted</div>
+                    <div className="font-display font-extrabold text-2xl mt-1 text-[color:var(--accent-main)] tabular-nums" data-testid="preview-users">{payPreview.credited_users}</div>
+                  </div>
+                  <div className="card-soft p-3 col-span-2">
+                    <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Total amount</div>
+                    <div className="font-display font-extrabold text-3xl mt-1 text-[color:var(--success)] tabular-nums" data-testid="preview-amount">{formatNaira(payPreview.total_amount)}</div>
+                    <div className="text-[10px] text-[color:var(--text-tertiary)] mt-1">{payPreview.scanned_referrals} referrals scanned · idempotent (re-running won't double-pay)</div>
+                  </div>
+                </div>
+                {payPreview.credited_transactions === 0 ? (
+                  <div className="mt-4 p-3 rounded-lg bg-[color:var(--success-soft)] text-[color:var(--success)] text-xs font-semibold flex items-center gap-2">
+                    <Trophy className="w-4 h-4" /> All bonuses are already up to date — nothing to pay.
+                  </div>
+                ) : (
+                  <div className="mt-4 p-3 rounded-lg bg-[color:var(--gold-soft)] text-[color:var(--warning)] text-[11px] flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>This will instantly credit user wallets and record <span className="font-bold">referral</span> transactions flagged <span className="font-mono">backfill: true</span>. The action is logged in Activity Log.</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-5">
+                  <button
+                    onClick={() => setPayOpen(false)}
+                    disabled={payBusy}
+                    className="px-3 py-2 rounded-md text-xs font-semibold bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]/70 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmPayMissing}
+                    disabled={payBusy || payPreview.credited_transactions === 0}
+                    data-testid="pay-missing-confirm"
+                    className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[color:var(--brand)] to-[#FF5BAA] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" /> {payBusy ? "Crediting…" : `Pay ${formatNaira(payPreview.total_amount)}`}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

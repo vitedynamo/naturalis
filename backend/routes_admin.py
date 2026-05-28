@@ -1571,11 +1571,168 @@ async def list_referrals(request: Request, _admin=Depends(get_current_admin)):
     return items
 
 
+class PayMissingBonusesPayload(BaseModel):
+    dry_run: bool = False
+
+
+@router.post("/admin/referrals/pay-missing-bonuses")
+async def admin_pay_missing_referral_bonuses(
+    payload: PayMissingBonusesPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    """For every (referrer, referred_user) pair where the referred user has invested
+    but the referrer's recorded `referral` bonus is below what they should have earned,
+    credit the delta to the referrer's wallet and write a `referral` transaction
+    flagged `meta.backfill: true`.
+
+    Set `dry_run: true` to preview the operation without crediting anything.
+    """
+    db = request.app.state.db
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    percents = {
+        1: float(settings.get("gen1_percent", 10.0)),
+        2: float(settings.get("gen2_percent", 5.0)),
+    }
+
+    referrals = await db.referrals.find({}, {"_id": 0}).to_list(20000)
+
+    # Group all referred-user investments by user_id.
+    referred_ids = list({r["referred_id"] for r in referrals})
+    inv_docs = await db.investments.find(
+        {"user_id": {"$in": referred_ids}},
+        {"_id": 0, "id": 1, "user_id": 1, "amount": 1, "product_name": 1, "started_at": 1},
+    ).to_list(50000)
+    inv_by_user: dict[str, list[dict]] = {}
+    for inv in inv_docs:
+        inv_by_user.setdefault(inv["user_id"], []).append(inv)
+
+    # Existing referral payouts keyed by (referrer_id, source_investment_id) — never double-pay.
+    paid_rows = await db.transactions.find(
+        {"type": "referral", "meta.investment_id": {"$exists": True}},
+        {"_id": 0, "user_id": 1, "meta": 1},
+    ).to_list(50000)
+    already_paid_set = {
+        (t["user_id"], (t.get("meta") or {}).get("investment_id"))
+        for t in paid_rows
+        if (t.get("meta") or {}).get("investment_id")
+    }
+
+    summary = {
+        "scanned_referrals": len(referrals),
+        "credited_users": 0,
+        "credited_transactions": 0,
+        "total_amount": 0.0,
+        "dry_run": payload.dry_run,
+    }
+    per_referrer_totals: dict[str, float] = {}
+    per_referrer_count: dict[str, int] = {}
+
+    now = _now_iso()
+    for r in referrals:
+        gen = int(r.get("generation") or 0)
+        pct = percents.get(gen)
+        if not pct or pct <= 0:
+            continue
+        invs = inv_by_user.get(r["referred_id"], [])
+        if not invs:
+            continue
+        for inv in invs:
+            key = (r["referrer_id"], inv["id"])
+            if key in already_paid_set:
+                continue
+            amount = round(float(inv.get("amount") or 0) * (pct / 100.0), 2)
+            if amount <= 0:
+                continue
+            per_referrer_totals[r["referrer_id"]] = per_referrer_totals.get(r["referrer_id"], 0.0) + amount
+            per_referrer_count[r["referrer_id"]] = per_referrer_count.get(r["referrer_id"], 0) + 1
+            summary["total_amount"] += amount
+            summary["credited_transactions"] += 1
+            if payload.dry_run:
+                already_paid_set.add(key)  # ensure same pair isn't counted twice across multi-gen
+                continue
+            referrer = await db.users.find_one_and_update(
+                {"id": r["referrer_id"]},
+                {"$inc": {
+                    "wallet_balance": amount,
+                    "total_earnings": amount,
+                    "referral_earnings": amount,
+                }},
+                return_document=True,
+                projection={"_id": 0, "wallet_balance": 1, "name": 1},
+            )
+            if not referrer:
+                continue
+            await db.transactions.insert_one({
+                "id": gen_reference("tx"),
+                "user_id": r["referrer_id"],
+                "type": "referral",
+                "amount": amount,
+                "description": f"Gen-{gen} bonus backfill from {inv.get('product_name','an investment')}",
+                "balance_after": referrer["wallet_balance"],
+                "meta": {
+                    "generation": gen,
+                    "from_user_id": r["referred_id"],
+                    "investment_id": inv["id"],
+                    "basis": "invest_amount",
+                    "backfill": True,
+                },
+                "created_at": now,
+            })
+            already_paid_set.add(key)
+
+    summary["credited_users"] = len(per_referrer_totals)
+
+    if not payload.dry_run and summary["credited_transactions"] > 0:
+        await _log_admin_activity(
+            db, _admin, "referral.backfill",
+            target_type="referrals", target_id=None,
+            description=(
+                f"Paid missing referral bonuses · ₦{summary['total_amount']:,.2f} "
+                f"across {summary['credited_transactions']} record(s) to {summary['credited_users']} user(s)"
+            ),
+            meta={
+                "total_amount": summary["total_amount"],
+                "credited_transactions": summary["credited_transactions"],
+                "credited_users": summary["credited_users"],
+                "per_referrer_totals": per_referrer_totals,
+            },
+        )
+
+    return summary
+
+
+
+
 # ===== Coupons =====
+def _parse_optional_iso(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(400, "expires_at must be ISO-8601")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
 @router.get("/admin/coupons")
 async def list_coupons(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
-    return await db.coupons.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    items = await db.coupons.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    # Enrich with redemption totals (used_count is also tracked on the coupon doc,
+    # but this gives us a canonical sum and the *credit* delivered).
+    if items:
+        redemp_rows = await db.coupon_redemptions.aggregate([
+            {"$group": {"_id": "$coupon_id", "count": {"$sum": 1}, "total": {"$sum": "$amount"}}},
+        ]).to_list(1000)
+        rmap = {r["_id"]: {"count": int(r["count"]), "total": float(r["total"])} for r in redemp_rows}
+        for c in items:
+            r = rmap.get(c["id"], {"count": 0, "total": 0.0})
+            c["redemption_count"] = r["count"]
+            c["total_credited"] = r["total"]
+    return items
 
 
 @router.post("/admin/coupons")
@@ -1591,6 +1748,8 @@ async def create_coupon(data: CouponCreate, request: Request, _admin=Depends(get
         "max_uses": int(data.max_uses),
         "used_count": 0,
         "is_active": bool(data.is_active),
+        "expires_at": _parse_optional_iso(data.expires_at),
+        "note": (data.note or "").strip() or None,
         "created_at": _now_iso(),
     }
     await db.coupons.insert_one(doc)
@@ -1606,6 +1765,8 @@ async def update_coupon(cid: str, data: CouponCreate, request: Request, _admin=D
         "amount": float(data.amount),
         "max_uses": int(data.max_uses),
         "is_active": bool(data.is_active),
+        "expires_at": _parse_optional_iso(data.expires_at),
+        "note": (data.note or "").strip() or None,
     }
     await db.coupons.update_one({"id": cid}, {"$set": update})
     return await db.coupons.find_one({"id": cid}, {"_id": 0})
