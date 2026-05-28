@@ -14,7 +14,10 @@ from pydantic import BaseModel, Field
 from storage import put_object, get_object
 from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, list_transfers as nomba_list_transfers, invalidate_token_cache as nomba_invalidate_token
 
-router = APIRouter()
+# Shared APIRouter — exported back at module bottom for `server.py`.
+# Domain sub-modules under `/app/backend/routes/` attach endpoints via the same
+# instance so we can split this 3k-line file gradually.
+from _routers import admin_router as router  # noqa: E402
 
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
@@ -1788,42 +1791,9 @@ async def list_all_tx(request: Request, _admin=Depends(get_current_admin)):
 
 
 # ===== Password resets =====
-@router.get("/admin/password-resets")
-async def list_password_resets(request: Request, _admin=Depends(get_current_admin)):
-    db = request.app.state.db
-    items = await db.password_resets.find({}, {"_id": 0, "new_password_hash": 0}).sort("created_at", -1).to_list(2000)
-    return items
-
-
-@router.post("/admin/password-resets/{rid}/approve")
-async def approve_password_reset(rid: str, payload: PasswordResetActionRequest, request: Request, _admin=Depends(get_current_admin)):
-    db = request.app.state.db
-    pr = await db.password_resets.find_one({"id": rid}, {"_id": 0})
-    if not pr:
-        raise HTTPException(404, "Request not found")
-    if pr["status"] != "pending":
-        raise HTTPException(400, f"Already {pr['status']}")
-    await db.users.update_one({"id": pr["user_id"]}, {"$set": {"password_hash": pr["new_password_hash"]}})
-    await db.password_resets.update_one(
-        {"id": rid},
-        {"$set": {"status": "approved", "admin_note": payload.note, "updated_at": _now_iso()}},
-    )
-    return {"status": "ok"}
-
-
-@router.post("/admin/password-resets/{rid}/reject")
-async def reject_password_reset(rid: str, payload: PasswordResetActionRequest, request: Request, _admin=Depends(get_current_admin)):
-    db = request.app.state.db
-    pr = await db.password_resets.find_one({"id": rid}, {"_id": 0})
-    if not pr:
-        raise HTTPException(404, "Request not found")
-    if pr["status"] != "pending":
-        raise HTTPException(400, f"Already {pr['status']}")
-    await db.password_resets.update_one(
-        {"id": rid},
-        {"$set": {"status": "rejected", "admin_note": payload.note, "updated_at": _now_iso()}},
-    )
-    return {"status": "ok"}
+# Implemented in routes/admin_password_resets.py (modularisation step 1).
+# The import below registers the handlers onto the shared admin_router.
+from routes import admin_password_resets as _r_admin_password_resets  # noqa: F401, E402
 
 
 async def _refresh_pending_deposit(db, d: dict) -> dict:

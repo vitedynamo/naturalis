@@ -252,7 +252,7 @@ export default function AdminManualAdjustments() {
           return (
             <div
               key={t.id}
-              className="card-soft p-0 overflow-hidden relative group hover:shadow-lg transition-shadow"
+              className="card-soft p-0 overflow-hidden relative"
               data-testid={`adj-row-${t.id}`}
             >
               {/* Side accent strip — green for credit, red for debit */}
@@ -266,10 +266,10 @@ export default function AdminManualAdjustments() {
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ backgroundColor: avatarColor(t.user_id) }}>
                   {(t.user_name || "?").trim()[0]?.toUpperCase()}
                 </div>
-                {/* Identity + note */}
+                {/* Identity + note — username font matches AdminUsers (semibold, base sans) */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link to={`/admin/users/${t.user_id}`} className="font-display font-bold text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate" data-testid={`adj-user-${t.id}`}>
+                    <Link to={`/admin/users/${t.user_id}`} className="font-semibold text-sm text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate" data-testid={`adj-user-${t.id}`}>
                       {t.user_name || "—"}
                     </Link>
                     <span className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{t.user_phone}</span>
@@ -289,9 +289,9 @@ export default function AdminManualAdjustments() {
                     )}
                   </div>
                 </div>
-                {/* Amount + date */}
+                {/* Amount + date — smaller (matches AdminUsers balance scale) */}
                 <div className="text-right shrink-0">
-                  <div className={`font-display font-extrabold text-xl tabular-nums leading-tight ${positive ? "text-[color:var(--success)]" : "text-[color:var(--error)]"}`} data-testid={`adj-amount-${t.id}`}>
+                  <div className={`font-display font-bold text-base tabular-nums leading-tight ${positive ? "text-[color:var(--success)]" : "text-[color:var(--error)]"}`} data-testid={`adj-amount-${t.id}`}>
                     {positive ? "+" : ""}{formatNaira(t.amount)}
                   </div>
                   <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5 whitespace-nowrap">{formatDate(t.created_at)}</div>

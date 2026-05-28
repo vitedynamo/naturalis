@@ -1,8 +1,36 @@
 # Evoque-Nova — PRD & Implementation Log
 
-## Recent Changes (Feb 2026 — iteration 56)
+## Recent Changes (Feb 2026 — iteration 57)
 
-### Featured-plan toggle + Activity Log redesign + Password Resets redesign
+### Admin polish + start of route modularisation
+
+**1. Manual Adjustments polish**
+- Removed the hover-shadow effect on each adjustment card (was distracting at scroll).
+- Username font reduced + restyled to match the AdminUsers table (`font-semibold text-sm` instead of `font-display font-bold`).
+- Amount font reduced from `text-xl font-extrabold` → `text-base font-bold` so the row reads as a unified line.
+
+**2. AdminUsers pagination upgrade**
+- Replaced the bespoke prev/next buttons with the shared `<Pagination>` component (same one used by Admin Deposits / Withdrawals). Users now get the full feature set: "Showing X – Y of N" copy, keyboard shortcuts (←/→ flip pages, `g g` to jump), Go-to input, and consistent visual style across all admin tables.
+
+**3. Password Resets card polish**
+- Username font reduced from `font-display font-bold text-base` → `font-semibold text-sm` to match the AdminUsers table convention.
+
+**4. Route modularisation (incremental — step 1 of N)**
+- New `/app/backend/_routers.py` exports the canonical `user_router` and `admin_router` instances. Both legacy files now re-export the SAME instances, so domain modules can safely attach handlers without breaking server.py's `from routes_user import router as user_router` contract.
+- New `/app/backend/routes/` package holds per-domain files. Three domains extracted as a proof-of-concept and to validate the pattern:
+  - `routes/admin_password_resets.py` — 3 endpoints
+  - `routes/user_daily_claim.py` — 2 endpoints
+  - `routes/user_coupons_transactions.py` — 2 endpoints
+- `routes_user.py` reduced 1626 → 1514 lines; `routes_admin.py` reduced 3060 → 3029 lines.
+- New `/app/backend/tests/test_route_modularisation.py` snapshots the registered routes (35 user + 70 admin) so any accidental drop during future incremental extractions fails immediately.
+
+**Why incremental?** A bulk move of 4600+ lines into ~20 domain files would be high-risk: many handlers share file-local helpers (`_settings`, `_log_admin_activity`, `_announce_doc`, etc.) and rewriting those import chains in one shot invites regressions. The shared-router pattern unblocks safe incremental extraction — future agents can move one domain at a time without touching the rest of the codebase.
+
+**Verified**: all extracted endpoints + a sample of legacy endpoints (transactions, withdrawals, investments, settings, products) return correctly via curl; `test_route_modularisation.py` passes (35 user / 70 admin routes intact).
+
+
+
+## Recent Changes (Feb 2026 — iteration 56)
 
 **1. Featured plan visibility toggle** — new Setting `home_featured_plan_enabled` (default `True`). Admin Settings → Home now exposes a toggle that hides the entire "Featured Plan" hero (image + stats + CTA + right-hand cards/image) on the user dashboard when OFF. Verified via curl PUT + `/settings/public` round-trip and the user `Dashboard` early-exit guard.
 

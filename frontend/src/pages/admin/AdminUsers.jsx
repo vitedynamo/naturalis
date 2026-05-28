@@ -7,8 +7,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Users as UsersIcon, Search, Download, Plus, Minus, KeyRound, Lock, LogIn, Ban,
-  UserCheck, UserPlus, Wifi, BadgeCheck, ChevronLeft, ChevronRight,
+  UserCheck, UserPlus, Wifi, BadgeCheck,
 } from "lucide-react";
+import Pagination from "@/components/admin/Pagination";
 
 function Stat({ icon: Icon, label, value, sub, color }) {
   return (
@@ -131,8 +132,6 @@ export default function AdminUsers() {
     } catch { toast.error("Export failed"); }
   };
 
-  const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
-
   return (
     <AdminLayout title="">
       {/* Hero header */}
@@ -235,26 +234,15 @@ export default function AdminUsers() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t border-[color:var(--border-default)]" data-testid="users-pagination">
-            <div className="text-xs text-[color:var(--text-secondary)]">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.total)} of {data.total}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                data-testid="users-page-prev"
-                className="p-2 rounded-md border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] disabled:opacity-30 disabled:cursor-not-allowed">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="text-xs font-semibold text-[color:var(--text-primary)] px-2 tabular-nums">{page} / {totalPages}</div>
-              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                data-testid="users-page-next"
-                className="p-2 rounded-md border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] disabled:opacity-30 disabled:cursor-not-allowed">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+        {/* Pagination — shared component (matches Admin Deposits / Withdrawals) */}
+        {data.total > 0 && (
+          <Pagination
+            page={page}
+            setPage={setPage}
+            totalItems={data.total || 0}
+            pageSize={PAGE_SIZE}
+            testidPrefix="users-page"
+          />
         )}
       </div>
 

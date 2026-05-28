@@ -35,7 +35,10 @@ from payouts import process_investment_payouts
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# Shared APIRouter — exported back at module bottom for `server.py`.
+# Domain sub-modules under `/app/backend/routes/` attach their endpoints to the
+# same instance via `from _routers import user_router as router`.
+from _routers import user_router as router  # noqa: E402
 
 
 def _now_iso():
@@ -1336,57 +1339,10 @@ async def my_referrals(request: Request, user=Depends(get_current_user)):
     }
 
 
-# =========== COUPONS ===========
-@router.post("/coupons/redeem")
-async def redeem_coupon(data: CouponRedeemRequest, request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    code = data.code.strip().upper()
-    coupon = await db.coupons.find_one({"code": code, "is_active": True}, {"_id": 0})
-    if not coupon:
-        raise HTTPException(404, "Invalid coupon code")
-    if coupon["used_count"] >= coupon["max_uses"]:
-        raise HTTPException(400, "Coupon usage limit reached")
-    already = await db.coupon_redemptions.find_one({"coupon_id": coupon["id"], "user_id": user["id"]})
-    if already:
-        raise HTTPException(400, "You have already redeemed this coupon")
-
-    new_user = await db.users.find_one_and_update(
-        {"id": user["id"]},
-        {"$inc": {"wallet_balance": float(coupon["amount"])}},
-        return_document=True,
-        projection={"_id": 0},
-    )
-    await db.coupons.update_one({"id": coupon["id"]}, {"$inc": {"used_count": 1}})
-    await db.coupon_redemptions.insert_one({
-        "id": gen_reference("crd"),
-        "coupon_id": coupon["id"],
-        "user_id": user["id"],
-        "code": code,
-        "amount": float(coupon["amount"]),
-        "created_at": _now_iso(),
-    })
-    await db.transactions.insert_one({
-        "id": gen_reference("tx"),
-        "user_id": user["id"],
-        "type": "coupon",
-        "amount": float(coupon["amount"]),
-        "description": f"Coupon {code} redeemed",
-        "balance_after": new_user["wallet_balance"],
-        "meta": {"coupon_id": coupon["id"]},
-        "created_at": _now_iso(),
-    })
-    return {"status": "ok", "amount": coupon["amount"], "wallet_balance": new_user["wallet_balance"]}
-
-
-# =========== TRANSACTIONS ===========
-@router.get("/transactions")
-async def my_transactions(request: Request, ttype: Optional[str] = None, user=Depends(get_current_user)):
-    db = request.app.state.db
-    q = {"user_id": user["id"]}
-    if ttype:
-        q["type"] = ttype
-    items = await db.transactions.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
-    return items
+# =========== COUPONS + TRANSACTIONS ===========
+# Implemented in routes/user_coupons_transactions.py (modularisation step 1).
+# The import below registers the handlers onto the shared user_router.
+from routes import user_coupons_transactions as _r_user_coupons_tx  # noqa: F401, E402
 
 
 # =========== TEAM DETAIL ===========
@@ -1552,71 +1508,7 @@ async def user_dismiss_announcement(ann_id: str, request: Request, current=Depen
 # ============================================================================
 # Daily claim
 # ============================================================================
-
-@router.get("/daily-claim/status")
-async def daily_claim_status(request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    settings = await _settings(db)
-    enabled = bool(settings.get("daily_claim_enabled"))
-    amount = float(settings.get("daily_claim_amount") or 0)
-    last = user.get("last_daily_claim_at")
-    cooldown_remaining_sec = 0
-    if last:
-        try:
-            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00")) if isinstance(last, str) else last
-            if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
-            elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
-            cooldown_remaining_sec = max(0, 24 * 3600 - int(elapsed))
-        except Exception:
-            cooldown_remaining_sec = 0
-    return {
-        "enabled": enabled,
-        "amount": amount,
-        "can_claim": enabled and amount > 0 and cooldown_remaining_sec == 0,
-        "cooldown_remaining_sec": cooldown_remaining_sec,
-        "last_claim_at": last,
-    }
-
-
-@router.post("/daily-claim/claim")
-async def daily_claim_claim(request: Request, user=Depends(get_current_user)):
-    db = request.app.state.db
-    settings = await _settings(db)
-    if not settings.get("daily_claim_enabled"):
-        raise HTTPException(400, "Daily claim is disabled")
-    amount = float(settings.get("daily_claim_amount") or 0)
-    if amount <= 0:
-        raise HTTPException(400, "Daily claim amount is zero")
-    last = user.get("last_daily_claim_at")
-    if last:
-        try:
-            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00")) if isinstance(last, str) else last
-            if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
-            if (datetime.now(timezone.utc) - last_dt).total_seconds() < 24 * 3600:
-                raise HTTPException(429, "You've already claimed today. Come back in 24 hours.")
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-    now = _now_iso()
-    new_user = await db.users.find_one_and_update(
-        {"id": user["id"]},
-        {"$inc": {"wallet_balance": amount, "total_earnings": amount},
-         "$set": {"last_daily_claim_at": now}},
-        return_document=True,
-        projection={"_id": 0, "wallet_balance": 1},
-    )
-    await db.transactions.insert_one({
-        "id": gen_reference("tx"),
-        "user_id": user["id"],
-        "type": "daily_claim",
-        "amount": amount,
-        "description": "Daily sign-in bonus",
-        "balance_after": new_user["wallet_balance"],
-        "meta": {"source": "daily_claim"},
-        "created_at": now,
-    })
-    return {"status": "ok", "amount": amount, "new_balance": new_user["wallet_balance"]}
+# Implemented in routes/user_daily_claim.py (modularisation step 1).
+# The import below registers the handlers onto the shared user_router.
+from routes import user_daily_claim as _r_user_daily_claim  # noqa: F401, E402
 

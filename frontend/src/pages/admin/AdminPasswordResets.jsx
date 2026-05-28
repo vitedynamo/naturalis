@@ -131,7 +131,7 @@ function RequestCard({ r, onApprove, onReject, expanded, onToggle }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="font-display font-bold text-base text-[color:var(--text-primary)] truncate">{r.user_name || "—"}</div>
+            <div className="font-semibold text-sm text-[color:var(--text-primary)] truncate">{r.user_name || "—"}</div>
             <span className={TONE_PILL[meta.tone]}><StatusIcon className="w-3 h-3" /> {meta.label}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-[color:var(--text-tertiary)]">
