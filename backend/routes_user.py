@@ -1094,8 +1094,8 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         "created_at": _now_iso(),
     })
 
-    # Try auto-payout if enabled and we have a bank_code
-    auto = bool(settings.get("auto_payout_enabled", False))
+    # Try auto-payout — enabled by default. Admins can disable via Settings if they want manual approval.
+    auto = bool(settings.get("auto_payout_enabled", True))
     if auto and user.get("bank_code"):
         payout_gateway = settings.get("payout_gateway", "paystack")
         mode = settings.get("payment_mode", "mock")
@@ -1131,7 +1131,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     return doc
                 # Sufficient (or balance check unavailable) — proceed
                 ref = gen_reference("ntr")
-                await nomba_transfer(
+                transfer_resp = await nomba_transfer(
                     client_id=settings["nomba_client_id"], client_secret=settings["nomba_client_secret"],
                     account_id=settings.get("nomba_account_id", ""),
                     amount_naira=float(data.amount), account_number=user["account_number"],
@@ -1139,9 +1139,44 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     merchant_tx_ref=ref, narration=f"Auto payout {wid}",
                     environment=settings.get("nomba_environment"),
                 )
-                # Mark as initiated (NOT paid) — final status confirmed by status poll
-                await db.withdrawals.update_one({"id": wid}, {"$set": {"status": "processing", "method": "auto", "admin_note": f"Auto Nomba · {ref} (status pending confirmation)", "nomba_transfer_ref": ref, "updated_at": _now_iso()}})
-                doc["status"] = "processing"; doc["method"] = "auto"
+                # Capture Nomba's own transactionId (canonical lookup key for requery)
+                nomba_txn_id = transfer_resp.get("_nomba_transaction_id")
+                nomba_initial_status = transfer_resp.get("_nomba_status", "PENDING")
+
+                if nomba_initial_status == "SUCCESS":
+                    # Nomba confirmed success at transfer time — skip "processing"
+                    await db.withdrawals.update_one(
+                        {"id": wid},
+                        {"$set": {
+                            "status": "paid", "method": "auto",
+                            "admin_note": f"Auto Nomba · {ref}"
+                                          + (f" · txn {nomba_txn_id}" if nomba_txn_id else "")
+                                          + " · SUCCESS at create",
+                            "nomba_transfer_ref": ref,
+                            "nomba_transaction_id": nomba_txn_id,
+                            "updated_at": _now_iso(),
+                        }},
+                    )
+                    doc["status"] = "paid"
+                    doc["method"] = "auto"
+                    doc["nomba_transaction_id"] = nomba_txn_id
+                else:
+                    # Mark as initiated — final status confirmed by adaptive poller (every 30s for the first 3 min)
+                    await db.withdrawals.update_one(
+                        {"id": wid},
+                        {"$set": {
+                            "status": "processing", "method": "auto",
+                            "admin_note": f"Auto Nomba · {ref}"
+                                          + (f" · txn {nomba_txn_id}" if nomba_txn_id else "")
+                                          + " · awaiting status confirmation",
+                            "nomba_transfer_ref": ref,
+                            "nomba_transaction_id": nomba_txn_id,
+                            "updated_at": _now_iso(),
+                        }},
+                    )
+                    doc["status"] = "processing"
+                    doc["method"] = "auto"
+                    doc["nomba_transaction_id"] = nomba_txn_id
             elif payout_gateway == "paystack" and mode == "live" and settings.get("paystack_secret_key"):
                 # Paystack: recipient + transfer
                 async with httpx.AsyncClient(timeout=20) as client:

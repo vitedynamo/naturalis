@@ -1,5 +1,22 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 37)
+
+### Auto-payout enabled by default — withdrawals self-process end-to-end
+**User request**: "I want withdrawal to be automatically updated. It shouldn't have to be approved from the admin. Once a withdrawal has been made, the app should automatically check if the transaction has been processed successfully."
+
+**Changes**:
+1. `models.py::SettingsDoc.auto_payout_enabled` default flipped to `True`.
+2. `routes_user.py::request_withdrawal` Nomba branch now:
+   - Captures Nomba's `transactionId` from the create-transfer response via the recursive `_find_nomba_id` extractor.
+   - If Nomba reports `SUCCESS` at create time → status flips directly to `paid` (skips `processing`).
+   - Otherwise stores `nomba_transaction_id` + `nomba_transfer_ref` and lets the adaptive poller take over.
+3. Admin settings UI already exposes the `auto_payout_enabled` toggle — admins can still revert to manual approval if they want.
+4. Pre-existing fallbacks preserved: insufficient float / no bank_code / Nomba rejection all route to the admin queue with a clear `admin_note` instead of failing silently.
+
+**End-to-end flow** (no admin involvement required):
+- User submits withdrawal → backend immediately calls Nomba → captures `transactionId` → adaptive poller (30s for first 3 min, then 60s, then 5 min) auto-confirms status → flips to `paid` the moment Nomba returns `SUCCESS`.
+
 ## Recent Changes (Feb 2026 — iteration 36)
 
 ### Bulk Nomba backfill + dedup + relaxed gateway display

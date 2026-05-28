@@ -307,7 +307,7 @@ class Settings(BaseModel):
     welcome_message: str = ""
     welcome_modal_title: str = ""
     welcome_modal_active: bool = True
-    auto_payout_enabled: bool = False
+    auto_payout_enabled: bool = True
     withdrawals_open: bool = True
     withdrawal_start_time: str = "00:00"
     withdrawal_end_time: str = "23:59"
