@@ -2898,3 +2898,162 @@ async def admin_delete_announcement(ann_id: str, request: Request, _admin=Depend
     )
     return {"status": "ok"}
 
+
+
+# ============================================================================
+# Iteration 52 — Danger zone, reverse-adjustment, change-password
+# ============================================================================
+from auth import hash_password, verify_password  # noqa: E402
+
+CLEAR_DB_TOKEN = "CLEAR_ALL_DATA"
+CLEAR_USERS_TOKEN = "CLEAR_USER_DATA"
+
+
+class ConfirmTokenPayload(BaseModel):
+    confirm_token: str
+
+
+class ChangePasswordPayload(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class ReverseAdjustmentPayload(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post("/admin/system/logout-all-users")
+async def admin_logout_all_users(request: Request, _admin=Depends(get_current_admin)):
+    """Bump every non-admin user's `session_epoch`, forcing fresh login on next request."""
+    db = request.app.state.db
+    res = await db.users.update_many({"is_admin": {"$ne": True}}, {"$inc": {"session_epoch": 1}})
+    await _log_admin_activity(
+        db, _admin, "system.logout_all",
+        target_type="system", target_id=None,
+        description=f"Forced logout of {res.modified_count} non-admin user(s)",
+        meta={"affected": res.modified_count},
+    )
+    return {"status": "ok", "affected": res.modified_count}
+
+
+@router.post("/admin/system/clear-user-data")
+async def admin_clear_user_data(payload: ConfirmTokenPayload, request: Request, _admin=Depends(get_current_admin)):
+    """Wipe transactional collections (deposits, withdrawals, investments, transactions,
+    referrals, coupon_redemptions, announcement_dismissals) and zero every non-admin
+    user's wallet balance. User accounts remain — only their activity is cleared.
+    """
+    if payload.confirm_token != CLEAR_USERS_TOKEN:
+        raise HTTPException(400, f"Type '{CLEAR_USERS_TOKEN}' to confirm")
+    db = request.app.state.db
+    collections = ["deposits", "withdrawals", "investments", "transactions",
+                   "referrals", "coupon_redemptions", "announcement_dismissals"]
+    counts = {}
+    for c in collections:
+        r = await db[c].delete_many({})
+        counts[c] = r.deleted_count
+    user_update = await db.users.update_many(
+        {"is_admin": {"$ne": True}},
+        {"$set": {"wallet_balance": 0, "total_earnings": 0, "referral_earnings": 0}},
+    )
+    await _log_admin_activity(
+        db, _admin, "system.clear_user_data",
+        target_type="system", target_id=None,
+        description=f"Cleared all user transactional data · {sum(counts.values())} records deleted · {user_update.modified_count} wallets zeroed",
+        meta={"counts": counts, "users_zeroed": user_update.modified_count},
+    )
+    return {"status": "ok", "deleted": counts, "users_zeroed": user_update.modified_count}
+
+
+@router.post("/admin/system/clear-database")
+async def admin_clear_database(payload: ConfirmTokenPayload, request: Request, _admin=Depends(get_current_admin)):
+    """Nuke EVERYTHING except settings and admin user accounts."""
+    if payload.confirm_token != CLEAR_DB_TOKEN:
+        raise HTTPException(400, f"Type '{CLEAR_DB_TOKEN}' to confirm")
+    db = request.app.state.db
+    # Drop every collection except settings + keep admin users
+    deleted_users = await db.users.delete_many({"is_admin": {"$ne": True}})
+    collections = ["deposits", "withdrawals", "investments", "transactions",
+                   "referrals", "coupon_redemptions", "announcement_dismissals",
+                   "announcements", "products", "coupons", "admin_activity"]
+    counts = {"users": deleted_users.deleted_count}
+    for c in collections:
+        r = await db[c].delete_many({})
+        counts[c] = r.deleted_count
+    # Re-log AFTER wipe so this action is preserved
+    await _log_admin_activity(
+        db, _admin, "system.clear_database",
+        target_type="system", target_id=None,
+        description=f"NUKE — cleared {sum(counts.values())} records across {len(counts)} collections",
+        meta={"counts": counts},
+    )
+    return {"status": "ok", "deleted": counts}
+
+
+@router.post("/admin/transactions/{tx_id}/reverse")
+async def admin_reverse_transaction(tx_id: str, payload: ReverseAdjustmentPayload, request: Request, _admin=Depends(get_current_admin)):
+    """Create the inverse of an admin-driven adjustment. Original tx is marked
+    `meta.reversed: true` and the new inverse tx points back via `meta.reverses`.
+    Refuses to reverse a tx that's already been reversed.
+    """
+    db = request.app.state.db
+    tx = await db.transactions.find_one({"id": tx_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(404, "Transaction not found")
+    if (tx.get("meta") or {}).get("reversed"):
+        raise HTTPException(400, "This transaction was already reversed")
+    if (tx.get("meta") or {}).get("reverses"):
+        raise HTTPException(400, "Cannot reverse a reversal — adjust manually instead")
+    inverse_amount = -float(tx.get("amount") or 0)
+    user = await db.users.find_one_and_update(
+        {"id": tx["user_id"]},
+        {"$inc": {"wallet_balance": inverse_amount}},
+        return_document=True,
+        projection={"_id": 0, "wallet_balance": 1},
+    )
+    if not user:
+        raise HTTPException(404, "User no longer exists")
+    new_id = gen_reference("tx")
+    now = _now_iso()
+    new_doc = {
+        "id": new_id,
+        "user_id": tx["user_id"],
+        "type": tx.get("type") or "adjustment",
+        "amount": inverse_amount,
+        "description": f"REVERSAL of {tx_id} · {payload.reason}",
+        "balance_after": user["wallet_balance"],
+        "meta": {
+            "by_admin": True,
+            "admin_id": _admin["id"],
+            "reverses": tx_id,
+            "reason": payload.reason,
+        },
+        "created_at": now,
+    }
+    await db.transactions.insert_one(new_doc)
+    await db.transactions.update_one({"id": tx_id}, {"$set": {"meta.reversed": True, "meta.reversed_by": new_id, "meta.reversed_at": now}})
+    await _log_admin_activity(
+        db, _admin, "transaction.reversed",
+        target_type="transaction", target_id=tx_id,
+        description=f"Reversed transaction {tx_id} · ₦{abs(inverse_amount):,.2f} · {payload.reason}",
+        meta={"original_id": tx_id, "reversal_id": new_id, "amount": inverse_amount, "reason": payload.reason},
+    )
+    return {"status": "ok", "reversal_id": new_id, "new_balance": user["wallet_balance"]}
+
+
+@router.post("/admin/change-password")
+async def admin_change_password(payload: ChangePasswordPayload, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    admin_doc = await db.users.find_one({"id": _admin["id"]}, {"_id": 0, "password_hash": 1})
+    if not admin_doc or not verify_password(payload.current_password, admin_doc["password_hash"]):
+        raise HTTPException(400, "Current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(400, "New password must be different")
+    await db.users.update_one({"id": _admin["id"]}, {"$set": {"password_hash": hash_password(payload.new_password)}})
+    await _log_admin_activity(
+        db, _admin, "admin.password_changed",
+        target_type="user", target_id=_admin["id"],
+        description="Admin changed their own password",
+        meta={},
+    )
+    return {"status": "ok"}
+

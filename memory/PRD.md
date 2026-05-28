@@ -1,5 +1,29 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 52)
+
+### Settings expansion + Danger-zone tools + Reverse adjustment + Admin password
+**Backend** (`models.py`, `routes_admin.py`, `routes_user.py`):
+- Settings model + SettingsUpdate gained: `deposit_bonus_percent`, `deposit_bonus_limit_per_user`, `transfer_description_template`, `multi_gateway_enabled`, `let_users_choose_gateway`, `quick_deposit_amounts` (list), `require_withdrawal_pin`, `max_withdrawal`, `auto_payout_max_amount`, `daily_claim_enabled`, `daily_claim_amount`, `telegram_channel_url`, `telegram_group_url`, `whatsapp_channel_url`, `whatsapp_group_url`. All exposed on `/api/settings/public` for user-side rendering.
+- **Destructive admin endpoints**:
+  - `POST /api/admin/system/logout-all-users` — bumps `session_epoch` on every non-admin (forces re-login).
+  - `POST /api/admin/system/clear-user-data` — wipes deposits/withdrawals/investments/transactions/referrals/redemptions/dismissals, zeros every non-admin wallet (`total_earnings`, `referral_earnings` too). Requires typed token `CLEAR_USER_DATA`.
+  - `POST /api/admin/system/clear-database` — additionally drops products, coupons, announcements, admin_activity, and every non-admin user. Requires token `CLEAR_ALL_DATA`.
+- `POST /api/admin/transactions/{id}/reverse` — creates the inverse transaction, marks original `meta.reversed: true`, blocks re-reversal + reversing-a-reversal.
+- `POST /api/admin/change-password` — verifies current password, refuses identical-replacement, persists bcrypt hash.
+
+**Frontend** (`AdminSettings.jsx` overhaul, `AdminManualAdjustments.jsx`):
+- New tabs added: **Daily Claim**, **Password**, plus expanded Deposits/Withdrawals/Home.
+- Deposits tab: removed Welcome bonus from here (moved to Daily Claim); added Deposit bonus % + Bonus limit per user + new "Deposit experience" section (Transfer description template / Quick amounts CSV input / Multi-gateway toggle / Let-users-pick-gateway toggle).
+- Withdrawals tab: new "Limits & PIN" section with Min/Max withdrawal + Auto-payout limit + "Require 4-digit PIN" toggle.
+- Daily Claim tab: enable toggle + daily amount + welcome bonus.
+- Home tab: new Social channels section (Telegram channel · Telegram group · WhatsApp channel · WhatsApp group). Featured-product select rewritten with "— None (auto-pick highest ROI) —" + tier preview + currently-selected echo.
+- Password tab: full change-password form with current/new/confirm fields.
+- Danger zone: payment mode + three big destructive-action cards (SOFT logout · HARD clear-user-data · NUKE clear-database). Each opens a brand-coloured gradient modal with typed-token confirmation and warning callout.
+- **Manual Adjustments**: each row now has a **Reverse** button (red) that opens a confirm modal showing the amount-flip (+₦5,000 → -₦5,000), required reason textarea, and warning banner. Rows already reversed (or reversals themselves) show a disabled icon with a tooltip explanation.
+
+Verified e2e: settings save echoes new fields with correct values; logout-all returned `affected: 90`; clear-user-data with wrong token rejected; change-password with wrong current rejected; reverse-adjustment created `tx_d41386e2f0007998` with `new_balance: 6000`, re-reversal blocked. Screenshots confirm Danger zone & Deposits tab render correctly.
+
 ## Recent Changes (Feb 2026 — iteration 51)
 
 ### Admin Settings — full redesign with tabbed shell

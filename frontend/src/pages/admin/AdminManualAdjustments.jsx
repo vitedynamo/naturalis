@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import { Link } from "react-router-dom";
 import Pagination from "@/components/admin/Pagination";
+import { toast } from "sonner";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   SlidersHorizontal, Search, TrendingUp, TrendingDown, Coins, Eye,
-  ArrowUpRight, ArrowDownRight, User as UserIcon,
+  ArrowUpRight, ArrowDownRight, User as UserIcon, Undo2, AlertTriangle,
 } from "lucide-react";
 
 /* ----------------------------------------------------------------------------
@@ -63,6 +65,32 @@ export default function AdminManualAdjustments() {
       setLoading(false);
     });
   }, []);
+
+  const reload = () => api.get("/admin/transactions").then(({ data }) => {
+    setItems((data || []).filter((t) => (t?.meta || {}).by_admin === true));
+  });
+
+  const [reverseTx, setReverseTx] = useState(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reverseBusy, setReverseBusy] = useState(false);
+  const confirmReverse = async () => {
+    if (!reverseTx || reverseReason.trim().length < 3) {
+      toast.error("Please give a brief reason");
+      return;
+    }
+    setReverseBusy(true);
+    try {
+      const { data } = await api.post(`/admin/transactions/${reverseTx.id}/reverse`, { reason: reverseReason.trim() });
+      toast.success(`Reversed · new balance ${formatNaira(data.new_balance)}`);
+      setReverseTx(null);
+      setReverseReason("");
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Reversal failed");
+    } finally {
+      setReverseBusy(false);
+    }
+  };
 
   useEffect(() => { setPage(1); }, [filter, q, pageSize]);
 
@@ -278,6 +306,25 @@ export default function AdminManualAdjustments() {
                 >
                   <UserIcon className="w-4 h-4" />
                 </Link>
+                {/* Reverse */}
+                {(t?.meta?.reversed || t?.meta?.reverses) ? (
+                  <span
+                    className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)] cursor-not-allowed"
+                    title={t?.meta?.reversed ? "This adjustment has already been reversed" : "This row is a reversal — can't reverse a reversal"}
+                    data-testid={`adj-reverse-disabled-${t.id}`}
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => { setReverseTx(t); setReverseReason(""); }}
+                    data-testid={`adj-reverse-${t.id}`}
+                    title="Reverse this adjustment"
+                    className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md bg-[color:var(--error-soft)] text-[color:var(--error)] hover:opacity-90"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -296,6 +343,74 @@ export default function AdminManualAdjustments() {
           />
         </div>
       )}
+      {/* Reverse confirmation modal */}
+      <Dialog open={!!reverseTx} onOpenChange={(o) => !reverseBusy && !o && setReverseTx(null)}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-3xl gap-0" data-testid="reverse-modal">
+          <div className="relative bg-gradient-to-br from-[#7F1D1D] via-[#B91C1C] to-[#EF4444] text-white p-6">
+            <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
+            <div className="relative flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0">
+                <Undo2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Inverse transaction</div>
+                <div className="font-display font-extrabold text-2xl mt-1">Reverse adjustment</div>
+                <div className="text-white/85 text-xs mt-1.5">A new transaction will be written that undoes this one and the original will be flagged as reversed.</div>
+              </div>
+            </div>
+          </div>
+          {reverseTx && (
+            <div className="p-5 bg-[color:var(--surface)] space-y-4">
+              <div className="card-soft p-3">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Reversing</div>
+                <div className="font-display font-extrabold text-2xl mt-1 tabular-nums leading-none">
+                  <span className={reverseTx.amount >= 0 ? "text-[color:var(--success)]" : "text-[color:var(--error)]"}>
+                    {reverseTx.amount >= 0 ? "+" : ""}{formatNaira(reverseTx.amount)}
+                  </span>
+                  <span className="text-[color:var(--text-tertiary)] text-base font-normal mx-2">→</span>
+                  <span className={reverseTx.amount >= 0 ? "text-[color:var(--error)]" : "text-[color:var(--success)]"}>
+                    {reverseTx.amount >= 0 ? "" : "+"}{formatNaira(-reverseTx.amount)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[color:var(--text-tertiary)] mt-1">{reverseTx.user_name} · <span className="italic">"{reverseTx.description}"</span></div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Reason (required)</label>
+                <textarea
+                  value={reverseReason}
+                  onChange={(e) => setReverseReason(e.target.value)}
+                  placeholder="e.g. incorrect amount, duplicate adjustment, user-side complaint…"
+                  rows={2}
+                  maxLength={500}
+                  data-testid="reverse-reason"
+                  className="w-full input-base resize-none text-sm"
+                />
+              </div>
+              <div className="rounded-lg bg-[color:var(--error-soft)] text-[color:var(--error)] p-2.5 text-[11px] flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>The user's wallet will be updated immediately. This action is logged.</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => setReverseTx(null)}
+                  disabled={reverseBusy}
+                  className="px-3 py-2 rounded-md text-xs font-semibold bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]/70 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmReverse}
+                  disabled={reverseBusy || reverseReason.trim().length < 3}
+                  data-testid="reverse-confirm"
+                  className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-[color:var(--error)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Undo2 className="w-3.5 h-3.5" /> {reverseBusy ? "Reversing…" : "Reverse"}
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

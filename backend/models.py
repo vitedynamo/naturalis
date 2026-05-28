@@ -351,6 +351,26 @@ class Settings(BaseModel):
     withdrawals_open: bool = True
     withdrawal_start_time: str = "00:00"
     withdrawal_end_time: str = "23:59"
+    # ===== Newly added (iteration 52) =====
+    # Deposits
+    deposit_bonus_percent: float = 0.0
+    deposit_bonus_limit_per_user: float = 0.0  # 0 = unlimited
+    transfer_description_template: str = "NaijaInvest deposit"
+    multi_gateway_enabled: bool = False
+    let_users_choose_gateway: bool = False
+    quick_deposit_amounts: list = Field(default_factory=lambda: [3000, 5000, 10000, 25000, 50000, 100000])
+    # Withdrawals
+    require_withdrawal_pin: bool = True
+    max_withdrawal: float = 1000000.0
+    auto_payout_max_amount: float = 0.0  # 0 = no cap; above this, manual approval required
+    # Daily claim
+    daily_claim_enabled: bool = False
+    daily_claim_amount: float = 100.0
+    # Home / social
+    telegram_channel_url: str = ""
+    telegram_group_url: str = ""
+    whatsapp_channel_url: str = ""
+    whatsapp_group_url: str = ""
 
 
 class SettingsUpdate(BaseModel):
@@ -388,6 +408,22 @@ class SettingsUpdate(BaseModel):
     withdrawals_open: Optional[bool] = None
     withdrawal_start_time: Optional[str] = None
     withdrawal_end_time: Optional[str] = None
+    # Newly added
+    deposit_bonus_percent: Optional[float] = None
+    deposit_bonus_limit_per_user: Optional[float] = None
+    transfer_description_template: Optional[str] = None
+    multi_gateway_enabled: Optional[bool] = None
+    let_users_choose_gateway: Optional[bool] = None
+    quick_deposit_amounts: Optional[list] = None
+    require_withdrawal_pin: Optional[bool] = None
+    max_withdrawal: Optional[float] = None
+    auto_payout_max_amount: Optional[float] = None
+    daily_claim_enabled: Optional[bool] = None
+    daily_claim_amount: Optional[float] = None
+    telegram_channel_url: Optional[str] = None
+    telegram_group_url: Optional[str] = None
+    whatsapp_channel_url: Optional[str] = None
+    whatsapp_group_url: Optional[str] = None
 
 
 class PaystackPayRequest(BaseModel):

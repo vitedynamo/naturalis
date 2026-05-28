@@ -5,8 +5,11 @@ import { toast } from "sonner";
 import {
   Save, Megaphone, Flame, ImagePlus, X, Banknote, Clock, KeyRound,
   ArrowDownToLine, ArrowUpFromLine, Share2, ShieldAlert, Home,
-  Sparkles, Check,
+  Sparkles, Check, Gift, LogOut, Database, Eraser, AlertTriangle,
+  Lock, MessageCircle, Send,
 } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 function resolveImg(url) {
   if (!url) return "";
@@ -107,9 +110,11 @@ function GatewayCard({ active, label, name, sub, onClick, testid }) {
 const TABS = [
   { key: "deposits",    label: "Deposits",     icon: ArrowDownToLine },
   { key: "withdrawals", label: "Withdrawals",  icon: ArrowUpFromLine },
+  { key: "daily",       label: "Daily Claim",  icon: Gift },
   { key: "referrals",   label: "Referrals",    icon: Share2 },
   { key: "gateways",    label: "Gateways",     icon: KeyRound },
   { key: "home",        label: "Home",         icon: Home },
+  { key: "password",    label: "Password",     icon: Lock },
   { key: "danger",      label: "Danger zone",  icon: ShieldAlert },
 ];
 
@@ -178,6 +183,23 @@ export default function AdminSettings() {
         withdrawals_open: s.withdrawals_open !== false,
         withdrawal_start_time: s.withdrawal_start_time || "00:00",
         withdrawal_end_time: s.withdrawal_end_time || "23:59",
+        // Iteration 52 — new fields
+        deposit_bonus_percent: Number(s.deposit_bonus_percent) || 0,
+        deposit_bonus_limit_per_user: Number(s.deposit_bonus_limit_per_user) || 0,
+        transfer_description_template: s.transfer_description_template || "",
+        multi_gateway_enabled: !!s.multi_gateway_enabled,
+        let_users_choose_gateway: !!s.let_users_choose_gateway,
+        quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
+          .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
+        require_withdrawal_pin: !!s.require_withdrawal_pin,
+        max_withdrawal: Number(s.max_withdrawal) || 0,
+        auto_payout_max_amount: Number(s.auto_payout_max_amount) || 0,
+        daily_claim_enabled: !!s.daily_claim_enabled,
+        daily_claim_amount: Number(s.daily_claim_amount) || 0,
+        telegram_channel_url: s.telegram_channel_url || "",
+        telegram_group_url: s.telegram_group_url || "",
+        whatsapp_channel_url: s.whatsapp_channel_url || "",
+        whatsapp_group_url: s.whatsapp_group_url || "",
         featured_product_id: s.featured_product_id || null,
         home_announcement: s.home_announcement || "",
         home_announcement_active: !!s.home_announcement_active,
@@ -281,8 +303,39 @@ export default function AdminSettings() {
             <Section title="Limits & bonuses">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label="Min deposit (₦)"    value={s.min_deposit}    onChange={(v) => setS({ ...s, min_deposit: v })}   testid="min-deposit" />
-                <Field label="Welcome bonus (₦)"  value={s.welcome_bonus}  onChange={(v) => setS({ ...s, welcome_bonus: v })} testid="welcome-bonus" sub="Credited once at signup" />
-                <Field label="Min withdrawal (₦)" value={s.min_withdrawal} onChange={(v) => setS({ ...s, min_withdrawal: v })} testid="min-withdrawal" />
+                <Field label="Deposit bonus (%)"  value={s.deposit_bonus_percent} step="0.1" onChange={(v) => setS({ ...s, deposit_bonus_percent: v })} testid="dep-bonus-percent" sub="Credited automatically after each successful deposit. 0 = off." />
+                <Field label="Bonus limit per user (₦)" value={s.deposit_bonus_limit_per_user} onChange={(v) => setS({ ...s, deposit_bonus_limit_per_user: v })} testid="dep-bonus-cap" sub="0 = unlimited" />
+              </div>
+            </Section>
+
+            <Section title="Deposit experience" hint="Controls what users see on the deposit page.">
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Transfer description template</span>
+                  <input
+                    type="text"
+                    value={s.transfer_description_template || ""}
+                    onChange={(e) => setS({ ...s, transfer_description_template: e.target.value })}
+                    placeholder="NaijaInvest deposit"
+                    data-testid="transfer-desc-input"
+                    className="w-full input-base"
+                  />
+                  <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Shown on the deposit page as the narration users should use when transferring.</span>
+                </label>
+                <label className="block">
+                  <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Quick amounts on user deposit page</span>
+                  <input
+                    type="text"
+                    value={s.quick_deposit_amounts_raw !== undefined ? s.quick_deposit_amounts_raw : (s.quick_deposit_amounts || []).join(", ")}
+                    onChange={(e) => setS({ ...s, quick_deposit_amounts_raw: e.target.value })}
+                    placeholder="3000, 5000, 10000, 25000, 50000, 100000"
+                    data-testid="quick-amounts-input"
+                    className="w-full input-base font-mono text-sm"
+                  />
+                  <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Comma-separated list of preset deposit chips users can tap.</span>
+                </label>
+                <Toggle checked={!!s.multi_gateway_enabled}     onChange={(v) => setS({ ...s, multi_gateway_enabled: v })} label="Multiple deposit gateways enabled" hint="Allow more than one provider to be active at the same time. With it OFF, only the gateway picked above is used." testid="multi-gw-toggle" />
+                <Toggle checked={!!s.let_users_choose_gateway}  onChange={(v) => setS({ ...s, let_users_choose_gateway: v })} label="Let users pick the gateway" hint="Shows a selector on the deposit page. Requires Multiple deposit gateways = ON." testid="user-gw-toggle" />
               </div>
             </Section>
           </>
@@ -295,6 +348,15 @@ export default function AdminSettings() {
                 <GatewayCard active={s.payout_gateway === "paystack"} label="Transfer" name="Paystack" sub="Paystack Transfers API" onClick={() => setS({ ...s, payout_gateway: "paystack" })} testid="payout-gw-paystack" />
                 <GatewayCard active={s.payout_gateway === "nomba"}    label="Wallet"   name="Nomba"    sub="Nomba transfer-to-bank"  onClick={() => setS({ ...s, payout_gateway: "nomba" })}    testid="payout-gw-nomba" />
               </div>
+            </Section>
+
+            <Section title="Limits & PIN" hint="Hard floor / ceiling on user withdrawals plus security PIN requirement.">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <Field label="Min withdrawal (₦)" value={s.min_withdrawal} onChange={(v) => setS({ ...s, min_withdrawal: v })} testid="min-withdrawal-w" />
+                <Field label="Max withdrawal (₦)" value={s.max_withdrawal} onChange={(v) => setS({ ...s, max_withdrawal: v })} testid="max-withdrawal" sub="Hard cap per request" />
+                <Field label="Auto-payout limit (₦)" value={s.auto_payout_max_amount} onChange={(v) => setS({ ...s, auto_payout_max_amount: v })} testid="auto-payout-max" sub="Above this, requires admin approval. 0 = no cap." />
+              </div>
+              <Toggle checked={!!s.require_withdrawal_pin} onChange={(v) => setS({ ...s, require_withdrawal_pin: v })} label="Require 4-digit withdrawal PIN" hint="Users will be prompted for their PIN before each withdrawal. Off = PIN bypassed." testid="require-pin-toggle" />
             </Section>
 
             <Section title="Automation & opening hours" hint="Auto-payout pushes money out the moment a user requests it. With it off, withdrawals queue for admin approval.">
@@ -315,6 +377,22 @@ export default function AdminSettings() {
               <p className="text-[11px] text-[color:var(--text-tertiary)] mt-2">Set to 00:00 → 23:59 for always-on. Overnight windows (e.g. 22:00 → 04:00) supported.</p>
             </Section>
           </>
+        )}
+
+        {tab === "daily" && (
+          <Section title="Daily sign-in bonus" hint="A small reward users can claim once per day to encourage active sessions.">
+            <div className="space-y-4">
+              <Toggle checked={!!s.daily_claim_enabled} onChange={(v) => setS({ ...s, daily_claim_enabled: v })} label="Daily claim enabled" hint="When ON, eligible users see a Claim button on their dashboard each day." testid="daily-claim-toggle" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Daily claim amount (₦)" value={s.daily_claim_amount} onChange={(v) => setS({ ...s, daily_claim_amount: v })} testid="daily-amount" />
+                <Field label="Welcome bonus (₦)" value={s.welcome_bonus} onChange={(v) => setS({ ...s, welcome_bonus: v })} testid="welcome-bonus" sub="One-time bonus credited at signup. Lives here because it's also a 'first claim' reward." />
+              </div>
+            </div>
+          </Section>
+        )}
+
+        {tab === "password" && (
+          <PasswordSection />
         )}
 
         {tab === "referrals" && (
@@ -410,37 +488,30 @@ export default function AdminSettings() {
               </div>
             </Section>
 
-            <Section title="Featured product" hint="Pinned to the top of the Invest tab.">
+            <Section title="Social channels" hint="Linked from the user profile and welcome modal. Leave blank to hide a row.">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Telegram channel URL" text value={s.telegram_channel_url} onChange={(v) => setS({ ...s, telegram_channel_url: v })} testid="tg-channel-url" />
+                <Field label="Telegram group URL"   text value={s.telegram_group_url}   onChange={(v) => setS({ ...s, telegram_group_url: v })}   testid="tg-group-url" />
+                <Field label="WhatsApp channel URL" text value={s.whatsapp_channel_url} onChange={(v) => setS({ ...s, whatsapp_channel_url: v })} testid="wa-channel-url" />
+                <Field label="WhatsApp group URL"   text value={s.whatsapp_group_url}   onChange={(v) => setS({ ...s, whatsapp_group_url: v })}   testid="wa-group-url" />
+              </div>
+            </Section>
+
+            <Section title="Featured product" hint="Pinned to the top of the Invest tab. Resets to highest ROI when set to None.">
               <label className="block">
                 <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Pick a product</span>
                 <select value={s.featured_product_id || ""} onChange={(e) => setS({ ...s, featured_product_id: e.target.value || null })} data-testid="featured-product-select" className="w-full input-base">
-                  <option value="">None</option>
-                  {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                  <option value="">— None (auto-pick highest ROI) —</option>
+                  {products.map((p) => (<option key={p.id} value={p.id}>{p.name} · {p.daily_profit_percent}%/day · {p.duration_days} days</option>))}
                 </select>
+                <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Currently selected: <span className="font-bold text-[color:var(--text-primary)]">{products.find((p) => p.id === s.featured_product_id)?.name || "— None —"}</span></span>
               </label>
             </Section>
           </>
         )}
 
         {tab === "danger" && (
-          <Section title="Danger zone" hint="Settings that affect how real money moves. Touch with care.">
-            <div className="space-y-4">
-              <div className="card-soft p-4 border border-[color:var(--error)]/20">
-                <label className="block">
-                  <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--error)] mb-1.5">Payment mode</span>
-                  <select value={s.payment_mode || "mock"} onChange={(e) => setS({ ...s, payment_mode: e.target.value })} data-testid="payment-mode-select" className="w-full input-base font-semibold">
-                    <option value="mock">Mock — deposits auto-succeed, payouts simulated (testing only)</option>
-                    <option value="live">Live — real Paystack / Nomba / Marasoft calls</option>
-                  </select>
-                  <span className="block text-[11px] text-[color:var(--text-tertiary)] mt-2">Mock mode never moves real money. Switch to <span className="font-bold">Live</span> only when you've added gateway credentials and tested a real deposit.</span>
-                </label>
-              </div>
-              <div className="rounded-xl bg-[color:var(--error-soft)] text-[color:var(--error)] p-3 text-[11px] flex items-start gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>Always verify a small test transaction after editing gateway credentials. Changes apply instantly and may interrupt in-flight deposits.</span>
-              </div>
-            </div>
-          </Section>
+          <DangerZone s={s} setS={setS} />
         )}
 
         {/* Sticky save bar at the bottom */}
@@ -460,3 +531,172 @@ export default function AdminSettings() {
     </AdminLayout>
   );
 }
+
+/* ----------------------------------------------------------------------------
+ * Password change (separate component to keep its own local state)
+ * --------------------------------------------------------------------------*/
+function PasswordSection() {
+  const [cur, setCur] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (next.length < 6) { toast.error("New password must be at least 6 characters"); return; }
+    if (next !== confirm) { toast.error("New passwords don't match"); return; }
+    setBusy(true);
+    try {
+      await api.post("/admin/change-password", { current_password: cur, new_password: next });
+      toast.success("Password changed");
+      setCur(""); setNext(""); setConfirm("");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Change failed");
+    } finally { setBusy(false); }
+  };
+  return (
+    <Section title="Change admin password" hint="You'll stay signed in. Use a strong, unique password.">
+      <form onSubmit={submit} className="space-y-3 max-w-md">
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Current password</span>
+          <input type="password" value={cur} onChange={(e) => setCur(e.target.value)} data-testid="pw-current" className="w-full input-base" required />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">New password</span>
+          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} data-testid="pw-new" className="w-full input-base" required minLength={6} />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Confirm new password</span>
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} data-testid="pw-confirm" className="w-full input-base" required minLength={6} />
+        </label>
+        <button type="submit" disabled={busy || !cur || !next || !confirm} data-testid="pw-submit"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-[color:var(--brand)] to-[#FF5BAA] text-white disabled:opacity-50">
+          <Lock className="w-4 h-4" /> {busy ? "Changing…" : "Change password"}
+        </button>
+      </form>
+    </Section>
+  );
+}
+
+/* ----------------------------------------------------------------------------
+ * Danger zone — payment mode + destructive actions
+ * --------------------------------------------------------------------------*/
+function DangerZone({ s, setS }) {
+  const navigate = useNavigate();
+  const [confirmKind, setConfirmKind] = useState(null); // 'logout' | 'clear-users' | 'clear-db'
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const TOKENS = { "clear-users": "CLEAR_USER_DATA", "clear-db": "CLEAR_ALL_DATA" };
+  const meta = {
+    "logout":      { title: "Logout all users",        tone: "warn", body: "Forces every non-admin user to sign back in. You stay logged in." },
+    "clear-users": { title: "Clear all user data",     tone: "error", body: "Deletes every deposit, withdrawal, investment, transaction, referral and zeros wallets. User accounts remain.", token: "CLEAR_USER_DATA" },
+    "clear-db":    { title: "Clear database (NUKE)",   tone: "error", body: "Permanently deletes every non-admin user and all transactional collections. Admins, settings, and gateway credentials remain.", token: "CLEAR_ALL_DATA" },
+  };
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      if (confirmKind === "logout") {
+        const { data } = await api.post("/admin/system/logout-all-users");
+        toast.success(`Logged out ${data.affected} user(s)`);
+      } else if (confirmKind === "clear-users") {
+        const { data } = await api.post("/admin/system/clear-user-data", { confirm_token: confirmText });
+        toast.success(`Cleared user data · ${Object.values(data.deleted || {}).reduce((a, b) => a + b, 0)} records removed · ${data.users_zeroed} wallets zeroed`);
+      } else if (confirmKind === "clear-db") {
+        const { data } = await api.post("/admin/system/clear-database", { confirm_token: confirmText });
+        toast.success(`Database cleared · ${Object.values(data.deleted || {}).reduce((a, b) => a + b, 0)} records removed`);
+        // After a nuke, navigate away to avoid stale state
+        setTimeout(() => navigate("/admin"), 800);
+      }
+      setConfirmKind(null);
+      setConfirmText("");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Action failed");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <Section title="Payment mode">
+        <select value={s.payment_mode || "mock"} onChange={(e) => setS({ ...s, payment_mode: e.target.value })} data-testid="payment-mode-select" className="w-full input-base font-semibold">
+          <option value="mock">Mock — deposits auto-succeed, payouts simulated (testing only)</option>
+          <option value="live">Live — real Paystack / Nomba / Marasoft calls</option>
+        </select>
+        <p className="text-[11px] text-[color:var(--text-tertiary)] mt-2">Mock mode never moves real money. Switch to Live only after you've added gateway credentials and tested a real deposit.</p>
+      </Section>
+
+      <Section title="Destructive actions" hint="Each action is logged in Activity Log. The two clear-data actions require a typed confirmation token.">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button type="button" onClick={() => { setConfirmKind("logout"); setConfirmText(""); }}
+            data-testid="logout-all-btn"
+            className="card-soft p-4 text-left border border-[color:var(--warning)]/30 hover:bg-[color:var(--gold-soft)] transition-colors">
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--gold-soft)] text-[color:var(--warning)]">
+              <LogOut className="w-3 h-3" /> Soft
+            </div>
+            <div className="font-display font-bold text-base mt-2 text-[color:var(--text-primary)]">Logout all users</div>
+            <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Bumps session epoch — everyone signs back in.</p>
+          </button>
+          <button type="button" onClick={() => { setConfirmKind("clear-users"); setConfirmText(""); }}
+            data-testid="clear-users-btn"
+            className="card-soft p-4 text-left border border-[color:var(--error)]/30 hover:bg-[color:var(--error-soft)] transition-colors">
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--error-soft)] text-[color:var(--error)]">
+              <Eraser className="w-3 h-3" /> Hard
+            </div>
+            <div className="font-display font-bold text-base mt-2 text-[color:var(--text-primary)]">Clear all user data</div>
+            <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Wipes deposits, withdrawals, investments, transactions. Accounts remain.</p>
+          </button>
+          <button type="button" onClick={() => { setConfirmKind("clear-db"); setConfirmText(""); }}
+            data-testid="clear-db-btn"
+            className="card-soft p-4 text-left border border-[color:var(--error)]/60 hover:bg-[color:var(--error-soft)] transition-colors">
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--error)] text-white">
+              <Database className="w-3 h-3" /> Nuke
+            </div>
+            <div className="font-display font-bold text-base mt-2 text-[color:var(--text-primary)]">Clear database</div>
+            <p className="text-[11px] text-[color:var(--text-tertiary)] mt-1">Deletes non-admin users, products, coupons, everything except settings.</p>
+          </button>
+        </div>
+      </Section>
+
+      <Dialog open={!!confirmKind} onOpenChange={(o) => !busy && !o && setConfirmKind(null)}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-3xl gap-0">
+          {confirmKind && (() => { const m = meta[confirmKind]; return (
+            <>
+              <div className={`relative bg-gradient-to-br ${m.tone === "warn" ? "from-[#7c4807] via-[#a36a08] to-[#F59E0B]" : "from-[#7F1D1D] via-[#B91C1C] to-[#EF4444]"} text-white p-6`}>
+                <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
+                <div className="relative flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Confirm</div>
+                    <div className="font-display font-extrabold text-2xl mt-1">{m.title}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5 bg-[color:var(--surface)] space-y-3">
+                <p className="text-sm text-[color:var(--text-secondary)] leading-relaxed">{m.body}</p>
+                {m.token && (
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Type <span className="font-mono text-[color:var(--error)]">{m.token}</span> to confirm</label>
+                    <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} data-testid="danger-confirm-input"
+                      className="w-full input-base font-mono" placeholder={m.token} />
+                  </div>
+                )}
+                <div className="rounded-lg bg-[color:var(--error-soft)] text-[color:var(--error)] p-2.5 text-[11px] flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> <span>This action is irreversible and logged to Activity Log.</span>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button onClick={() => setConfirmKind(null)} disabled={busy}
+                    className="px-3 py-2 rounded-md text-xs font-semibold bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] disabled:opacity-50">Cancel</button>
+                  <button onClick={run} disabled={busy || (m.token && confirmText !== m.token)} data-testid="danger-confirm-run"
+                    className={`ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider text-white ${m.tone === "warn" ? "bg-[color:var(--warning)]" : "bg-[color:var(--error)]"} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                    {busy ? "Working…" : "Run"}
+                  </button>
+                </div>
+              </div>
+            </>
+          ); })()}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+

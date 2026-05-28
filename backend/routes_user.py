@@ -1390,6 +1390,20 @@ async def public_settings(request: Request):
         "withdrawal_start_time": s.get("withdrawal_start_time", "00:00"),
         "withdrawal_end_time": s.get("withdrawal_end_time", "23:59"),
         "auto_payout_enabled": s.get("auto_payout_enabled", False),
+        # Iteration 52 — exposed for user-side rendering
+        "deposit_bonus_percent": s.get("deposit_bonus_percent", 0.0),
+        "transfer_description_template": s.get("transfer_description_template", "NaijaInvest deposit"),
+        "multi_gateway_enabled": s.get("multi_gateway_enabled", False),
+        "let_users_choose_gateway": s.get("let_users_choose_gateway", False),
+        "quick_deposit_amounts": s.get("quick_deposit_amounts") or [3000, 5000, 10000, 25000, 50000, 100000],
+        "require_withdrawal_pin": s.get("require_withdrawal_pin", True),
+        "max_withdrawal": s.get("max_withdrawal", 1000000.0),
+        "daily_claim_enabled": s.get("daily_claim_enabled", False),
+        "daily_claim_amount": s.get("daily_claim_amount", 100.0),
+        "telegram_channel_url": s.get("telegram_channel_url", ""),
+        "telegram_group_url": s.get("telegram_group_url", ""),
+        "whatsapp_channel_url": s.get("whatsapp_channel_url", ""),
+        "whatsapp_group_url": s.get("whatsapp_group_url", ""),
     }
 
 
