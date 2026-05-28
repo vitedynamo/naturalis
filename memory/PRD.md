@@ -1,5 +1,21 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 44)
+
+### Pause / Resume investments — single + bulk
+**Backend** (`routes_admin.py`):
+- `POST /api/admin/investments/{id}/pause` — flips `active → paused`, stamps `paused_at`/`pause_reason`/`paused_by_admin_id`. 400 if not currently active.
+- `POST /api/admin/investments/{id}/resume` — flips `paused → active`, advances `last_payout_at` to *now* so the user gets a fresh 24h cycle (no backlog drops). 400 if not currently paused.
+- `POST /api/admin/investments/bulk-pause` and `…/bulk-resume` — accept `{investment_ids: list[str], reason?: str}`, walk through each, return per-id results + summary counts (`paused/not_active/not_found` and `resumed/not_paused/not_found`).
+- Every action writes an `investment.paused` / `investment.resumed` activity log entry with full context.
+- The payouts cron query already filters `{status: "active"}`, so paused investments are naturally skipped.
+
+**Frontend** (`AdminInvestments.jsx`):
+- **Single action**: new "Payout control" section in the detail modal (rendered for both active & paused) with a contextual button — pause (gold outlined) or resume (green filled) — and a status line showing "Paused {relative-time} ago".
+- **Bulk action**: per-row checkbox column (only enabled for active/paused), header-level "select all on page" toggle, and a **sticky bulk-action bar** that appears the moment selection is non-empty. The bar shows the selection breakdown (`3 active · 0 paused`), enables/disables Pause/Resume buttons based on what's in the selection, and includes a Clear control.
+- Selected rows render in the pink brand-soft tint for unmistakable feedback.
+- Verified e2e via curl: single pause + re-pause guard + single resume + bulk pause (3 paused) + bulk resume (3 resumed).
+
 ## Recent Changes (Feb 2026 — iteration 43)
 
 ### Cancel investment from admin modal

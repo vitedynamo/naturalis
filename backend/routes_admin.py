@@ -1297,6 +1297,150 @@ async def admin_cancel_investment(
     }
 
 
+class PauseInvestmentPayload(BaseModel):
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+class ResumeInvestmentPayload(BaseModel):
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class BulkInvestmentPayload(BaseModel):
+    investment_ids: list[str] = Field(..., min_length=1, max_length=500)
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+async def _pause_investment(db, inv_id: str, admin: dict, reason: Optional[str]) -> dict:
+    """Returns one of: paused, not_found, not_active."""
+    inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
+    if not inv:
+        return {"investment_id": inv_id, "result": "not_found"}
+    if inv.get("status") != "active":
+        return {"investment_id": inv_id, "result": "not_active", "status": inv.get("status")}
+    now = _now_iso()
+    await db.investments.update_one(
+        {"id": inv_id},
+        {"$set": {
+            "status": "paused",
+            "paused_at": now,
+            "pause_reason": reason,
+            "paused_by_admin_id": admin["id"],
+            "updated_at": now,
+        }},
+    )
+    await _log_admin_activity(
+        db, admin, "investment.paused",
+        target_type="investment", target_id=inv_id,
+        description=(
+            f"Paused investment of ₦{float(inv.get('amount') or 0):,.2f} "
+            f"({inv.get('product_name')})"
+            + (f" · {reason}" if reason else "")
+        ),
+        meta={"investment_id": inv_id, "user_id": inv["user_id"], "reason": reason},
+    )
+    return {"investment_id": inv_id, "result": "paused", "paused_at": now}
+
+
+async def _resume_investment(db, inv_id: str, admin: dict, note: Optional[str]) -> dict:
+    """Returns one of: resumed, not_found, not_paused. When resuming, advance
+    `last_payout_at` to now so the user doesn't get a backlog of "missed" drops
+    during the pause window — payouts continue on a fresh 24h cycle from resume.
+    """
+    inv = await db.investments.find_one({"id": inv_id}, {"_id": 0})
+    if not inv:
+        return {"investment_id": inv_id, "result": "not_found"}
+    if inv.get("status") != "paused":
+        return {"investment_id": inv_id, "result": "not_paused", "status": inv.get("status")}
+    now = _now_iso()
+    await db.investments.update_one(
+        {"id": inv_id},
+        {"$set": {
+            "status": "active",
+            "resumed_at": now,
+            "resume_note": note,
+            "resumed_by_admin_id": admin["id"],
+            # Reset the 24h cycle so payouts schedule fresh from resume.
+            "last_payout_at": now,
+            "updated_at": now,
+        }},
+    )
+    await _log_admin_activity(
+        db, admin, "investment.resumed",
+        target_type="investment", target_id=inv_id,
+        description=(
+            f"Resumed investment of ₦{float(inv.get('amount') or 0):,.2f} "
+            f"({inv.get('product_name')})"
+            + (f" · {note}" if note else "")
+        ),
+        meta={"investment_id": inv_id, "user_id": inv["user_id"], "note": note},
+    )
+    return {"investment_id": inv_id, "result": "resumed", "resumed_at": now}
+
+
+@router.post("/admin/investments/{inv_id}/pause")
+async def admin_pause_investment(
+    inv_id: str,
+    payload: PauseInvestmentPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    res = await _pause_investment(request.app.state.db, inv_id, _admin, payload.reason)
+    if res["result"] == "not_found":
+        raise HTTPException(404, "Investment not found")
+    if res["result"] == "not_active":
+        raise HTTPException(400, f"Cannot pause a {res.get('status')} investment")
+    return {"status": "ok", **res}
+
+
+@router.post("/admin/investments/{inv_id}/resume")
+async def admin_resume_investment(
+    inv_id: str,
+    payload: ResumeInvestmentPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    res = await _resume_investment(request.app.state.db, inv_id, _admin, payload.note)
+    if res["result"] == "not_found":
+        raise HTTPException(404, "Investment not found")
+    if res["result"] == "not_paused":
+        raise HTTPException(400, f"Cannot resume a {res.get('status')} investment")
+    return {"status": "ok", **res}
+
+
+@router.post("/admin/investments/bulk-pause")
+async def admin_bulk_pause_investments(
+    payload: BulkInvestmentPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    db = request.app.state.db
+    results = []
+    counts = {"paused": 0, "not_active": 0, "not_found": 0}
+    for inv_id in payload.investment_ids:
+        r = await _pause_investment(db, inv_id, _admin, payload.reason)
+        results.append(r)
+        counts[r["result"]] = counts.get(r["result"], 0) + 1
+    return {"status": "ok", "counts": counts, "results": results}
+
+
+@router.post("/admin/investments/bulk-resume")
+async def admin_bulk_resume_investments(
+    payload: BulkInvestmentPayload,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    db = request.app.state.db
+    results = []
+    counts = {"resumed": 0, "not_paused": 0, "not_found": 0}
+    for inv_id in payload.investment_ids:
+        r = await _resume_investment(db, inv_id, _admin, payload.reason)
+        results.append(r)
+        counts[r["result"]] = counts.get(r["result"], 0) + 1
+    return {"status": "ok", "counts": counts, "results": results}
+
+
+
+
 # ===== Referrals =====
 @router.get("/admin/referrals")
 async def list_referrals(request: Request, _admin=Depends(get_current_admin)):

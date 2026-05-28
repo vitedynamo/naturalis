@@ -7,6 +7,7 @@ import {
   Sparkles, Search, TrendingUp, Wallet, Banknote, Target, Timer,
   ArrowDownRight, ArrowUpRight, Activity, X, ChevronRight, Layers, CalendarRange,
   CheckCircle2, AlertCircle, ExternalLink, User as UserIcon, Ban, ShieldAlert,
+  Pause, Play, CheckSquare, Square,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
@@ -211,14 +212,14 @@ function PlanBadge({ name, dailyPct }) {
 /* ----------------------------------------------------------------------------
  * Detail modal
  * --------------------------------------------------------------------------*/
-function InvestmentDetailModal({ inv, onClose, onCancelled }) {
+function InvestmentDetailModal({ inv, onClose, onCancelled, onChanged }) {
   useTick(1000);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [refundCapital, setRefundCapital] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pauseBusy, setPauseBusy] = useState(false);
   useEffect(() => {
-    // Reset confirm form whenever a different investment is opened.
     setConfirmOpen(false);
     setReason("");
     setRefundCapital(false);
@@ -258,6 +259,23 @@ function InvestmentDetailModal({ inv, onClose, onCancelled }) {
       toast.error(e?.response?.data?.detail || "Cancellation failed");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const togglePause = async () => {
+    setPauseBusy(true);
+    try {
+      const isActive = inv.status === "active";
+      const path = isActive ? "pause" : "resume";
+      const body = isActive ? { reason: "Paused from admin panel" } : { note: "Resumed from admin panel" };
+      await api.post(`/admin/investments/${inv.id}/${path}`, body);
+      toast.success(isActive ? "Investment paused · daily drops stopped" : "Investment resumed · drops scheduled from now");
+      onChanged?.();
+      onClose();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Action failed");
+    } finally {
+      setPauseBusy(false);
     }
   };
 
@@ -379,6 +397,42 @@ function InvestmentDetailModal({ inv, onClose, onCancelled }) {
               <KV label="Product ID" value={inv.product_id} />
             </div>
           </section>
+
+          {/* Pause / Resume control — shown for both active and paused investments */}
+          {(inv.status === "active" || inv.status === "paused") && (
+            <section data-testid="pause-resume-section">
+              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] mb-2 flex items-center gap-1.5">
+                {inv.status === "active" ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                Payout control
+              </div>
+              <div className="card-soft p-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm text-[color:var(--text-primary)]">
+                    {inv.status === "active" ? "Pause daily drops" : "Resume daily drops"}
+                  </div>
+                  <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">
+                    {inv.status === "active"
+                      ? "Halts every future drop until you resume. Nothing is refunded or lost."
+                      : `Paused ${inv.paused_at ? relativeTime(inv.paused_at) : ""}. Resuming restarts the 24h cycle from now.`}
+                  </div>
+                </div>
+                <button
+                  onClick={togglePause}
+                  disabled={pauseBusy}
+                  data-testid={inv.status === "active" ? "pause-investment" : "resume-investment"}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                    inv.status === "active"
+                      ? "border border-[color:var(--warning)]/40 text-[color:var(--warning)] hover:bg-[color:var(--gold-soft)]"
+                      : "bg-[color:var(--success)] text-white hover:opacity-90"
+                  }`}
+                >
+                  {inv.status === "active"
+                    ? (<><Pause className="w-3.5 h-3.5" /> {pauseBusy ? "Pausing…" : "Pause"}</>)
+                    : (<><Play className="w-3.5 h-3.5" /> {pauseBusy ? "Resuming…" : "Resume"}</>)}
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* Danger zone — Cancel investment */}
           {inv.status === "active" && (
@@ -506,6 +560,8 @@ export default function AdminInvestments() {
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   useTick(1000); // for live countdowns
 
   useEffect(() => {
@@ -566,6 +622,66 @@ export default function AdminInvestments() {
     () => filtered.slice((safePage - 1) * safeSize, safePage * safeSize),
     [filtered, safePage, safeSize],
   );
+
+  // Selection helpers — only `active` / `paused` rows are bulk-actionable.
+  const selectableIds = useMemo(
+    () => pageItems.filter((i) => i.status === "active" || i.status === "paused").map((i) => i.id),
+    [pageItems],
+  );
+  const allOnPageSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const toggleOne = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const togglePage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) selectableIds.forEach((id) => next.delete(id));
+      else selectableIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+  const clearSelection = () => setSelected(new Set());
+
+  // Categorise selection by status so bulk action button enablement is clear.
+  const selectionBreakdown = useMemo(() => {
+    let act = 0, pau = 0;
+    for (const i of items) {
+      if (!selected.has(i.id)) continue;
+      if (i.status === "active") act += 1;
+      else if (i.status === "paused") pau += 1;
+    }
+    return { active: act, paused: pau, total: act + pau };
+  }, [items, selected]);
+
+  const runBulk = async (kind) => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const { data } = await api.post(`/admin/investments/bulk-${kind}`, {
+        investment_ids: ids,
+        reason: kind === "pause" ? "Bulk pause from admin panel" : "Bulk resume from admin panel",
+      });
+      const c = data.counts || {};
+      const done = c[kind === "pause" ? "paused" : "resumed"] || 0;
+      const skipped = (c.not_active || 0) + (c.not_paused || 0) + (c.not_found || 0);
+      toast.success(
+        `${kind === "pause" ? "Paused" : "Resumed"} ${done} investment${done === 1 ? "" : "s"}` +
+        (skipped ? ` · ${skipped} skipped` : ""),
+      );
+      clearSelection();
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Bulk action failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const QUICK_SIZES = [5, 20, 50, 100, "all"];
 
@@ -682,12 +798,68 @@ export default function AdminInvestments() {
         </span>
       </div>
 
+      {/* ===== Bulk action bar (sticky when selection is active) ===== */}
+      {selected.size > 0 && (
+        <div
+          className="sticky top-3 z-30 mt-3 card-soft p-3 border border-[color:var(--brand)]/30 shadow-lg flex items-center gap-3 flex-wrap bg-[color:var(--surface)]"
+          data-testid="investments-bulk-bar"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[color:var(--brand-soft)] text-[color:var(--brand)] text-xs font-bold">
+            <CheckSquare className="w-3.5 h-3.5" />
+            {selectionBreakdown.total} selected
+            <span className="font-normal text-[color:var(--text-tertiary)] ml-1">
+              ({selectionBreakdown.active} active · {selectionBreakdown.paused} paused)
+            </span>
+          </div>
+          <button
+            onClick={() => runBulk("pause")}
+            disabled={bulkBusy || selectionBreakdown.active === 0}
+            data-testid="bulk-pause"
+            title={selectionBreakdown.active === 0 ? "No active investments in selection" : `Pause ${selectionBreakdown.active} active investment(s)`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider border border-[color:var(--warning)]/40 text-[color:var(--warning)] hover:bg-[color:var(--gold-soft)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Pause className="w-3.5 h-3.5" />
+            {bulkBusy ? "Working…" : `Pause ${selectionBreakdown.active}`}
+          </button>
+          <button
+            onClick={() => runBulk("resume")}
+            disabled={bulkBusy || selectionBreakdown.paused === 0}
+            data-testid="bulk-resume"
+            title={selectionBreakdown.paused === 0 ? "No paused investments in selection" : `Resume ${selectionBreakdown.paused} paused investment(s)`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[color:var(--success)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" />
+            {bulkBusy ? "Working…" : `Resume ${selectionBreakdown.paused}`}
+          </button>
+          <button
+            onClick={clearSelection}
+            disabled={bulkBusy}
+            data-testid="bulk-clear"
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)] disabled:opacity-50"
+          >
+            <X className="w-3.5 h-3.5" /> Clear
+          </button>
+        </div>
+      )}
+
       {/* ===== Table ===== */}
       <div className="card-soft mt-3 overflow-hidden" data-testid="investments-table">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] border-b border-[color:var(--border-default)]">
+                <th className="p-4 w-10">
+                  <button
+                    type="button"
+                    onClick={togglePage}
+                    disabled={selectableIds.length === 0}
+                    data-testid="select-all-on-page"
+                    title={allOnPageSelected ? "Deselect all on page" : "Select all active/paused on page"}
+                    className="inline-flex items-center justify-center text-[color:var(--text-tertiary)] hover:text-[color:var(--brand)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {allOnPageSelected ? <CheckSquare className="w-4 h-4 text-[color:var(--brand)]" /> : <Square className="w-4 h-4" />}
+                  </button>
+                </th>
                 <th className="text-left p-4">User</th>
                 <th className="text-left p-4 hidden md:table-cell">Plan</th>
                 <th className="text-right p-4">Invested</th>
@@ -700,10 +872,10 @@ export default function AdminInvestments() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={8} className="p-12 text-center text-[color:var(--text-tertiary)]">Loading…</td></tr>
+                <tr><td colSpan={9} className="p-12 text-center text-[color:var(--text-tertiary)]">Loading…</td></tr>
               )}
               {!loading && pageItems.length === 0 && (
-                <tr><td colSpan={8} className="p-12 text-center text-[color:var(--text-tertiary)]">
+                <tr><td colSpan={9} className="p-12 text-center text-[color:var(--text-tertiary)]">
                   {q || statusFilter !== "All" || planFilter !== "All"
                     ? "No investments match this filter."
                     : "No investments yet."}
@@ -717,9 +889,24 @@ export default function AdminInvestments() {
                 return (
                   <tr
                     key={i.id}
-                    className={`border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors ${due ? "bg-[color:var(--brand-soft)]/30" : ""}`}
+                    className={`border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors ${due ? "bg-[color:var(--brand-soft)]/30" : ""} ${selected.has(i.id) ? "bg-[color:var(--brand-soft)]/40" : ""}`}
                     data-testid={`investment-row-${i.id}`}
                   >
+                    {/* Select */}
+                    <td className="p-4 w-10">
+                      {(i.status === "active" || i.status === "paused") ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleOne(i.id)}
+                          data-testid={`select-investment-${i.id}`}
+                          className="inline-flex items-center justify-center text-[color:var(--text-tertiary)] hover:text-[color:var(--brand)]"
+                        >
+                          {selected.has(i.id) ? <CheckSquare className="w-4 h-4 text-[color:var(--brand)]" /> : <Square className="w-4 h-4" />}
+                        </button>
+                      ) : (
+                        <span className="inline-block w-4 h-4 opacity-20"><Square className="w-4 h-4" /></span>
+                      )}
+                    </td>
                     {/* User */}
                     <td className="p-4 max-w-[220px]">
                       <Link to={`/admin/users/${i.user_id}`} className="flex items-center gap-2.5 group min-w-0">
@@ -800,7 +987,7 @@ export default function AdminInvestments() {
         )}
       </div>
 
-      <InvestmentDetailModal inv={viewing} onClose={() => setViewing(null)} onCancelled={reload} />
+      <InvestmentDetailModal inv={viewing} onClose={() => setViewing(null)} onCancelled={reload} onChanged={reload} />
     </AdminLayout>
   );
 }
