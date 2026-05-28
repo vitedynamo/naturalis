@@ -43,7 +43,7 @@ export default function UserLayout({ children }) {
         <div className="px-6 py-6 border-b border-[color:var(--border-default)] flex items-center justify-between">
           <div>
             <div className="font-display font-extrabold text-2xl tracking-tight text-[color:var(--brand)]">
-              Naija<span className="text-[color:var(--accent-main)]">Invest</span>
+              Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
             </div>
             <div className="text-label mt-1">Daily Returns Platform</div>
           </div>
@@ -91,7 +91,7 @@ export default function UserLayout({ children }) {
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-[color:var(--surface)]/95 backdrop-blur border-b border-[color:var(--border-default)] px-4 h-14 flex items-center justify-between">
         <div className="font-display font-extrabold text-lg text-[color:var(--brand)]">
-          Naija<span className="text-[color:var(--accent-main)]">Invest</span>
+          Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="text-right">

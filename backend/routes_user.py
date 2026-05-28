@@ -483,12 +483,40 @@ async def list_products(request: Request, user=Depends(get_current_user)):
 
 # =========== INVEST ===========
 async def _award_invest_commissions(db, investor_id: str, invest_amount: float, source_investment_id: str, product_name: str):
-    """One-time commission paid to up to 2 generations based on the investment amount."""
+    """Commission paid to up to 2 generations based on the investment amount.
+
+    Mode (controlled by settings.referral_commission_mode):
+      * first_only — pay only on the very first investment the referred user ever makes
+      * unlimited  — pay on every investment
+      * capped     — pay only on the first N investments (referral_commission_cap_n)
+    """
     settings = await _settings(db)
     percents = [
         float(settings.get("gen1_percent", 10.0)),
         float(settings.get("gen2_percent", 5.0)),
     ]
+    mode = (settings.get("referral_commission_mode") or "first_only").lower()
+    cap_n = int(settings.get("referral_commission_cap_n") or 0)
+
+    # Count how many of this investor's prior investments already triggered a referral payout.
+    # We look at any "referral" transaction whose meta.from_user_id == investor_id and group
+    # by investment_id so we don't double-count two-generation rows for the same investment.
+    prior_paid_invest_ids = set()
+    if mode != "unlimited":
+        cursor = db.transactions.find(
+            {"type": "referral", "meta.from_user_id": investor_id},
+            {"_id": 0, "meta": 1},
+        )
+        async for row in cursor:
+            iid = (row.get("meta") or {}).get("investment_id")
+            if iid and iid != source_investment_id:
+                prior_paid_invest_ids.add(iid)
+        # Skip entirely based on mode
+        if mode == "first_only" and len(prior_paid_invest_ids) >= 1:
+            return
+        if mode == "capped" and cap_n > 0 and len(prior_paid_invest_ids) >= cap_n:
+            return
+
     current = await db.users.find_one({"id": investor_id}, {"_id": 0})
     if not current:
         return
@@ -614,6 +642,12 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     reference = gen_reference("dep")
     mode = settings.get("payment_mode", "mock")
     gateway = settings.get("deposit_gateway", "paystack")
+    # Per-gateway enable toggles. Default True for backwards compat.
+    enabled_map = {
+        "paystack": settings.get("gateway_paystack_enabled", True),
+        "nomba":    settings.get("gateway_nomba_enabled", True),
+        "marasoft": settings.get("gateway_marasoft_enabled", True),
+    }
     # If multi-gateway + user-choose are both enabled, honour the client-provided gateway
     if (
         settings.get("multi_gateway_enabled")
@@ -621,6 +655,15 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
         and data.gateway in ("paystack", "nomba", "marasoft")
     ):
         gateway = data.gateway
+
+    # Reject if the selected gateway is disabled by an admin toggle. We try to fall back to
+    # the primary gateway when possible, otherwise raise a 503 so the user sees a clear error.
+    if not enabled_map.get(gateway, True):
+        primary = settings.get("deposit_gateway", "paystack")
+        if primary != gateway and enabled_map.get(primary, True):
+            gateway = primary
+        else:
+            raise HTTPException(503, f"{gateway.title()} is currently disabled by the admin. Please pick another payment method.")
 
     # Decide which gateway to use based on settings
     use_marasoft = gateway == "marasoft" and bool(settings.get("marasoft_public_key"))
@@ -1418,6 +1461,12 @@ async def public_settings(request: Request):
         "telegram_group_url": s.get("telegram_group_url", ""),
         "whatsapp_channel_url": s.get("whatsapp_channel_url", ""),
         "whatsapp_group_url": s.get("whatsapp_group_url", ""),
+        # Per-gateway toggles + referral commission mode (used by user-facing UI)
+        "gateway_paystack_enabled": s.get("gateway_paystack_enabled", True),
+        "gateway_nomba_enabled": s.get("gateway_nomba_enabled", True),
+        "gateway_marasoft_enabled": s.get("gateway_marasoft_enabled", True),
+        "referral_commission_mode": s.get("referral_commission_mode", "first_only"),
+        "referral_commission_cap_n": s.get("referral_commission_cap_n", 3),
     }
 
 

@@ -68,7 +68,7 @@ export default function Login() {
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="font-display text-3xl font-extrabold">
-            Naija<span className="text-white/90">Invest</span>
+            Evoque<span className="text-white/90">-Nova</span>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Daily returns</div>

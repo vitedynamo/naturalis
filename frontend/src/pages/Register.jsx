@@ -71,7 +71,7 @@ export default function Register() {
     <div className="min-h-screen flex bg-[color:var(--app-bg)]">
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="font-display text-3xl font-extrabold">Naija<span className="text-white/90">Invest</span></div>
+          <div className="font-display text-3xl font-extrabold">Evoque<span className="text-white/90">-Nova</span></div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Get started</div>
             <h2 className="font-display text-5xl font-black tracking-tight mt-3 leading-[1.05]">

@@ -337,8 +337,14 @@ class Settings(BaseModel):
     marasoft_last_name: str = ""
     marasoft_bvn: str = ""
     marasoft_dob: str = ""  # format: '01 September 1998'
-    deposit_gateway: str = "paystack"  # paystack | nomba | marasoft
+    deposit_gateway: str = "paystack"  # paystack | nomba | marasoft — primary/default pick when no multi-gateway
     payout_gateway: str = "paystack"   # paystack | nomba
+    # Individual gateway on/off toggles. Used when multi_gateway_enabled is ON so admins can
+    # selectively expose providers to users. The "primary" deposit_gateway above must also
+    # be enabled to be valid. Defaults match the historical single-gateway behaviour.
+    gateway_paystack_enabled: bool = True
+    gateway_nomba_enabled: bool = True
+    gateway_marasoft_enabled: bool = True
     payment_mode: str = "mock"  # mock | live
     featured_product_id: Optional[str] = None
     home_announcement: str = ""
@@ -372,6 +378,12 @@ class Settings(BaseModel):
     telegram_group_url: str = ""
     whatsapp_channel_url: str = ""
     whatsapp_group_url: str = ""
+    # Referral commission mode (image-driven design):
+    #   first_only — pay commission ONLY on the referred user's first investment (legacy)
+    #   unlimited  — pay commission on EVERY investment the referred user makes
+    #   capped     — pay commission on the FIRST N investments only
+    referral_commission_mode: str = "first_only"
+    referral_commission_cap_n: int = 3
 
 
 class SettingsUpdate(BaseModel):
@@ -425,6 +437,11 @@ class SettingsUpdate(BaseModel):
     telegram_group_url: Optional[str] = None
     whatsapp_channel_url: Optional[str] = None
     whatsapp_group_url: Optional[str] = None
+    gateway_paystack_enabled: Optional[bool] = None
+    gateway_nomba_enabled: Optional[bool] = None
+    gateway_marasoft_enabled: Optional[bool] = None
+    referral_commission_mode: Optional[str] = None  # first_only | unlimited | capped
+    referral_commission_cap_n: Optional[int] = None
 
 
 class PaystackPayRequest(BaseModel):

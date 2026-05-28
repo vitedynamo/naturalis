@@ -189,6 +189,11 @@ export default function AdminSettings() {
         transfer_description_template: s.transfer_description_template || "",
         multi_gateway_enabled: !!s.multi_gateway_enabled,
         let_users_choose_gateway: !!s.let_users_choose_gateway,
+        gateway_paystack_enabled: s.gateway_paystack_enabled !== false,
+        gateway_nomba_enabled: s.gateway_nomba_enabled !== false,
+        gateway_marasoft_enabled: s.gateway_marasoft_enabled !== false,
+        referral_commission_mode: s.referral_commission_mode || "first_only",
+        referral_commission_cap_n: Number(s.referral_commission_cap_n) || 3,
         quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
         require_withdrawal_pin: !!s.require_withdrawal_pin,
@@ -338,6 +343,14 @@ export default function AdminSettings() {
                 <Toggle checked={!!s.let_users_choose_gateway}  onChange={(v) => setS({ ...s, let_users_choose_gateway: v })} label="Let users pick the gateway" hint="Shows a selector on the deposit page. Requires Multiple deposit gateways = ON." testid="user-gw-toggle" />
               </div>
             </Section>
+
+            <Section title="Per-gateway availability" hint="Switch individual providers on or off. Disabled gateways are hidden from the user-side picker even when multiple gateways are enabled.">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Toggle checked={s.gateway_paystack_enabled !== false} onChange={(v) => setS({ ...s, gateway_paystack_enabled: v })} label="Paystack" hint="Card + bank transfer (NGN)" testid="gw-enabled-paystack" />
+                <Toggle checked={s.gateway_nomba_enabled !== false}    onChange={(v) => setS({ ...s, gateway_nomba_enabled: v })}    label="Nomba"    hint="Virtual account · bank pay-in" testid="gw-enabled-nomba" />
+                <Toggle checked={s.gateway_marasoft_enabled !== false} onChange={(v) => setS({ ...s, gateway_marasoft_enabled: v })} label="Marasoft" hint="Dynamic virtual account · 9PSB" testid="gw-enabled-marasoft" />
+              </div>
+            </Section>
           </>
         )}
 
@@ -396,12 +409,51 @@ export default function AdminSettings() {
         )}
 
         {tab === "referrals" && (
-          <Section title="Commission percentages" hint="Applied to each daily profit payout your referrals receive (2 generations).">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Generation 1 (%) · direct referrals" value={s.gen1_percent} step="0.1" onChange={(v) => setS({ ...s, gen1_percent: v })} testid="gen1" />
-              <Field label="Generation 2 (%) · indirect"          value={s.gen2_percent} step="0.1" onChange={(v) => setS({ ...s, gen2_percent: v })} testid="gen2" />
-            </div>
-          </Section>
+          <>
+            <Section title="Bonus percentages" hint="The percentage of a referred user's investment that is paid to the referrer (Level 1 = direct, Level 2 = indirect).">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Level 1 Bonus (%)" value={s.gen1_percent} step="0.1" onChange={(v) => setS({ ...s, gen1_percent: v })} testid="gen1" />
+                <Field label="Level 2 Bonus (%)" value={s.gen2_percent} step="0.1" onChange={(v) => setS({ ...s, gen2_percent: v })} testid="gen2" />
+              </div>
+            </Section>
+
+            <Section title="Commission mode" hint="Controls when a referrer earns commission on a referred user's investment.">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { v: "first_only", label: "Legacy",    sub: "First only",  desc: "Pay commission only on the referred user's first investment." },
+                  { v: "unlimited",  label: "Unlimited", sub: "Every invest", desc: "Pay commission on every investment the referred user makes." },
+                  { v: "capped",     label: "Capped",    sub: "First N",      desc: "Pay commission on the first N investments only." },
+                ].map((m) => {
+                  const active = (s.referral_commission_mode || "first_only") === m.v;
+                  return (
+                    <button
+                      key={m.v}
+                      type="button"
+                      onClick={() => setS({ ...s, referral_commission_mode: m.v })}
+                      data-testid={`ref-mode-${m.v}`}
+                      className={`relative text-left p-4 rounded-2xl border-2 transition-all ${active
+                        ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)] shadow-md ring-2 ring-[color:var(--brand)]/10"
+                        : "border-[color:var(--border-default)] bg-[color:var(--surface)] hover:border-[color:var(--brand)]/50"}`}
+                    >
+                      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">{m.label}</div>
+                      <div className={`font-display font-extrabold text-lg mt-0.5 ${active ? "text-[color:var(--brand)]" : "text-[color:var(--text-primary)]"}`}>{m.sub}</div>
+                      <div className="text-[11px] text-[color:var(--text-tertiary)] mt-2 leading-snug">{m.desc}</div>
+                      {active && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[color:var(--brand)] text-white flex items-center justify-center">
+                          <Check className="w-3 h-3" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {(s.referral_commission_mode || "first_only") === "capped" && (
+                <div className="mt-4 max-w-xs">
+                  <Field label="Cap (N investments)" value={s.referral_commission_cap_n ?? 3} onChange={(v) => setS({ ...s, referral_commission_cap_n: v })} testid="ref-cap-n" sub="Pay commission only on this many of the referred user's investments." />
+                </div>
+              )}
+            </Section>
+          </>
         )}
 
         {tab === "gateways" && (

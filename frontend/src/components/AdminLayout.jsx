@@ -30,7 +30,7 @@ function Brand() {
   return (
     <div className="px-5 pt-5 pb-4 flex items-center gap-3">
       <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[color:var(--accent-main)] to-[color:var(--brand)] flex items-center justify-center font-display font-extrabold text-white text-lg shadow-lg shadow-[color:var(--accent-main)]/30">
-        NI
+        EN
       </div>
       <div className="leading-tight">
         <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">EVOQUE-NOVA</div>

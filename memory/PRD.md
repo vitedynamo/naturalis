@@ -1,4 +1,30 @@
-# Naija Invest — PRD & Implementation Log
+# Evoque-Nova — PRD & Implementation Log
+
+## Recent Changes (Feb 2026 — iteration 54)
+
+### Brand rename + per-gateway toggles + referral commission modes + favicon
+**Branding** — renamed `NaijaInvest` → `Evoque-Nova` across user/admin layouts (`UserLayout.jsx`, `Register.jsx`, `Login.jsx`, `ForgotPassword.jsx`); admin sidebar badge `NI` → `EN`. Title was already `Evoque-Nova — Daily Returns Platform`.
+
+**Favicon** — added second image (uploaded `evoque-nova.jpg`) to `/app/frontend/public/`; wired `<link rel="icon">` + `<link rel="apple-touch-icon">` in `index.html`.
+
+**Backend** (`models.py`, `routes_user.py`):
+- New Settings fields: `gateway_paystack_enabled`, `gateway_nomba_enabled`, `gateway_marasoft_enabled` (all default `True`), `referral_commission_mode` (`first_only`|`unlimited`|`capped`, default `first_only`), `referral_commission_cap_n` (default `3`).
+- `/deposit/initialize` now rejects deposits routed to a disabled gateway with `503 "<gateway> is currently disabled"` — auto-fallback to the primary if it is enabled.
+- `_award_invest_commissions` honours the new mode:
+  - `first_only` — pay only on the referred user's first investment ever
+  - `unlimited` — pay on every investment
+  - `capped` — pay on the first N investments (N = `referral_commission_cap_n`)
+- All new fields exposed on `/settings/public` so the user-side gateway picker can filter disabled providers.
+
+**Frontend** (`AdminSettings.jsx`, `Deposit.jsx`):
+- Admin Settings → Deposits: new **"Per-gateway availability"** section with three toggles (Paystack/Nomba/Marasoft).
+- Admin Settings → Referrals: redesigned to match reference image — Level 1 / Level 2 bonus inputs + 3 commission-mode cards (Legacy · First only, Unlimited · Every invest, Capped · First N). When Capped is selected, an inline "Cap (N investments)" input appears.
+- User Deposit page: gateway-picker filters out disabled providers, so toggling Nomba off on admin hides the Nomba chip from the user.
+
+**Verified e2e**:
+- Backend pytest-style script confirmed all 3 modes work: first_only → 1 tx after 2 invests; unlimited → +1 tx; capped N=3 → 3 tx held at cap.
+- Curl against `/deposit/initialize` rejected disabled gateway choice with 503 + clear message.
+- Screenshots verified Referrals tab matches user's reference image; Per-gateway toggles render; user login shows "Evoque-Nova" brand and favicon resolves.
 
 ## Recent Changes (Feb 2026 — iteration 53)
 

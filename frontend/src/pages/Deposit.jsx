@@ -147,10 +147,10 @@ export default function Deposit() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">Payment method</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { v: "paystack", label: "Card", sub: "Paystack" },
-                  { v: "nomba",    label: "Wallet", sub: "Nomba" },
-                  { v: "marasoft", label: "Transfer", sub: "Marasoft" },
-                ].map((g) => {
+                  { v: "paystack", label: "Card", sub: "Paystack", enabled: settings.gateway_paystack_enabled !== false },
+                  { v: "nomba",    label: "Wallet", sub: "Nomba", enabled: settings.gateway_nomba_enabled !== false },
+                  { v: "marasoft", label: "Transfer", sub: "Marasoft", enabled: settings.gateway_marasoft_enabled !== false },
+                ].filter((g) => g.enabled).map((g) => {
                   const sel = chosenGateway === g.v || (!chosenGateway && settings.deposit_gateway === g.v);
                   return (
                     <button type="button" key={g.v} onClick={() => setChosenGateway(g.v)}
