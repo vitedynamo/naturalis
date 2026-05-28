@@ -1,5 +1,17 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 30)
+
+### Nomba auto-polling fixed (no webhook required)
+**Root cause**: Nomba's `/v1/transactions/accounts/single` requery endpoint is keyed by Nomba's internal `transactionId` (format `API-TRANSFER-XXX-XXX`), NOT by our `merchantTxRef`. We were querying with `merchantTxRef`, Nomba returned empty payloads, and our normaliser defaulted empty → `PENDING`, leaving withdrawals stuck forever. A 5-min background poller was running the whole time but couldn't recover state.
+
+**Fixes** (`nomba.py` + `routes_admin.py`):
+1. `transfer_to_bank` now extracts Nomba's `transactionId` from the create response and injects two convenience fields: `_nomba_transaction_id` and `_nomba_status` (normalised SUCCESS/PENDING/FAILED).
+2. `pay-nomba` admin endpoint now persists `nomba_transaction_id` on the withdrawal. If `_nomba_status === "SUCCESS"` at create time, the withdrawal is marked `paid` immediately — no `processing` phase.
+3. `get_transfer_status` (Nomba) now accepts an optional `nomba_transaction_id`; tries it first (canonical key), falls back to `merchantTxRef`, then falls back to `/v2/transfers/bank/{id}` for stubborn cases.
+4. Recognises Nomba's `REFUND` status as `FAILED` so the user wallet is auto-credited.
+5. The 5-min background poller (already running in `server.py`) automatically picks up the new lookup path.
+
 ## Recent Changes (Feb 2026 — iteration 29)
 
 ### Bug fix: withdrawals stuck in "processing" can now be resolved

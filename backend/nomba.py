@@ -178,7 +178,18 @@ async def transfer_to_bank(
     merchant_tx_ref: str, sender_name: str = "NaijaInvest", narration: str = "Withdrawal payout",
     environment: str | None = None,
 ) -> dict:
-    """Initiate a bank transfer via Nomba. Raises RuntimeError if Nomba rejects the transfer."""
+    """Initiate a bank transfer via Nomba. Raises RuntimeError if Nomba rejects the transfer.
+
+    The returned dict mirrors Nomba's raw payload, with two convenience fields injected so
+    the caller doesn't have to dig through the body shape:
+        - `_nomba_transaction_id`: Nomba's own transactionId (e.g. ``API-TRANSFER-XXXX-XXXX``).
+          This is the canonical key Nomba uses on its requery endpoint, so callers MUST
+          persist it and pass it back when polling status (our `merchantTxRef` is not
+          reliably indexed by Nomba's transactions endpoint).
+        - `_nomba_status`: normalized transfer status as already reported by Nomba in the
+          create-transfer response — one of ``SUCCESS|PENDING|FAILED``. If Nomba returns
+          ``SUCCESS`` here we can skip the "processing" phase entirely.
+    """
     status, data = await _call_with_fallback(
         client_id=client_id, client_secret=client_secret, account_id=account_id,
         environment=environment, method="POST", path="/v2/transfers/bank",
@@ -194,14 +205,35 @@ async def transfer_to_bank(
         timeout=30,
     )
     # Nomba returns code "00" for success in `data["code"]`
-    success = (data.get("code") == "00") or (200 <= status < 300 and (data.get("data") or {}).get("status", "").upper() in ("SUCCESS", "SUCCESSFUL", "PENDING", "PROCESSING", ""))
+    inner = (data.get("data") or {}) if isinstance(data, dict) else {}
+    raw_inner_status = (inner.get("status") or "").upper().strip()
+    success = (data.get("code") == "00") or (200 <= status < 300 and raw_inner_status in ("SUCCESS", "SUCCESSFUL", "PENDING", "PROCESSING", ""))
     if status >= 400 or data.get("code") not in (None, "00"):
         msg = data.get("description") or data.get("message") or f"HTTP {status}"
         raise RuntimeError(f"Nomba transfer rejected: {msg}")
     if not success:
         msg = data.get("description") or data.get("message") or "unknown error"
         raise RuntimeError(f"Nomba transfer rejected: {msg}")
-    return data
+
+    # Extract Nomba's transactionId — the canonical key for requery.
+    nomba_txn_id = (
+        inner.get("id")
+        or inner.get("transactionId")
+        or inner.get("transactionRef")
+        or inner.get("transaction_id")
+    )
+
+    if raw_inner_status in ("SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID"):
+        norm_status = "SUCCESS"
+    elif raw_inner_status in ("FAILED", "FAILURE", "DECLINED", "REVERSED", "REJECTED", "REFUND"):
+        norm_status = "FAILED"
+    else:
+        norm_status = "PENDING"
+
+    out = dict(data) if isinstance(data, dict) else {"raw": data}
+    out["_nomba_transaction_id"] = nomba_txn_id
+    out["_nomba_status"] = norm_status
+    return out
 
 
 async def list_banks(*, client_id: str, client_secret: str, account_id: str, environment: str | None = None) -> list[dict]:
@@ -260,25 +292,68 @@ async def get_wallet_balance(*, client_id: str, client_secret: str, account_id: 
 
 async def get_transfer_status(
     *, client_id: str, client_secret: str, account_id: str, merchant_tx_ref: str,
-    environment: str | None = None,
+    nomba_transaction_id: str | None = None, environment: str | None = None,
 ) -> dict:
-    """Query Nomba for the status of a previous transfer by merchantTxRef.
+    """Query Nomba for the status of a previous transfer.
 
-    Endpoint: GET /v1/transactions/accounts/single?transactionRef=<ref>
-    Returns dict with at least {status: 'SUCCESS'|'FAILED'|'PENDING', raw: ...}.
+    Strategy (Nomba's requery is reliably keyed by their internal `transactionId`,
+    NOT by our merchantTxRef):
+      1. If `nomba_transaction_id` is provided, query with that. This is the canonical key.
+      2. Else fall back to querying with our `merchantTxRef` — works on some Nomba envs but
+         can return empty payloads on the production v1 endpoint.
+      3. If the lookup returns no data, also try the v2 transfer endpoint as a last resort.
+
+    Returns ``{status, raw_status, raw, description}`` where ``status`` is normalised to
+    ``SUCCESS|FAILED|PENDING|REFUND``.
     """
-    _, data = await _call_with_fallback(
-        client_id=client_id, client_secret=client_secret, account_id=account_id,
-        environment=environment, method="GET", path="/v1/transactions/accounts/single",
-        params={"transactionRef": merchant_tx_ref},
-    )
+    primary_ref = nomba_transaction_id or merchant_tx_ref
+
+    async def _query_v1(ref):
+        return await _call_with_fallback(
+            client_id=client_id, client_secret=client_secret, account_id=account_id,
+            environment=environment, method="GET", path="/v1/transactions/accounts/single",
+            params={"transactionRef": ref},
+        )
+
+    _, data = await _query_v1(primary_ref)
     d = data.get("data") or {}
     if isinstance(d, list):
         d = d[0] if d else {}
+
+    # Fallback 1: if we used Nomba's txn id but it returned empty, try our merchantTxRef
+    if not d and nomba_transaction_id and merchant_tx_ref and merchant_tx_ref != primary_ref:
+        _, data2 = await _query_v1(merchant_tx_ref)
+        d2 = data2.get("data") or {}
+        if isinstance(d2, list):
+            d2 = d2[0] if d2 else {}
+        if d2:
+            data = data2
+            d = d2
+
+    # Fallback 2: try the v2 transfer-by-id endpoint
+    if not d and primary_ref and primary_ref.upper().startswith("API-TRANSFER"):
+        try:
+            _, data3 = await _call_with_fallback(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+                environment=environment, method="GET",
+                path=f"/v2/transfers/bank/{primary_ref}",
+            )
+            d3 = data3.get("data") or {}
+            if isinstance(d3, list):
+                d3 = d3[0] if d3 else {}
+            if d3:
+                data = data3
+                d = d3
+        except Exception:
+            pass
+
     raw_status = (d.get("status") or d.get("transactionStatus") or "").upper().strip()
     if raw_status in ("SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID"):
         norm = "SUCCESS"
     elif raw_status in ("FAILED", "FAILURE", "DECLINED", "REVERSED", "REJECTED"):
+        norm = "FAILED"
+    elif raw_status in ("REFUND", "REFUNDED"):
+        # Nomba refunds the float when a transfer can't settle — treat as failed for our flow.
         norm = "FAILED"
     elif raw_status in ("PENDING", "PROCESSING", "IN_PROGRESS"):
         norm = "PENDING"

@@ -280,14 +280,47 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
             )
         except Exception as e:
             raise HTTPException(502, f"Nomba transfer failed: {e}")
+
+        nomba_txn_id = transfer_resp.get("_nomba_transaction_id")
+        nomba_initial_status = transfer_resp.get("_nomba_status", "PENDING")
+
+        # If Nomba already reports SUCCESS on the create response, skip "processing".
+        if nomba_initial_status == "SUCCESS":
+            await db.withdrawals.update_one(
+                {"id": wid},
+                {"$set": {
+                    "status": "paid",
+                    "method": "auto",
+                    "admin_note": f"Nomba transfer · ref {transfer_ref}"
+                                  + (f" · txn {nomba_txn_id}" if nomba_txn_id else "")
+                                  + " · live · SUCCESS at create",
+                    "nomba_transfer_ref": transfer_ref,
+                    "nomba_transaction_id": nomba_txn_id,
+                    "bank_code": payload.bank_code,
+                    "needs_attention": False,
+                    "insufficient_float": False,
+                    "updated_at": _now_iso(),
+                }},
+            )
+            await _log_admin_activity(
+                db, _admin, "withdrawal.paid_nomba",
+                target_type="withdrawal", target_id=wid,
+                description=f"Paid ₦{float(w['amount']):,.2f} via Nomba (SUCCESS at create)",
+                meta={"amount": w["amount"], "user_id": w["user_id"], "reference": transfer_ref, "nomba_transaction_id": nomba_txn_id},
+            )
+            return {"status": "ok", "reference": transfer_ref, "nomba_transaction_id": nomba_txn_id, "mode": "live"}
+
         # Live transfer initiated — mark as "processing" so the status-poll confirms final state
         await db.withdrawals.update_one(
             {"id": wid},
             {"$set": {
                 "status": "processing",
                 "method": "auto",
-                "admin_note": f"Nomba transfer · ref {transfer_ref} (status pending confirmation)",
+                "admin_note": f"Nomba transfer · ref {transfer_ref}"
+                              + (f" · txn {nomba_txn_id}" if nomba_txn_id else "")
+                              + " · awaiting status confirmation",
                 "nomba_transfer_ref": transfer_ref,
+                "nomba_transaction_id": nomba_txn_id,
                 "bank_code": payload.bank_code,
                 "needs_attention": False,
                 "insufficient_float": False,
@@ -298,9 +331,9 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
             db, _admin, "withdrawal.paid_nomba",
             target_type="withdrawal", target_id=wid,
             description=f"Initiated Nomba payout ₦{float(w['amount']):,.2f} (processing)",
-            meta={"amount": w["amount"], "user_id": w["user_id"], "reference": transfer_ref},
+            meta={"amount": w["amount"], "user_id": w["user_id"], "reference": transfer_ref, "nomba_transaction_id": nomba_txn_id},
         )
-        return {"status": "processing", "reference": transfer_ref, "mode": "live"}
+        return {"status": "processing", "reference": transfer_ref, "nomba_transaction_id": nomba_txn_id, "mode": "live"}
 
     # Mock mode — no real transfer, mark as paid immediately
     await db.withdrawals.update_one(
@@ -1425,6 +1458,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
             res = await nomba_status(
                 client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
                 account_id=s.get("nomba_account_id", ""), merchant_tx_ref=ref,
+                nomba_transaction_id=w.get("nomba_transaction_id"),
                 environment=s.get("nomba_environment"),
             )
             st = res.get("status", "PENDING")
