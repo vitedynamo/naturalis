@@ -476,7 +476,7 @@ export default function AdminInvestments() {
               <div className="text-white/85 text-xs md:text-sm mt-1.5">
                 <span className="font-bold tabular-nums">{kpis.total}</span> investment{kpis.total === 1 ? "" : "s"} · {" "}
                 <span className="font-bold tabular-nums">{kpis.active}</span> active · {" "}
-                <span className="font-bold tabular-nums text-white">{formatNaira(kpis.invested, { compact: true })}</span> capital working
+                <span className="font-bold tabular-nums text-white">{formatNaira(kpis.invested)}</span> capital working
               </div>
             </div>
           </div>
@@ -497,9 +497,9 @@ export default function AdminInvestments() {
 
       {/* ===== KPI cards ===== */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-        <StatCard tone="brand"   icon={Wallet}      label="Capital invested" value={formatNaira(kpis.invested, { compact: true })} sub="All-time inflow" testid="kpi-invested" />
-        <StatCard tone="success" icon={TrendingUp}  label="Profit paid"      value={formatNaira(kpis.earned, { compact: true })} sub={`${kpis.expected > 0 ? ((kpis.earned / kpis.expected) * 100).toFixed(1) : "0.0"}% of projected`} testid="kpi-earned" />
-        <StatCard tone="warn"    icon={Target}      label="Projected return" value={formatNaira(kpis.expected, { compact: true })} sub="If every plan completes" testid="kpi-expected" />
+        <StatCard tone="brand"   icon={Wallet}      label="Capital invested" value={formatNaira(kpis.invested)} sub="All-time inflow" testid="kpi-invested" />
+        <StatCard tone="success" icon={TrendingUp}  label="Profit paid"      value={formatNaira(kpis.earned)} sub={`${kpis.expected > 0 ? ((kpis.earned / kpis.expected) * 100).toFixed(1) : "0.0"}% of projected`} testid="kpi-earned" />
+        <StatCard tone="warn"    icon={Target}      label="Projected return" value={formatNaira(kpis.expected)} sub="If every plan completes" testid="kpi-expected" />
         <StatCard tone="accent"  icon={Activity}    label="Active plans"     value={kpis.active} sub={`${kpis.completed} completed · ${kpis.total} total`} testid="kpi-active" />
       </div>
 

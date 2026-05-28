@@ -95,6 +95,22 @@ export default function AdminDeposits() {
     finally { setPolling(false); }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+  const backfillGatewayIds = async () => {
+    setBackfilling(true);
+    try {
+      const { data } = await api.post("/admin/deposits/bulk-backfill-gateway-ids");
+      toast.success(
+        `Backfilled ${data.updated} of ${data.scanned} historical deposits` +
+        (data.not_found ? ` · ${data.not_found} not found at gateway` : "") +
+        (data.errors ? ` · ${data.errors} errors` : ""),
+        { duration: 7000 },
+      );
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Backfill failed"); }
+    finally { setBackfilling(false); }
+  };
+
   const filtered = useMemo(() => {
     let r = items;
     if (filter !== "All") r = r.filter((d) => d.status === filter.toLowerCase());
@@ -185,6 +201,12 @@ export default function AdminDeposits() {
           title="Re-verify every pending and failed deposit with its payment gateway. Credits any that the gateway now confirms."
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Rechecking…" : "Bulk recheck"}
+        </button>
+        <button onClick={backfillGatewayIds} disabled={backfilling}
+          data-testid="deposits-backfill-gateway-ids"
+          title="Scan every funded deposit that is missing its gateway-side ID and refetch it from Marasoft/Paystack. Does not change status or credit anything."
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] disabled:opacity-50">
+          <Wallet className={`w-4 h-4 ${backfilling ? "animate-pulse" : ""}`} /> {backfilling ? "Backfilling…" : "Backfill gateway IDs"}
         </button>
       </div>
 

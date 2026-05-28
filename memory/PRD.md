@@ -1,5 +1,14 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 42)
+
+### Investments KPI locale formatting + Deposits bulk gateway-ID backfill
+1. **Investments KPI cards** — values now render in full Naira locale (`₦81,000.00`) instead of compact (`₦81K`). Hero strip "capital working" amount likewise full-locale.
+2. **Backfill gateway IDs for historical deposits**
+   - **Backend** `POST /api/admin/deposits/bulk-backfill-gateway-ids`: scans every `success` deposit (Marasoft / Paystack) with `gateway_id` empty, re-queries the gateway and writes the extracted ID. Does **not** touch status or wallet balance — purely a metadata backfill. Returns `{scanned, updated, not_found, errors, skipped_provider}`.
+   - **Frontend** `AdminDeposits.jsx`: new accent-coloured **"Backfill gateway IDs"** button next to *Bulk recheck*, with toast summary of the run.
+   - Verified end-to-end via curl on preview (`scanned: 11, updated: 0, not_found: 9, skipped_provider: 2` — expected since most preview records are sandbox/mocked).
+
 ## Recent Changes (Feb 2026 — iteration 41)
 
 ### Admin Investments page — full redesign

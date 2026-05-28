@@ -1464,6 +1464,78 @@ async def admin_poll_pending_deposits(request: Request, _admin=Depends(get_curre
     return results
 
 
+@router.post("/admin/deposits/bulk-backfill-gateway-ids")
+async def admin_bulk_backfill_deposit_gateway_ids(request: Request, _admin=Depends(get_current_admin)):
+    """Scan every `success` deposit that is missing `gateway_id` and try to fetch
+    the gateway-side ID (Marasoft transaction_id / Paystack id) from each provider's
+    verify endpoint. Does NOT change status or credit anything — only writes the
+    `gateway_id` field so the admin table shows the canonical reference.
+
+    Returns counts of how many were scanned / updated / failed / skipped.
+    """
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    has_marasoft = bool(s.get("marasoft_encryption_key"))
+    has_paystack = bool(s.get("paystack_secret_key"))
+
+    cursor = db.deposits.find(
+        {
+            "status": "success",
+            "method": {"$in": ["marasoft", "paystack"]},
+            "$or": [{"gateway_id": None}, {"gateway_id": ""}, {"gateway_id": {"$exists": False}}],
+        },
+        {"_id": 0, "id": 1, "method": 1, "reference": 1},
+    ).sort("created_at", -1)
+    candidates = await cursor.to_list(1000)
+
+    results = {
+        "scanned": len(candidates),
+        "updated": 0,
+        "not_found": 0,
+        "errors": 0,
+        "skipped_provider": 0,
+    }
+
+    for d in candidates:
+        method = d.get("method")
+        ref = d.get("reference") or ""
+        if not ref:
+            results["skipped_provider"] += 1
+            continue
+        gw_id: str | None = None
+        try:
+            if method == "marasoft" and has_marasoft:
+                from marasoft import check_transaction_status as ms_check
+                res = await ms_check(enc_key=s["marasoft_encryption_key"], transaction_ref=ref)
+                gw_id = _extract_marasoft_gateway_id(res.get("raw"))
+            elif method == "paystack" and has_paystack:
+                async with httpx.AsyncClient(timeout=20) as client:
+                    resp = await client.get(
+                        f"https://api.paystack.co/transaction/verify/{ref}",
+                        headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
+                    )
+                    data = resp.json()
+                gw_id = _extract_paystack_gateway_id(data.get("data") or {})
+            else:
+                results["skipped_provider"] += 1
+                continue
+        except Exception:
+            results["errors"] += 1
+            continue
+        if not gw_id:
+            results["not_found"] += 1
+            continue
+        await db.deposits.update_one(
+            {"id": d["id"]},
+            {"$set": {"gateway_id": gw_id, "updated_at": _now_iso()}},
+        )
+        results["updated"] += 1
+
+    return results
+
+
+
+
 # ===== Nomba float balance + transfer status =====
 @router.get("/admin/nomba/balance")
 async def admin_nomba_balance(request: Request, _admin=Depends(get_current_admin)):
