@@ -23,11 +23,17 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err?.response?.status === 401) {
-      // Clear from whichever storage held the bad token
-      sessionStorage.removeItem("ni_token");
-      sessionStorage.removeItem("ni_user");
-      localStorage.removeItem("ni_token");
-      localStorage.removeItem("ni_user");
+      // Only clear the user's stored token when the 401 came from an endpoint they
+      // *should* have access to. A logged-in regular user hitting an /admin/* endpoint
+      // legitimately gets 401 — that must NOT log them out of their user session.
+      const url = err?.config?.url || "";
+      const isAdminEndpoint = url.startsWith("/admin") || url.includes("/api/admin");
+      if (!isAdminEndpoint) {
+        sessionStorage.removeItem("ni_token");
+        sessionStorage.removeItem("ni_user");
+        localStorage.removeItem("ni_token");
+        localStorage.removeItem("ni_user");
+      }
     }
     return Promise.reject(err);
   },

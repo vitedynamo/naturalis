@@ -204,15 +204,26 @@ async def transfer_to_bank(
         },
         timeout=30,
     )
-    # Nomba returns code "00" for success in `data["code"]`
+    # Nomba success criteria — be lenient with code variants.
+    # Production Nomba returns various code formats ("00", "200", "S00", etc.) but a
+    # `description` of "SUCCESS" / "SUCCESSFUL" is a reliable success indicator.
     inner = (data.get("data") or {}) if isinstance(data, dict) else {}
     raw_inner_status = (inner.get("status") or "").upper().strip()
-    success = (data.get("code") == "00") or (200 <= status < 300 and raw_inner_status in ("SUCCESS", "SUCCESSFUL", "PENDING", "PROCESSING", ""))
-    if status >= 400 or data.get("code") not in (None, "00"):
-        msg = data.get("description") or data.get("message") or f"HTTP {status}"
-        raise RuntimeError(f"Nomba transfer rejected: {msg}")
+    desc_upper = (data.get("description") or data.get("message") or "").upper().strip()
+    code_str = str(data.get("code") or "").strip()
+    http_ok = 200 <= status < 300
+
+    code_indicates_success = code_str in ("", "00", "0", "200", "201")
+    desc_indicates_success = "SUCCESS" in desc_upper or desc_upper in ("OK", "ACCEPTED", "")
+    inner_indicates_non_failure = raw_inner_status in (
+        "SUCCESS", "SUCCESSFUL", "COMPLETED", "PAID",
+        "PENDING", "PROCESSING", "IN_PROGRESS", "",
+    )
+
+    success = http_ok and (code_indicates_success or desc_indicates_success or inner_indicates_non_failure)
+
     if not success:
-        msg = data.get("description") or data.get("message") or "unknown error"
+        msg = data.get("description") or data.get("message") or f"HTTP {status}"
         raise RuntimeError(f"Nomba transfer rejected: {msg}")
 
     # Extract Nomba's transactionId — the canonical key for requery.
@@ -265,6 +276,10 @@ async def transfer_to_bank(
         norm_status = "SUCCESS"
     elif raw_inner_status in ("FAILED", "FAILURE", "DECLINED", "REVERSED", "REJECTED", "REFUND"):
         norm_status = "FAILED"
+    elif not raw_inner_status and "SUCCESS" in desc_upper:
+        # Inner payload didn't set a status field, but top-level description says SUCCESS.
+        # Treat as confirmed success — production Nomba does this for some transfer types.
+        norm_status = "SUCCESS"
     else:
         norm_status = "PENDING"
 
