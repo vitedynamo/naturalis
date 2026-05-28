@@ -1,5 +1,18 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 51)
+
+### Admin Settings — full redesign with tabbed shell
+**Frontend** (`AdminSettings.jsx` full rewrite, preserves every existing field binding):
+- **Brand-magenta hero** with gear-strip SVG decoration; status strip in the hero showing current mode + active deposit + payout gateways (`Mode: LIVE · Deposit gateway: MARASOFT · Payout gateway: NOMBA`); big white "Save changes" pill on the right.
+- **6 horizontal pill tabs** (Deposits · Withdrawals · Referrals · Gateways · Home · Danger zone). Active pill is a magenta→pink gradient with shadow; inactive pills are subtle text-only buttons.
+- **Signature element** — `GatewayCard` selectable cards with check badge + brand-pink border + soft-pink fill on the selected provider. Used for both *Active deposit gateway* (Paystack / Nomba / Marasoft) and *Active payout gateway* (Paystack / Nomba).
+- Custom brand-gradient **toggle switches** (gradient ON, neutral OFF) for auto-payout, withdrawals-open, banner-active, welcome-modal-active, etc.
+- Reusable `Field`, `SecretField`, `Toggle`, `Section`, `GatewayCard` building blocks keep every tab visually consistent.
+- **Sticky save bar at the bottom** with sparkle icon and a second "Save changes" button.
+- Danger-zone tab wraps the live/mock payment-mode select in a red-bordered card with a warning callout.
+- Verified light mode via screenshots — Deposits tab and Withdrawals tab both render beautifully with the selected gateway card highlighted.
+
 ## Recent Changes (Feb 2026 — iteration 50)
 
 ### Admin Manual Adjustments — full redesign + Withdrawals-style pagination
