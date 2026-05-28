@@ -728,7 +728,7 @@ async def admin_users_export(request: Request, q: Optional[str] = Query(None), _
         base_filter = {"$or": [{"name": rx}, {"phone": rx}, {"email": rx}, {"referral_code": rx}]}
     users = await db.users.find(base_filter, {"_id": 0, "password_hash": 0, "security_answer_hash_1": 0, "security_answer_hash_2": 0, "withdrawal_pin_hash": 0}).sort("created_at", -1).to_list(20000)
     buf = io.StringIO()
-    cols = ["id", "name", "phone", "email", "wallet_balance", "referral_code", "referred_by_code", "is_blocked", "is_admin", "created_at"]
+    cols = ["id", "name", "phone", "email", "wallet_balance", "referral_code", "referred_by", "is_blocked", "is_admin", "created_at"]
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
     for u in users:
@@ -798,9 +798,9 @@ async def admin_user_details(user_id: str, request: Request, _admin=Depends(get_
     withdrawals_count = int(wdr[0]["count"]) if wdr else 0
 
     # Referrals
-    referred_users_count = await db.users.count_documents({"referred_by_code": u.get("referral_code")})
+    referred_users_count = await db.users.count_documents({"referred_by": user_id})
     invested_referrals = await db.users.count_documents({
-        "referred_by_code": u.get("referral_code"),
+        "referred_by": user_id,
         "wallet_balance": {"$gt": 0},  # cheap proxy
     })
     referral_bonus = await db.transactions.aggregate([
@@ -811,9 +811,9 @@ async def admin_user_details(user_id: str, request: Request, _admin=Depends(get_
 
     # Referrer info
     referrer = None
-    if u.get("referred_by_code"):
+    if u.get("referred_by"):
         r = await db.users.find_one(
-            {"referral_code": u["referred_by_code"]},
+            {"id": u["referred_by"]},
             {"_id": 0, "id": 1, "name": 1, "phone": 1, "referral_code": 1},
         )
         if r:
@@ -867,14 +867,10 @@ async def admin_user_timeline(
     elif tab == "transactions":
         items = await db.transactions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(limit)
     elif tab == "referrals":
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "referral_code": 1})
-        code = (user or {}).get("referral_code")
-        items = []
-        if code:
-            items = await db.users.find(
-                {"referred_by_code": code},
-                {"_id": 0, "id": 1, "name": 1, "phone": 1, "created_at": 1, "wallet_balance": 1},
-            ).sort("created_at", -1).to_list(limit)
+        items = await db.users.find(
+            {"referred_by": user_id},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "created_at": 1, "wallet_balance": 1},
+        ).sort("created_at", -1).to_list(limit)
     elif tab == "bank":
         u = await db.users.find_one(
             {"id": user_id},

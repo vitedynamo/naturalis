@@ -1,5 +1,16 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 49)
+
+### Fix: Referrals tab on Admin User Detail returning empty
+**Bug**: On `/admin/users/{id}` the Referrals stat card, Referral Bonus card, Referrals tab badge, and the Referrals table were all empty / zero, even for users with active referred members. Confirmed in DB: 22 users carry `referred_by` (user id), 0 carry `referred_by_code`.
+
+**Root cause**: `routes_admin.py` was querying `{"referred_by_code": user.referral_code}` to find referred users — but the signup flow (`routes_user.py`) stores the relationship as `referred_by: <referrer_user_id>` directly. The `referred_by_code` field never existed on any document.
+
+**Fix** (`routes_admin.py`): three queries in `admin_user_details` and `admin_user_timeline` now use `{"referred_by": user_id}` for fetching the user's referred members, and `{"id": u["referred_by"]}` for resolving the user's own referrer info. Also updated the CSV export columns to use `referred_by` instead of the non-existent `referred_by_code`.
+
+Verified e2e via curl + UI screenshot — referrer with 3 referrals (Adam / Johnny / Manny) now renders correctly with stats `3 referrals · 3 active · ₦3,250 referral bonus`.
+
 ## Recent Changes (Feb 2026 — iteration 48)
 
 ### Announcements — full multi-row redesign (replaces single-banner setting)
