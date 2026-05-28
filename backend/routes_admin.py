@@ -1915,7 +1915,7 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
                 "user_id": d["user_id"],
                 "type": "deposit",
                 "amount": float(d["amount"]),
-                "description": f"Deposit credited via {gateway} status poll",
+                "description": "Deposit credited",
                 "balance_after": new_user["wallet_balance"],
                 "meta": {"reference": reference, "gateway": gateway, "by": "poll"},
                 "created_at": _now_iso(),
@@ -2100,7 +2100,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
                     await db.transactions.insert_one({
                         "id": gen_reference("tx"),
                         "user_id": w["user_id"], "type": "refund", "amount": refund_amount,
-                        "description": f"Auto-refund: Nomba transfer failed ({ref})",
+                        "description": "Auto-refund: withdrawal failed",
                         "balance_after": user_after["wallet_balance"],
                         "meta": {"withdrawal_id": w["id"], "by": "nomba_status_poll"},
                         "created_at": _now_iso(),
@@ -2140,7 +2140,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
                     await db.transactions.insert_one({
                         "id": gen_reference("tx"),
                         "user_id": w["user_id"], "type": "refund", "amount": refund_amount,
-                        "description": f"Auto-refund: Paystack transfer {st} ({paystack_ref})",
+                        "description": "Auto-refund: withdrawal failed",
                         "balance_after": user_after["wallet_balance"],
                         "meta": {"withdrawal_id": w["id"], "by": "paystack_status_poll"},
                         "created_at": _now_iso(),

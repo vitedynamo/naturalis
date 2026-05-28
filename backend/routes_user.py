@@ -859,7 +859,7 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
             "user_id": user["id"],
             "type": "deposit",
             "amount": deposit["amount"],
-            "description": f"Deposit via {deposit['method']}",
+            "description": "Deposit",
             "balance_after": new_user["wallet_balance"],
             "meta": {"reference": reference},
             "created_at": _now_iso(),
@@ -908,9 +908,9 @@ async def paystack_webhook(request: Request):
                 "user_id": deposit["user_id"],
                 "type": "deposit",
                 "amount": deposit["amount"],
-                "description": "Deposit via paystack (webhook)",
+                "description": "Deposit",
                 "balance_after": new_user["wallet_balance"],
-                "meta": {"reference": reference},
+                "meta": {"reference": reference, "source": "paystack_webhook"},
                 "created_at": _now_iso(),
             })
     return {"status": "ok"}
@@ -1017,7 +1017,7 @@ async def marasoft_webhook(request: Request):
         "user_id": deposit["user_id"],
         "type": "deposit",
         "amount": deposit["amount"],
-        "description": "Deposit via marasoft (webhook)",
+        "description": "Deposit",
         "balance_after": new_user["wallet_balance"],
         "meta": {"reference": reference, "gateway": "marasoft"},
         "created_at": _now_iso(),
@@ -1155,7 +1155,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
         "user_id": user["id"],
         "type": "withdrawal",
         "amount": -float(data.amount),
-        "description": f"Withdrawal request ({method})",
+        "description": "Withdrawal request",
         "balance_after": new_user["wallet_balance"],
         "meta": {"withdrawal_id": wid},
         "created_at": _now_iso(),
@@ -1467,6 +1467,10 @@ async def public_settings(request: Request):
         "gateway_marasoft_enabled": s.get("gateway_marasoft_enabled", True),
         "referral_commission_mode": s.get("referral_commission_mode", "first_only"),
         "referral_commission_cap_n": s.get("referral_commission_cap_n", 3),
+        "brand_logo_url": s.get("brand_logo_url", ""),
+        "home_featured_plan_enabled": s.get("home_featured_plan_enabled", True),
+        "home_below_featured_mode": s.get("home_below_featured_mode", "cards"),
+        "home_below_featured_image_url": s.get("home_below_featured_image_url", ""),
     }
 
 

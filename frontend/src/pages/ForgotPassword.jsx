@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { Phone, Lock, ArrowRight, KeyRound, ShieldQuestion, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const { logoUrl } = useBranding();
   const [mode, setMode] = useState("questions"); // "questions" or "admin"
   const [phone, setPhone] = useState("");
   const [step, setStep] = useState(1);
@@ -79,7 +81,12 @@ export default function ForgotPassword() {
     <div className="min-h-screen flex bg-[color:var(--app-bg)]">
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="font-display text-3xl font-extrabold">Evoque<span className="text-white/90">-Nova</span></div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
+              <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+            </div>
+            <div className="font-display text-3xl font-extrabold">Evoque<span className="text-white/90">-Nova</span></div>
+          </div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Account recovery</div>
             <h2 className="font-display text-5xl font-black tracking-tight mt-3 leading-[1.05]">

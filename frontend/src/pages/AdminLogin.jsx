@@ -5,10 +5,12 @@ import { useAuth } from "@/context/AuthContext";
 import { Lock, Phone, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
+  const { logoUrl } = useBranding();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,7 +45,7 @@ export default function AdminLogin() {
         <div className="relative">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-xl">
-              <img src={`${process.env.PUBLIC_URL || ""}/evoque-nova-logo.png`} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+              <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
             </div>
             <div>
               <div className="font-display font-extrabold text-xl tracking-tight">EVOQUE-NOVA</div>

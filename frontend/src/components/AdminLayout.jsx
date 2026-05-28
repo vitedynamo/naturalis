@@ -6,6 +6,7 @@ import {
   Megaphone, SlidersHorizontal, ShieldAlert, FileBarChart2, ExternalLink, History,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const items = [
@@ -27,10 +28,11 @@ const items = [
 ];
 
 function Brand() {
+  const { logoUrl } = useBranding();
   return (
     <div className="px-5 pt-5 pb-4 flex items-center gap-3">
       <div className="w-11 h-11 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-lg shadow-black/30">
-        <img src={`${process.env.PUBLIC_URL || ""}/evoque-nova-logo.png`} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+        <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
       </div>
       <div className="leading-tight">
         <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">EVOQUE-NOVA</div>

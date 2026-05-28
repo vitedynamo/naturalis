@@ -1,8 +1,52 @@
 # Evoque-Nova — PRD & Implementation Log
 
-## Recent Changes (Feb 2026 — iteration 54)
+## Recent Changes (Feb 2026 — iteration 56)
 
-### Brand rename + per-gateway toggles + referral commission modes + favicon
+### Featured-plan toggle + Activity Log redesign + Password Resets redesign
+
+**1. Featured plan visibility toggle** — new Setting `home_featured_plan_enabled` (default `True`). Admin Settings → Home now exposes a toggle that hides the entire "Featured Plan" hero (image + stats + CTA + right-hand cards/image) on the user dashboard when OFF. Verified via curl PUT + `/settings/public` round-trip and the user `Dashboard` early-exit guard.
+
+**2. Admin Activity Log redesign** (`AdminActivityLog.jsx`):
+   - Gradient hero with **Refresh** + **Export CSV** actions (export emits the currently-filtered rows to a clean CSV with timestamped filename).
+   - 4 stat cards: In current range / Last 24h / Unique admins / Sensitive actions.
+   - Filter toolbar: search input + action dropdown (showing friendly labels via `ACTION_META`) + date-range dropdown (All / 24h / 7d / 30d).
+   - Modern hoverable desktop table with target meta and "View" affordance; click any row to open a slide-in detail drawer with a JSON payload viewer + copy-to-clipboard buttons.
+   - Mobile list view: icon-tile cards (replaces the wide-table scroll on small screens).
+   - Pagination preserved.
+
+**3. Admin Password Resets redesign** (`AdminPasswordResets.jsx`):
+   - Gradient hero with Refresh action.
+   - 4 stat cards: Pending / Approved / Rejected / Total ever.
+   - Filter pill row with live counts (Pending • Approved • Rejected • All) + search box.
+   - Each request is an expandable card showing the user's name + phone + status pill + truncated reason. Expanding shows full reason, admin note, action timestamp, and the Approve/Reject buttons when pending.
+   - Replaced the bare `window.prompt()` workflow with a polished Shadcn `<Dialog>` confirmation: shows user summary, captures an internal note in a textarea, and warns admins that approval activates the new password immediately.
+   - Friendly empty state with `Inbox` icon when no requests match the current filter.
+
+**Verified**: curl PUT /admin/settings persists `home_featured_plan_enabled`; live admin screenshots confirm Activity Log + Password Resets render correctly with stat cards, filters, search, and expand-to-act flow.
+
+
+
+## Recent Changes (Feb 2026 — iteration 55)
+
+**1. Branding image uploader (Admin Settings → Branding tab)**
+- New Settings field `brand_logo_url` (uploaded via existing `/admin/upload-image` endpoint).
+- New `BrandingProvider` context (`/app/frontend/src/context/BrandingContext.jsx`) fetches `/settings/public` once and exposes `logoUrl` with fallback to the bundled `/evoque-nova-logo.png`.
+- `BrandingProvider` also syncs the document favicon (`<link rel="icon">` + `apple-touch-icon`) dynamically when the logo changes — so the browser tab icon updates without rebuilding the bundle.
+- Wired the dynamic logo into: `AdminLayout` sidebar, `AdminLogin` left panel, `Login`, `Register`, `ForgotPassword`, and the user `UserLayout` (desktop sidebar + mobile top bar).
+
+**2. Cleaned user-facing transaction descriptions** — backend now writes generic strings (`"Deposit"`, `"Deposit credited"`, `"Withdrawal request"`, `"Auto-refund: withdrawal failed"`) instead of leaking the gateway name. A one-off data migration normalized 47 existing rows. A new pytest at `/app/backend/tests/test_tx_descriptions.py` guards against regression by failing if any tx description contains `paystack|nomba|marasoft`.
+
+**3. Bottom-nav visibility fix (`AuthContext.jsx`)** — replaced the previous focus-only heuristic with a robust `visualViewport`-based keyboard detector. The nav now hides ONLY when the actual on-screen keyboard shrinks `visualViewport.height` by > 150px (with focus-based fallback for browsers that lack the API). A 2-second safety interval also force-clears the `kb-open` class whenever no input is focused, recovering from edge cases where `focusout` was swallowed by a modal dismiss.
+
+**4. Social links in user "More" sheet** — `UserLayout` now fetches `/settings/public` and renders any populated `telegram_url`, `telegram_channel_url`, `telegram_group_url`, `whatsapp_channel_url`, `whatsapp_group_url` as a "Join our community" block above the Sign out button on mobile.
+
+**5. Customizable section below the Featured Plan (Home)** — new Settings fields `home_below_featured_mode` (`cards` | `image`) + `home_below_featured_image_url`. Admin Settings → Home tab now exposes a 2-card toggle (`Default cards` / `Custom image`); when `image` is selected, the right-hand region of the user dashboard renders the uploaded poster instead of the default Team/Coupon/Packages CTAs.
+
+**Verified**: PUT admin/settings persists all new fields; user-facing screenshots confirm logo renders on login/admin/sidebar; mobile More sheet shows social links; 15/15 user transactions are gateway-free; bottom-nav is visible on Deposit page after focus/blur cycle.
+
+
+
+## Recent Changes (Feb 2026 — iteration 54)
 **Branding** — renamed `NaijaInvest` → `Evoque-Nova` across user/admin layouts (`UserLayout.jsx`, `Register.jsx`, `Login.jsx`, `ForgotPassword.jsx`); admin sidebar badge `NI` → `EN`. Title was already `Evoque-Nova — Daily Returns Platform`.
 
 **Favicon** — added second image (uploaded `evoque-nova.jpg`) to `/app/frontend/public/`; wired `<link rel="icon">` + `<link rel="apple-touch-icon">` in `index.html`.

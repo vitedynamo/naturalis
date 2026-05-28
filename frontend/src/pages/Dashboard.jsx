@@ -159,7 +159,7 @@ export default function Dashboard() {
       <DailyClaimCard onClaimed={refresh} />
 
       {/* Featured plan (admin-controlled) */}
-      {featured && (
+      {featured && (settings.home_featured_plan_enabled !== false) && (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-5 gap-5 animate-fade-up">
           <div className="md:col-span-3 card-soft overflow-hidden relative" data-testid="featured-plan">
             <div className="absolute top-4 right-4 pill pill-accent z-10">
@@ -203,7 +203,17 @@ export default function Dashboard() {
           </div>
 
           <div className="md:col-span-2 grid grid-cols-1 gap-3">
-            <Link to="/team" className="card-soft p-5 flex items-center gap-4 hover:-translate-y-0.5 transition-transform" data-testid="cta-team">
+            {settings.home_below_featured_mode === "image" && settings.home_below_featured_image_url ? (
+              <div className="card-soft overflow-hidden p-0" data-testid="home-below-featured-image">
+                <img
+                  src={resolveUrl(settings.home_below_featured_image_url)}
+                  alt="Investment packages"
+                  className="w-full h-full object-cover min-h-[260px]"
+                />
+              </div>
+            ) : (
+              <>
+                <Link to="/team" className="card-soft p-5 flex items-center gap-4 hover:-translate-y-0.5 transition-transform" data-testid="cta-team">
               <div className="w-12 h-12 rounded-xl bg-[color:var(--brand-soft)] text-[color:var(--brand)] flex items-center justify-center">
                 <Users className="w-6 h-6" />
               </div>
@@ -233,6 +243,8 @@ export default function Dashboard() {
               </div>
               <ArrowRight className="w-4 h-4 text-[color:var(--text-tertiary)]" />
             </Link>
+              </>
+            )}
           </div>
         </div>
       )}

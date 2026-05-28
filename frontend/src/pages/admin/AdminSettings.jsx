@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { useBranding } from "@/context/BrandingContext";
 
 function resolveImg(url) {
   if (!url) return "";
@@ -114,6 +115,7 @@ const TABS = [
   { key: "referrals",   label: "Referrals",    icon: Share2 },
   { key: "gateways",    label: "Gateways",     icon: KeyRound },
   { key: "home",        label: "Home",         icon: Home },
+  { key: "branding",    label: "Branding",     icon: ImagePlus },
   { key: "password",    label: "Password",     icon: Lock },
   { key: "danger",      label: "Danger zone",  icon: ShieldAlert },
 ];
@@ -125,6 +127,7 @@ export default function AdminSettings() {
   const [tab, setTab] = useState("deposits");
   const [saving, setSaving] = useState(false);
   const fileRef = useRef(null);
+  const { refresh: refreshBranding } = useBranding();
 
   useEffect(() => {
     Promise.all([
@@ -137,6 +140,10 @@ export default function AdminSettings() {
   }, []);
 
   const uploadAnnouncement = async (e) => {
+    return uploadInto("home_announcement_image_url", e);
+  };
+
+  const uploadInto = async (key, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
@@ -146,13 +153,13 @@ export default function AdminSettings() {
       const { data } = await api.post("/admin/upload-image", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setS((prev) => ({ ...prev, home_announcement_image_url: data.url }));
+      setS((prev) => ({ ...prev, [key]: data.url }));
       toast.success("Image uploaded");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Upload failed");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      if (e?.target) e.target.value = "";
     }
   };
 
@@ -194,6 +201,10 @@ export default function AdminSettings() {
         gateway_marasoft_enabled: s.gateway_marasoft_enabled !== false,
         referral_commission_mode: s.referral_commission_mode || "first_only",
         referral_commission_cap_n: Number(s.referral_commission_cap_n) || 3,
+        brand_logo_url: s.brand_logo_url || "",
+        home_featured_plan_enabled: s.home_featured_plan_enabled !== false,
+        home_below_featured_mode: s.home_below_featured_mode || "cards",
+        home_below_featured_image_url: s.home_below_featured_image_url || "",
         quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
         require_withdrawal_pin: !!s.require_withdrawal_pin,
@@ -216,6 +227,7 @@ export default function AdminSettings() {
       };
       const { data } = await api.put("/admin/settings", payload);
       setS(data);
+      refreshBranding?.();
       toast.success("Settings saved");
     } catch {
       toast.error("Save failed");
@@ -549,6 +561,16 @@ export default function AdminSettings() {
               </div>
             </Section>
 
+            <Section title="Featured plan visibility" hint="Show or hide the entire 'Featured Plan' hero section + CTA grid on the user home page. When OFF, the dashboard goes straight from the daily-claim card to the products list.">
+              <Toggle
+                checked={s.home_featured_plan_enabled !== false}
+                onChange={(v) => setS({ ...s, home_featured_plan_enabled: v })}
+                label="Show featured plan on home"
+                hint="Turn OFF to hide the entire hero block (image + stats + CTA + cards/image to the right)."
+                testid="featured-plan-toggle"
+              />
+            </Section>
+
             <Section title="Featured product" hint="Pinned to the top of the Invest tab. Resets to highest ROI when set to None.">
               <label className="block">
                 <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Pick a product</span>
@@ -559,7 +581,93 @@ export default function AdminSettings() {
                 <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Currently selected: <span className="font-bold text-[color:var(--text-primary)]">{products.find((p) => p.id === s.featured_product_id)?.name || "— None —"}</span></span>
               </label>
             </Section>
+
+            <Section title="Section below featured plan" hint="On the user dashboard, the area to the right of the featured plan can show the default action cards (Team / Coupon / Packages) or a custom image (e.g. a poster of your investment packages).">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { v: "cards", label: "Default cards", desc: "Team · Coupon · Packages CTAs" },
+                  { v: "image", label: "Custom image",  desc: "Upload a poster, banner, or package collage" },
+                ].map((m) => {
+                  const active = (s.home_below_featured_mode || "cards") === m.v;
+                  return (
+                    <button
+                      key={m.v}
+                      type="button"
+                      onClick={() => setS({ ...s, home_below_featured_mode: m.v })}
+                      data-testid={`home-below-mode-${m.v}`}
+                      className={`relative text-left p-4 rounded-2xl border-2 transition-all ${active
+                        ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)] shadow-md ring-2 ring-[color:var(--brand)]/10"
+                        : "border-[color:var(--border-default)] bg-[color:var(--surface)] hover:border-[color:var(--brand)]/50"}`}
+                    >
+                      <div className={`font-display font-extrabold text-base ${active ? "text-[color:var(--brand)]" : "text-[color:var(--text-primary)]"}`}>{m.label}</div>
+                      <div className="text-[11px] text-[color:var(--text-tertiary)] mt-1">{m.desc}</div>
+                      {active && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[color:var(--brand)] text-white flex items-center justify-center">
+                          <Check className="w-3 h-3" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {(s.home_below_featured_mode || "cards") === "image" && (
+                <div className="mt-4">
+                  <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Image</span>
+                  {s.home_below_featured_image_url ? (
+                    <div className="relative inline-block">
+                      <img src={resolveImg(s.home_below_featured_image_url)} alt="" className="max-h-48 rounded-xl" data-testid="home-below-image-preview" />
+                      <button type="button" onClick={() => setS({ ...s, home_below_featured_image_url: "" })} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[color:var(--error)] text-white flex items-center justify-center"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-[color:var(--border-default)] cursor-pointer hover:bg-[color:var(--surface-alt)]">
+                      <ImagePlus className="w-5 h-5 text-[color:var(--brand)]" />
+                      <span className="text-sm font-semibold text-[color:var(--text-primary)]">{uploading ? "Uploading…" : "Click to upload image"}</span>
+                      <input type="file" accept="image/*" onChange={(e) => uploadInto("home_below_featured_image_url", e)} className="hidden" data-testid="home-below-image-upload" />
+                    </label>
+                  )}
+                </div>
+              )}
+            </Section>
           </>
+        )}
+
+        {tab === "branding" && (
+          <Section title="Brand logo" hint="Used on the admin sidebar, the admin login page, the user sign-in / register / forgot-password screens, and the browser favicon (rel icon). Square images work best — 256×256 PNG or JPG. Leave empty to fall back to the default Evoque-Nova logo.">
+            <div className="flex items-start gap-6 flex-wrap">
+              <div>
+                <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Current logo</span>
+                <div className="w-28 h-28 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-lg" data-testid="brand-logo-preview">
+                  <img
+                    src={s.brand_logo_url ? resolveImg(s.brand_logo_url) : `${process.env.PUBLIC_URL || ""}/evoque-nova-logo.png`}
+                    alt="Brand logo"
+                    className="w-full h-full object-contain p-1"
+                  />
+                </div>
+                {s.brand_logo_url && (
+                  <button
+                    type="button"
+                    onClick={() => setS({ ...s, brand_logo_url: "" })}
+                    data-testid="brand-logo-reset"
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[color:var(--error)] hover:underline"
+                  >
+                    <X className="w-3 h-3" /> Reset to default
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-[240px]">
+                <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Upload new logo</span>
+                <label className="flex items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-[color:var(--border-default)] cursor-pointer hover:bg-[color:var(--surface-alt)]">
+                  <ImagePlus className="w-5 h-5 text-[color:var(--brand)]" />
+                  <span className="text-sm font-semibold text-[color:var(--text-primary)]">{uploading ? "Uploading…" : "Click to upload image"}</span>
+                  <input type="file" accept="image/*" onChange={(e) => uploadInto("brand_logo_url", e)} className="hidden" data-testid="brand-logo-upload" />
+                </label>
+                <div className="mt-3 text-[11px] text-[color:var(--text-tertiary)] leading-relaxed">
+                  After saving, the new logo appears immediately across the app (admin layout, login pages, user layout, and browser tab favicon). On returning visitors, the browser may cache the old favicon for a few minutes.
+                </div>
+              </div>
+            </div>
+          </Section>
         )}
 
         {tab === "danger" && (

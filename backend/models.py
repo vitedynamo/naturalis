@@ -384,6 +384,15 @@ class Settings(BaseModel):
     #   capped     — pay commission on the FIRST N investments only
     referral_commission_mode: str = "first_only"
     referral_commission_cap_n: int = 3
+    # Branding — uploaded via Admin Settings → Branding tab. When empty, the static logo
+    # at /evoque-nova-logo.png is used. Drives sidebar/login badges and favicon.
+    brand_logo_url: str = ""
+    # Home: show/hide the Featured Plan hero on the user dashboard. When False,
+    # the entire featured plan + 3 CTA grid is hidden.
+    home_featured_plan_enabled: bool = True
+    # Home: customizable section under the featured plan
+    home_below_featured_mode: str = "cards"  # cards | image
+    home_below_featured_image_url: str = ""
 
 
 class SettingsUpdate(BaseModel):
@@ -442,6 +451,10 @@ class SettingsUpdate(BaseModel):
     gateway_marasoft_enabled: Optional[bool] = None
     referral_commission_mode: Optional[str] = None  # first_only | unlimited | capped
     referral_commission_cap_n: Optional[int] = None
+    brand_logo_url: Optional[str] = None
+    home_featured_plan_enabled: Optional[bool] = None
+    home_below_featured_mode: Optional[str] = None  # cards | image
+    home_below_featured_image_url: Optional[str] = None
 
 
 class PaystackPayRequest(BaseModel):

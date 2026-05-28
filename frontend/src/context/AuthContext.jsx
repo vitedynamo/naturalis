@@ -112,31 +112,68 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Mobile keyboard handling — hide bottom nav while an input/textarea is focused
+  // Mobile keyboard handling — hide the bottom nav ONLY while the on-screen keyboard
+  // is actually open. The previous implementation toggled `kb-open` on any input focus
+  // (including desktop), which left the nav hidden whenever a focusout never fired
+  // (clicking the X on a modal, dragging away, etc.). Now we use the visualViewport API
+  // to detect a real keyboard, with a focus heuristic only as a fallback on mobile.
   useEffect(() => {
+    const MOBILE_MQ = window.matchMedia("(max-width: 1023px)");
     const isField = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
-    const onFocus = (e) => {
-      if (isField(e.target)) {
-        document.body.classList.add("kb-open");
-        setTimeout(() => {
-          try { e.target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
-        }, 80);
-      }
+
+    const setKb = (open) => {
+      const cls = document.body.classList;
+      if (open) cls.add("kb-open"); else cls.remove("kb-open");
     };
-    const onBlur = (e) => {
-      if (isField(e.target)) {
-        setTimeout(() => {
-          const a = document.activeElement;
-          if (!isField(a)) document.body.classList.remove("kb-open");
-        }, 50);
-      }
+
+    // visualViewport route — when the keyboard opens it shrinks visualViewport.height
+    // by ~30%+ versus the layout viewport. We use a 150px threshold to ignore browser
+    // chrome scroll-collapses.
+    const vv = window.visualViewport;
+    const onVVResize = () => {
+      if (!MOBILE_MQ.matches) { setKb(false); return; }
+      const diff = window.innerHeight - (vv?.height || window.innerHeight);
+      setKb(diff > 150);
+    };
+    vv?.addEventListener("resize", onVVResize);
+    window.addEventListener("orientationchange", onVVResize);
+
+    // Focus heuristic — only used as a safety net on touch-capable mobile devices that
+    // don't fire a visualViewport resize (rare). Always cleared on blur.
+    const supportsVV = typeof window.visualViewport !== "undefined";
+    const onFocus = (e) => {
+      if (!MOBILE_MQ.matches) return;
+      if (!isField(e.target)) return;
+      if (!supportsVV) setKb(true);
+      setTimeout(() => {
+        try { e.target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+      }, 80);
+    };
+    const onBlur = () => {
+      // Always clear on blur — let visualViewport drive the real state on its next resize.
+      setTimeout(() => {
+        const a = document.activeElement;
+        if (!isField(a)) setKb(false);
+      }, 60);
     };
     document.addEventListener("focusin", onFocus, true);
     document.addEventListener("focusout", onBlur, true);
+
+    // Final safety net: every 2s, if no field is focused, force-clear the nav. This
+    // guarantees we recover from any edge case where focusout was swallowed by a click
+    // outside (e.g. modal dismiss).
+    const iv = setInterval(() => {
+      const a = document.activeElement;
+      if (!isField(a)) setKb(false);
+    }, 2000);
+
     return () => {
+      vv?.removeEventListener("resize", onVVResize);
+      window.removeEventListener("orientationchange", onVVResize);
       document.removeEventListener("focusin", onFocus, true);
       document.removeEventListener("focusout", onBlur, true);
-      document.body.classList.remove("kb-open");
+      clearInterval(iv);
+      setKb(false);
     };
   }, []);
 

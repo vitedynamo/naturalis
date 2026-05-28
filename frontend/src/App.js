@@ -41,6 +41,7 @@ import AdminPayoutProjection from "@/pages/admin/AdminPayoutProjection";
 import AdminUserDetail from "@/pages/admin/AdminUserDetail";
 import MyPackages from "@/pages/MyPackages";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { BrandingProvider } from "@/context/BrandingContext";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
+            <BrandingProvider>
             <Toaster richColors position="top-right" />
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
@@ -90,6 +92,7 @@ function App() {
 
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+            </BrandingProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
