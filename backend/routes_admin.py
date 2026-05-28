@@ -1445,6 +1445,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     mode = s.get("payment_mode", "mock")
     ref = w.get("nomba_transfer_ref") or ""
+    nomba_txn_id = w.get("nomba_transaction_id") or ""
     paystack_ref = w.get("paystack_transfer_ref") or ""
     action = "no_op"
     new_status = w.get("status")
@@ -1454,12 +1455,13 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
     if w.get("status") in ("paid", "rejected"):
         return {**w, "_refresh": "already_final"}
 
-    if ref and mode == "live" and s.get("nomba_client_id"):
+    # Poll Nomba when we have EITHER our merchantTxRef OR Nomba's own transactionId.
+    if (ref or nomba_txn_id) and mode == "live" and s.get("nomba_client_id"):
         try:
             res = await nomba_status(
                 client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
-                account_id=s.get("nomba_account_id", ""), merchant_tx_ref=ref,
-                nomba_transaction_id=w.get("nomba_transaction_id"),
+                account_id=s.get("nomba_account_id", ""), merchant_tx_ref=ref or nomba_txn_id,
+                nomba_transaction_id=nomba_txn_id or None,
                 environment=s.get("nomba_environment"),
             )
             st = res.get("status", "PENDING")
@@ -1560,6 +1562,150 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
     fresh = await db.withdrawals.find_one({"id": w["id"]}, {"_id": 0})
     fresh["_refresh"] = action
     return fresh
+
+
+@router.post("/admin/withdrawals/backfill-all-stuck")
+async def admin_backfill_all_stuck(request: Request, _admin=Depends(get_current_admin)):
+    """Bulk: for every non-final withdrawal missing `nomba_transaction_id`, scan Nomba's
+    transaction history and link the match. Returns per-record outcomes."""
+    db = request.app.state.db
+    items = await db.withdrawals.find(
+        {"status": {"$in": ["pending", "processing"]}, "nomba_transaction_id": {"$in": [None, ""]}},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(500)
+
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    if not s.get("nomba_client_id"):
+        raise HTTPException(400, "Nomba credentials not configured")
+
+    results = {"scanned": len(items), "matched": 0, "marked_paid": 0, "no_match": 0, "errors": 0, "details": []}
+
+    # Pre-fetch every Nomba ID already linked elsewhere so we don't double-link the same
+    # Nomba transaction to two different withdrawals.
+    used_nomba_ids = set()
+    async for u in db.withdrawals.find(
+        {"nomba_transaction_id": {"$nin": [None, ""]}},
+        {"_id": 0, "nomba_transaction_id": 1},
+    ):
+        if u.get("nomba_transaction_id"):
+            used_nomba_ids.add(u["nomba_transaction_id"])
+
+    for w in items:
+        wid = w["id"]
+        try:
+            # Reuse the single-record backfill flow
+            try:
+                created_dt = datetime.fromisoformat((w.get("created_at") or "").replace("Z", "+00:00"))
+            except Exception:
+                created_dt = datetime.now(timezone.utc)
+            date_from = (created_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+            date_to = (created_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            candidates = []
+            for page in (1, 2, 3):
+                page_items = await nomba_list_transfers(
+                    client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
+                    account_id=s.get("nomba_account_id", ""),
+                    date_from=date_from, date_to=date_to, page=page, limit=100,
+                    environment=s.get("nomba_environment"),
+                )
+                if not page_items:
+                    break
+                candidates.extend(page_items)
+
+            if not candidates:
+                results["no_match"] += 1
+                results["details"].append({"id": wid, "outcome": "no_candidates"})
+                continue
+
+            target_amount = float(w.get("amount") or 0)
+            target_account = (w.get("account_number") or "").strip()
+            target_merchant_ref = (w.get("nomba_transfer_ref") or "").strip()
+
+            def _amt(t):
+                for k in ("amount", "transactionAmount", "value"):
+                    v = t.get(k)
+                    if v is not None:
+                        try: return float(v)
+                        except Exception: continue
+                return None
+
+            def _acct(t):
+                for k in ("accountNumber", "account_number", "recipientAccountNumber",
+                          "destinationAccountNumber", "customerBillerId", "billerId"):
+                    v = t.get(k)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+                return ""
+
+            def _mref(t):
+                for k in ("merchantTxRef", "merchant_tx_ref", "transactionRef", "merchantReference"):
+                    v = t.get(k)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+                return ""
+
+            def _id(t):
+                for k in ("id", "transactionId", "nombaTxnId"):
+                    v = t.get(k)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+                return ""
+
+            match = None
+            if target_merchant_ref:
+                match = next(
+                    (t for t in candidates
+                     if _mref(t) == target_merchant_ref and _id(t) not in used_nomba_ids),
+                    None,
+                )
+            if not match and target_account:
+                match = next(
+                    (t for t in candidates
+                     if _amt(t) == target_amount
+                     and _acct(t).endswith(target_account[-10:])
+                     and _id(t) not in used_nomba_ids),
+                    None,
+                )
+            if not match:
+                results["no_match"] += 1
+                results["details"].append({"id": wid, "outcome": "no_match"})
+                continue
+
+            nomba_id = _id(match)
+            if not nomba_id:
+                results["no_match"] += 1
+                results["details"].append({"id": wid, "outcome": "matched_but_no_id"})
+                continue
+
+            # Reserve this Nomba ID so subsequent records in the same batch don't reuse it.
+            used_nomba_ids.add(nomba_id)
+
+            await db.withdrawals.update_one(
+                {"id": wid},
+                {"$set": {"nomba_transaction_id": nomba_id, "updated_at": _now_iso()}},
+            )
+            w2 = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+            refreshed = await _refresh_one_withdrawal(db, w2)
+            results["matched"] += 1
+            if refreshed.get("_refresh") == "marked_paid":
+                results["marked_paid"] += 1
+            results["details"].append({
+                "id": wid, "nomba_id": nomba_id,
+                "outcome": refreshed.get("_refresh"),
+                "status": refreshed.get("status"),
+            })
+        except Exception as e:
+            results["errors"] += 1
+            results["details"].append({"id": wid, "outcome": "error", "error": str(e)})
+
+    await _log_admin_activity(
+        db, _admin, "withdrawal.bulk_backfill",
+        target_type="withdrawal", target_id="bulk",
+        description=f"Bulk-backfill: matched {results['matched']}/{results['scanned']}, paid {results['marked_paid']}",
+        meta={k: v for k, v in results.items() if k != "details"},
+    )
+    return results
 
 
 @router.post("/admin/withdrawals/{wid}/refresh-status")
@@ -1689,14 +1835,29 @@ async def admin_backfill_nomba_id(wid: str, request: Request, _admin=Depends(get
                 return v.strip()
         return ""
 
-    # Match priority: merchantTxRef > amount+account > amount+time-proximity (legacy)
+    # Match priority: merchantTxRef > amount+account > amount+time-proximity (legacy).
+    # Also skip Nomba IDs already linked to other withdrawals (avoid double-linking).
+    used_nomba_ids = set()
+    async for u in db.withdrawals.find(
+        {"id": {"$ne": wid}, "nomba_transaction_id": {"$nin": [None, ""]}},
+        {"_id": 0, "nomba_transaction_id": 1},
+    ):
+        if u.get("nomba_transaction_id"):
+            used_nomba_ids.add(u["nomba_transaction_id"])
+
     match = None
     if target_merchant_ref:
-        match = next((t for t in candidates if _mref(t) == target_merchant_ref), None)
+        match = next(
+            (t for t in candidates
+             if _mref(t) == target_merchant_ref and _id(t) not in used_nomba_ids),
+            None,
+        )
     if not match and target_account:
         match = next(
             (t for t in candidates
-             if _amt(t) == target_amount and _acct(t).endswith(target_account[-10:])),
+             if _amt(t) == target_amount
+             and _acct(t).endswith(target_account[-10:])
+             and _id(t) not in used_nomba_ids),
             None,
         )
     # Last resort: same amount within ±5 minutes of the withdrawal create time
@@ -1709,6 +1870,7 @@ async def admin_backfill_nomba_id(wid: str, request: Request, _admin=Depends(get
             for t in candidates:
                 ts = _ts(t)
                 if not ts or _amt(t) != target_amount: continue
+                if _id(t) in used_nomba_ids: continue
                 try:
                     tdt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                 except Exception:

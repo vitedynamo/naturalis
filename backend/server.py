@@ -248,7 +248,7 @@ async def on_startup():
                 ).sort("created_at", 1).to_list(500)
                 due_w = [
                     w for w in pendings
-                    if (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"))
+                    if (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref") or w.get("nomba_transaction_id"))
                     and _is_due(w, now)
                 ]
 

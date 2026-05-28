@@ -462,6 +462,24 @@ export default function AdminWithdrawals() {
     }
   };
 
+  const [bulkBackfilling, setBulkBackfilling] = useState(false);
+  const bulkBackfillStuck = async () => {
+    if (!window.confirm("Scan Nomba's transaction history and link any matching pending withdrawals? This may take a minute.")) return;
+    setBulkBackfilling(true);
+    try {
+      const { data } = await api.post("/admin/withdrawals/backfill-all-stuck");
+      toast.success(
+        `Scanned ${data.scanned} · matched ${data.matched} · marked PAID ${data.marked_paid} · no match ${data.no_match}`,
+        { duration: 8000 },
+      );
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Bulk backfill failed");
+    } finally {
+      setBulkBackfilling(false);
+    }
+  };
+
   const QUICK_SIZES = [5, 20, 50, 100, "all"];
 
   return (
@@ -510,6 +528,12 @@ export default function AdminWithdrawals() {
           data-testid="poll-all-btn"
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Polling…" : "Refresh all pending"}
+        </button>
+        <button onClick={bulkBackfillStuck} disabled={bulkBackfilling}
+          data-testid="bulk-backfill-btn"
+          title="Scan Nomba transaction history and link any pending withdrawals paid off-system"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] disabled:opacity-50">
+          <Wallet className={`w-4 h-4 ${bulkBackfilling ? "animate-pulse" : ""}`} /> {bulkBackfilling ? "Scanning…" : "Backfill from Nomba"}
         </button>
       </div>
 
@@ -576,8 +600,8 @@ export default function AdminWithdrawals() {
                 </td></tr>
               )}
               {pageItems.map((w) => {
-                const ref = w.nomba_transfer_ref || w.paystack_transfer_ref;
-                const gw = w.nomba_transfer_ref ? "nomba" : w.paystack_transfer_ref ? "paystack" : null;
+                const ref = w.nomba_transfer_ref || w.paystack_transfer_ref || w.nomba_transaction_id;
+                const gw = (w.nomba_transfer_ref || w.nomba_transaction_id) ? "nomba" : w.paystack_transfer_ref ? "paystack" : null;
                 return (
                   <tr key={w.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`withdrawal-row-${w.id}`}>
                     <td className="p-4 max-w-[200px]">
@@ -891,11 +915,11 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
             </Section>
           )}
 
-          {/* Nomba ID recovery — for legacy or stuck records without nomba_transaction_id */}
-          {!isFinal && gw === "nomba" && !w.nomba_transaction_id && (
+          {/* Nomba ID recovery — for legacy or off-system records without nomba_transaction_id */}
+          {!isFinal && !w.nomba_transaction_id && (
             <Section icon={Wallet} label="Nomba ID recovery">
               <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-alt)]/40 p-3 mb-3 text-[11px] text-[color:var(--text-secondary)]">
-                Status polling is keyed by Nomba's internal <span className="font-mono font-bold">transactionId</span>. This withdrawal is missing one — recover it below to resume auto-reconciliation.
+                If this withdrawal was paid via Nomba (either through this app or directly from the Nomba dashboard), scan Nomba's transaction history to link it. Once linked, status will auto-flip to <span className="font-bold">paid</span>.
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <ToolButton

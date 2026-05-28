@@ -1,5 +1,21 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 36)
+
+### Bulk Nomba backfill + dedup + relaxed gateway display
+**User report**: 23 production withdrawals showing pending despite being paid via Nomba — Nomba IDs not captured, gateway label missing. Caused by withdrawals paid **off-system** (via Nomba dashboard) that our app has no awareness of.
+
+**Fixes shipped**:
+1. `POST /admin/withdrawals/backfill-all-stuck` — one-shot bulk endpoint that scans Nomba's transaction history for *every* non-final withdrawal missing `nomba_transaction_id`, links matches, and immediately re-polls. Returns per-record outcome breakdown.
+2. **Dedup logic** in both bulk and single backfill: pre-loads every Nomba ID already attached to any other withdrawal and excludes them from candidate matches, so the same Nomba transaction can't be linked to two different records.
+3. `_refresh_one_withdrawal` now polls when EITHER `nomba_transfer_ref` OR `nomba_transaction_id` is present — previously skipped backfilled records that had only the recovered ID.
+4. Poller in `server.py` now treats records with only `nomba_transaction_id` as pollable.
+5. Toolkit "Nomba ID recovery" section no longer gated on `gw === "nomba"` — now appears for **every non-final record missing `nomba_transaction_id`**, since off-system payouts have no `nomba_transfer_ref` either.
+6. Withdrawals table: `gw` derivation now matches on `nomba_transfer_ref OR nomba_transaction_id`, so the **NOMBA pill** displays correctly once backfill links a record.
+7. New top-bar **Backfill from Nomba** button (accent-pink) sits next to *Refresh all pending*.
+
+**Verified live**: Bulk endpoint dedupes correctly (no duplicate matches); previously-stuck `w_652a44e14b991390` shows the recovered `AAP-WALLET_T-…` ID in the Gateway Ref column + green disbursed pill + NOMBA gateway label.
+
 ## Recent Changes (Feb 2026 — iteration 35)
 
 ### Nomba ID recovery — auto-backfill + manual-paste (resolves stuck legacy withdrawals)
