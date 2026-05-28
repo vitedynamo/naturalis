@@ -1,5 +1,12 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 33)
+
+### FIFO ordering on the adaptive poller
+- Both queries (`db.withdrawals.find` and `db.deposits.find`) in the poller now use `.sort("created_at", 1)` so the oldest pending records are evaluated first.
+- When the per-tick batch exceeds `POLLER_CONCURRENCY` (default 10), the oldest 10 win the slots — guaranteeing **fairness** so no aging record is starved out by a flood of newer ones.
+- Verified live: 5 synthetic withdrawals with staggered `created_at` (30s apart) all got refreshed in a single tick, with FIFO order honored (the polling outcome `last_polled_at` order matches `created_at` order exactly).
+
 ## Recent Changes (Feb 2026 — iteration 32)
 
 ### Bounded concurrency on the adaptive poller

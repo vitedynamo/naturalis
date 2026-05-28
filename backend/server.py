@@ -241,21 +241,21 @@ async def on_startup():
                 await asyncio.sleep(TICK_SEC)
                 now = datetime.now(timezone.utc)
 
-                # ----- Withdrawals -----
+                # ----- Withdrawals (FIFO — oldest first) -----
                 pendings = await db.withdrawals.find(
                     {"status": {"$in": ["pending", "processing"]}},
                     {"_id": 0},
-                ).to_list(500)
+                ).sort("created_at", 1).to_list(500)
                 due_w = [
                     w for w in pendings
                     if (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"))
                     and _is_due(w, now)
                 ]
 
-                # ----- Deposits -----
+                # ----- Deposits (FIFO — oldest first) -----
                 pending_deps = await db.deposits.find(
                     {"status": "pending"}, {"_id": 0},
-                ).to_list(500)
+                ).sort("created_at", 1).to_list(500)
                 due_d = [
                     d for d in pending_deps
                     if d.get("method") in ("marasoft", "paystack") and _is_due(d, now)
