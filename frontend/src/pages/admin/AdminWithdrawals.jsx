@@ -422,6 +422,46 @@ export default function AdminWithdrawals() {
     } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
   };
 
+  const [backfillingId, setBackfillingId] = useState(null);
+  const backfillNomba = async (w) => {
+    setBackfillingId(w.id);
+    try {
+      const { data } = await api.post(`/admin/withdrawals/${w.id}/backfill-nomba-id`);
+      if (data.status === "ok") {
+        toast.success(`Found Nomba ID · ${data.refresh_result === "marked_paid" ? "marked PAID" : data.withdrawal_status}`);
+        load();
+        setToolkit(null);
+      } else if (data.status === "skip") {
+        toast.info(`Already has Nomba ID: ${data.value}`);
+      } else {
+        toast.warning(`No match: ${data.reason} (scanned ${data.scanned || 0})`);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Backfill failed");
+    } finally {
+      setBackfillingId(null);
+    }
+  };
+
+  const resolveFromNomba = async (w) => {
+    const txnId = window.prompt(
+      "Paste Nomba transactionId (visible in Nomba dashboard):\nExpected format like API-TRANSFER-XXXX-XXXX or AAP-WALLET_T-XXXX-...",
+      "",
+    );
+    if (!txnId) return;
+    try {
+      const { data } = await api.post(`/admin/withdrawals/${w.id}/resolve-from-nomba`, {
+        nomba_transaction_id: txnId.trim(),
+      });
+      const result = data._refresh || "polled";
+      toast.success(`Resolved · ${result === "marked_paid" ? "marked PAID" : data.status}`);
+      load();
+      setToolkit(null);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Resolve failed");
+    }
+  };
+
   const QUICK_SIZES = [5, 20, 50, 100, "all"];
 
   return (
@@ -610,6 +650,9 @@ export default function AdminWithdrawals() {
         onPay={openPay}
         onApprove={(w) => act(w, "approve")}
         onReject={(w) => act(w, "reject")}
+        onBackfillNomba={backfillNomba}
+        onResolveFromNomba={resolveFromNomba}
+        backfillingId={backfillingId}
       />
 
       {/* ====== PAY DIALOG (kept the same flow) ====== */}
@@ -691,7 +734,7 @@ export default function AdminWithdrawals() {
  * ToolkitModal — drill-in detail (matches the design reference)
  * =========================================================================*/
 
-function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, onReject }) {
+function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, onReject, onBackfillNomba, onResolveFromNomba, backfillingId }) {
   if (!w) return null;
   const isFinal = w.status === "paid" || w.status === "rejected";
   const headerTone = w.status === "paid"
@@ -845,6 +888,44 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
                   </div>
                 </div>
               )}
+            </Section>
+          )}
+
+          {/* Nomba ID recovery — for legacy or stuck records without nomba_transaction_id */}
+          {!isFinal && gw === "nomba" && !w.nomba_transaction_id && (
+            <Section icon={Wallet} label="Nomba ID recovery">
+              <div className="rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-alt)]/40 p-3 mb-3 text-[11px] text-[color:var(--text-secondary)]">
+                Status polling is keyed by Nomba's internal <span className="font-mono font-bold">transactionId</span>. This withdrawal is missing one — recover it below to resume auto-reconciliation.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <ToolButton
+                  onClick={() => onBackfillNomba?.(w)}
+                  busy={backfillingId === w.id}
+                  icon={Wallet}
+                  label="Auto-backfill from Nomba"
+                  tone="brand"
+                  testid="tool-backfill-nomba"
+                />
+                <ToolButton
+                  onClick={() => onResolveFromNomba?.(w)}
+                  icon={Copy}
+                  label="Paste Nomba ID manually"
+                  tone="warn"
+                  testid="tool-paste-nomba-id"
+                />
+              </div>
+            </Section>
+          )}
+
+          {/* Show recovered Nomba ID if present */}
+          {w.nomba_transaction_id && (
+            <Section icon={BadgeCheck} label="Nomba transactionId (recovered)">
+              <div className="card-soft p-3 flex items-center">
+                <span className="font-mono text-xs text-[color:var(--text-primary)] truncate" data-testid="toolkit-nomba-txn-id">
+                  {w.nomba_transaction_id}
+                </span>
+                <CopyButton text={w.nomba_transaction_id} testid="copy-nomba-txn-id" />
+              </div>
             </Section>
           )}
         </div>

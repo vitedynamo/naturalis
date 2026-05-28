@@ -10,8 +10,9 @@ from fastapi.responses import Response
 
 from auth import get_current_admin, gen_reference
 from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalAction, PasswordResetActionRequest, PaystackPayRequest
+from pydantic import BaseModel
 from storage import put_object, get_object
-from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, invalidate_token_cache as nomba_invalidate_token
+from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, list_transfers as nomba_list_transfers, invalidate_token_cache as nomba_invalidate_token
 
 router = APIRouter()
 
@@ -1568,6 +1569,184 @@ async def admin_refresh_status(wid: str, request: Request, _admin=Depends(get_cu
     if not w:
         raise HTTPException(404, "Withdrawal not found")
     return await _refresh_one_withdrawal(db, w)
+
+
+class _ResolveBody(BaseModel):
+    nomba_transaction_id: str
+
+
+@router.post("/admin/withdrawals/{wid}/resolve-from-nomba")
+async def admin_resolve_from_nomba(
+    wid: str, body: _ResolveBody, request: Request, _admin=Depends(get_current_admin),
+):
+    """Manual resolve: admin pastes Nomba's `transactionId` (visible in Nomba dashboard),
+    we store it on the withdrawal and immediately re-poll to flip status."""
+    db = request.app.state.db
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    if not w:
+        raise HTTPException(404, "Withdrawal not found")
+    txn_id = (body.nomba_transaction_id or "").strip()
+    if not txn_id:
+        raise HTTPException(400, "nomba_transaction_id is required")
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {"nomba_transaction_id": txn_id, "updated_at": _now_iso()}},
+    )
+    # Re-read & refresh
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    refreshed = await _refresh_one_withdrawal(db, w)
+    await _log_admin_activity(
+        db, _admin, "withdrawal.resolve_from_nomba",
+        target_type="withdrawal", target_id=wid,
+        description=f"Admin attached Nomba transactionId {txn_id} and re-polled",
+        meta={"nomba_transaction_id": txn_id, "result": refreshed.get("_refresh")},
+    )
+    return refreshed
+
+
+@router.post("/admin/withdrawals/{wid}/backfill-nomba-id")
+async def admin_backfill_nomba_id(wid: str, request: Request, _admin=Depends(get_current_admin)):
+    """Auto-backfill Nomba's transactionId for a legacy withdrawal that's missing it.
+
+    Strategy: pull Nomba's transfer history for a window around the withdrawal's
+    `created_at` and find the entry whose amount + accountNumber match — then store
+    its `id` as our `nomba_transaction_id` and re-poll.
+    """
+    db = request.app.state.db
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    if not w:
+        raise HTTPException(404, "Withdrawal not found")
+    if w.get("nomba_transaction_id"):
+        return {"status": "skip", "reason": "already has nomba_transaction_id", "value": w["nomba_transaction_id"]}
+
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    if not s.get("nomba_client_id"):
+        raise HTTPException(400, "Nomba credentials not configured")
+
+    # Window: created_at ± 1 day to be generous
+    try:
+        created_dt = datetime.fromisoformat((w.get("created_at") or "").replace("Z", "+00:00"))
+    except Exception:
+        created_dt = datetime.now(timezone.utc)
+    date_from = (created_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    date_to = (created_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    candidates = []
+    for page in (1, 2, 3):
+        items = await nomba_list_transfers(
+            client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
+            account_id=s.get("nomba_account_id", ""),
+            date_from=date_from, date_to=date_to, page=page, limit=100,
+            environment=s.get("nomba_environment"),
+        )
+        if not items:
+            break
+        candidates.extend(items)
+
+    if not candidates:
+        return {"status": "no_match", "reason": "Nomba returned no transactions in this window", "scanned": 0}
+
+    target_amount = float(w.get("amount") or 0)
+    target_account = (w.get("account_number") or "").strip()
+    target_merchant_ref = (w.get("nomba_transfer_ref") or "").strip()
+
+    def _amt(t):
+        for k in ("amount", "transactionAmount", "value"):
+            v = t.get(k)
+            if v is not None:
+                try: return float(v)
+                except Exception: continue
+        return None
+
+    def _acct(t):
+        for k in ("accountNumber", "account_number", "recipientAccountNumber",
+                  "destinationAccountNumber", "customerBillerId", "billerId",
+                  "recipientAccount", "destinationAccount"):
+            v = t.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+
+    def _mref(t):
+        for k in ("merchantTxRef", "merchant_tx_ref", "transactionRef",
+                  "merchantTransactionRef", "merchantReference"):
+            v = t.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+
+    def _id(t):
+        for k in ("id", "transactionId", "nombaTxnId"):
+            v = t.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+
+    def _ts(t):
+        for k in ("timeCreated", "createdAt", "created_at"):
+            v = t.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        return ""
+
+    # Match priority: merchantTxRef > amount+account > amount+time-proximity (legacy)
+    match = None
+    if target_merchant_ref:
+        match = next((t for t in candidates if _mref(t) == target_merchant_ref), None)
+    if not match and target_account:
+        match = next(
+            (t for t in candidates
+             if _amt(t) == target_amount and _acct(t).endswith(target_account[-10:])),
+            None,
+        )
+    # Last resort: same amount within ±5 minutes of the withdrawal create time
+    if not match and target_amount:
+        try:
+            target_dt = datetime.fromisoformat((w.get("created_at") or "").replace("Z", "+00:00"))
+        except Exception:
+            target_dt = None
+        if target_dt:
+            for t in candidates:
+                ts = _ts(t)
+                if not ts or _amt(t) != target_amount: continue
+                try:
+                    tdt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except Exception:
+                    continue
+                if abs((tdt - target_dt).total_seconds()) <= 300:
+                    match = t
+                    break
+
+    if not match:
+        return {
+            "status": "no_match",
+            "reason": "No Nomba transaction matched merchantTxRef or amount+account",
+            "scanned": len(candidates),
+        }
+
+    nomba_id = _id(match)
+    if not nomba_id:
+        return {"status": "no_id", "reason": "Matched transaction has no usable id field", "raw": match}
+
+    await db.withdrawals.update_one(
+        {"id": wid},
+        {"$set": {"nomba_transaction_id": nomba_id, "updated_at": _now_iso()}},
+    )
+    w = await db.withdrawals.find_one({"id": wid}, {"_id": 0})
+    refreshed = await _refresh_one_withdrawal(db, w)
+    await _log_admin_activity(
+        db, _admin, "withdrawal.backfill_nomba_id",
+        target_type="withdrawal", target_id=wid,
+        description=f"Auto-backfilled Nomba transactionId {nomba_id}",
+        meta={"nomba_transaction_id": nomba_id, "scanned": len(candidates), "result": refreshed.get("_refresh")},
+    )
+    return {
+        "status": "ok",
+        "nomba_transaction_id": nomba_id,
+        "scanned": len(candidates),
+        "refresh_result": refreshed.get("_refresh"),
+        "withdrawal_status": refreshed.get("status"),
+    }
 
 
 @router.post("/admin/withdrawals/poll-pending")

@@ -1,5 +1,25 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 35)
+
+### Nomba ID recovery — auto-backfill + manual-paste (resolves stuck legacy withdrawals)
+
+**Problem confirmed live**: my earlier fix captures `nomba_transaction_id` only for *new* withdrawals. For legacy stuck `processing` records (which already had `nomba_transfer_ref` but no `nomba_transaction_id`), polling fails because Nomba's requery endpoint is keyed by their own `transactionId`, not our `merchantTxRef`. We had no recovery path.
+
+**Diagnosis**: added raw-response logging in `nomba.py::list_transfers` revealed Nomba's actual response shape is `data.data.results[]`, with fields `customerBillerId` (account), `timeCreated` (date), `amount` (string), and IDs prefixed `AAP-WALLET_T-…` (not `API-TRANSFER-…`).
+
+**Backend** (`nomba.py` + `routes_admin.py`):
+1. `nomba.py::list_transfers(date_from, date_to, limit)` — paginated transaction-history fetch. Uses ISO datetime format (`2026-05-23T00:00:00`) as Nomba requires. Skips obvious non-transaction shapes (the bank-list endpoint). Tries multiple `/v1/transactions/…` candidates and logs the raw response.
+2. `nomba.py::transfer_to_bank` — recursive `_find_nomba_id()` now searches every nested level of the response for an id-like field, plus added full raw-body logging so production deviations are auditable.
+3. `POST /admin/withdrawals/{wid}/backfill-nomba-id` — pulls the merchant's transfer history for `created_at ± 1 day`, matches by `merchantTxRef` → `amount+account` → `amount+time-proximity (±5 min)`, stores the recovered `nomba_transaction_id`, and immediately re-polls. **Verified live**: 4-day stuck record `w_652a44e14b991390` auto-resolved to `paid` after scanning 3 candidates.
+4. `POST /admin/withdrawals/{wid}/resolve-from-nomba` — accepts a manually-pasted Nomba `transactionId` (from Nomba dashboard), stores it, re-polls.
+
+**Frontend** (`AdminWithdrawals.jsx::ToolkitModal`):
+- New "Nomba ID recovery" section (only shown for non-final Nomba records missing `nomba_transaction_id`) with two buttons:
+  - **Auto-backfill from Nomba** (purple, brand)
+  - **Paste Nomba ID manually** (orange, warn)
+- New "NOMBA TRANSACTIONID (RECOVERED)" section (shown when the ID is present) — surfaces the recovered ID with a copy-to-clipboard button.
+
 ## Recent Changes (Feb 2026 — iteration 34)
 
 ### "Last polled" badge on Admin Withdrawals & Admin Deposits

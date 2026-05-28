@@ -217,26 +217,46 @@ async def transfer_to_bank(
 
     # Extract Nomba's transactionId — the canonical key for requery.
     # Try every common shape Nomba has used across docs/versions.
-    nomba_txn_id = (
-        inner.get("id")
-        or inner.get("transactionId")
-        or inner.get("transactionRef")
-        or inner.get("transaction_id")
-        or inner.get("nombaTxnId")
-        or inner.get("merchantTxRef")  # last-resort echo from Nomba
-        or (inner.get("transaction") or {}).get("id")
-        or (inner.get("transaction") or {}).get("transactionId")
-    )
+    def _find_nomba_id(blob, depth=0):
+        """Recursively search the response for a value that looks like Nomba's transactionId
+        (typically a string starting with 'API-TRANSFER' or matching common id field names)."""
+        if depth > 4 or blob is None:
+            return None
+        if isinstance(blob, str):
+            if blob.upper().startswith("API-TRANSFER") or blob.upper().startswith("API-NMB"):
+                return blob
+            return None
+        if isinstance(blob, dict):
+            # Preferred keys, then look at values
+            for key in ("transactionId", "id", "transactionRef", "transaction_id",
+                        "nombaTxnId", "nombaTransactionId", "providerTxnId"):
+                v = blob.get(key)
+                if isinstance(v, str) and v.strip():
+                    return v
+            for v in blob.values():
+                found = _find_nomba_id(v, depth + 1)
+                if found:
+                    return found
+        if isinstance(blob, list):
+            for v in blob:
+                found = _find_nomba_id(v, depth + 1)
+                if found:
+                    return found
+        return None
+
+    nomba_txn_id = _find_nomba_id(data)
 
     # Always log the raw Nomba transfer response so we can audit which fields are populated
     # in production (different Nomba environments have used slightly different response shapes).
     try:
+        import json as _json
         import logging
         logging.getLogger("nomba").info(
             f"transfer_to_bank response: merchantTxRef={merchant_tx_ref} "
             f"extracted_txn_id={nomba_txn_id!r} inner_status={raw_inner_status!r} "
             f"inner_keys={list(inner.keys()) if isinstance(inner, dict) else 'non-dict'} "
-            f"top_keys={list(data.keys()) if isinstance(data, dict) else 'non-dict'}"
+            f"top_keys={list(data.keys()) if isinstance(data, dict) else 'non-dict'} "
+            f"raw_truncated={_json.dumps(data)[:600]!r}"
         )
     except Exception:
         pass
@@ -417,3 +437,89 @@ async def get_transfer_status(
     else:
         norm = raw_status
     return {"status": norm, "raw_status": raw_status, "raw": d, "description": data.get("description")}
+
+
+async def list_transfers(
+    *, client_id: str, client_secret: str, account_id: str,
+    date_from: str | None = None, date_to: str | None = None,
+    page: int = 1, limit: int = 100, environment: str | None = None,
+) -> list[dict]:
+    """Fetch the merchant's transfer transaction history from Nomba (paginated).
+
+    Tries a handful of plausible endpoint+param shapes that Nomba has shipped across docs,
+    and returns the first non-empty list found. Each item is the raw Nomba transaction
+    object — callers should look for ``id`` / ``transactionId`` / ``merchantTxRef`` /
+    ``status`` / ``amount`` / ``accountNumber`` / ``createdAt`` etc.
+    """
+    candidates = [
+        ("/v1/transactions/accounts", {"limit": limit, "type": "transfer"}),
+        ("/v1/transactions/accounts", {"limit": limit}),
+        ("/v1/transactions", {"limit": limit, "type": "transfer"}),
+        ("/v1/transactions", {"limit": limit}),
+    ]
+    for path, base_params in candidates:
+        try:
+            params = dict(base_params)
+            # Nomba expects ISO datetime with seconds, not just YYYY-MM-DD.
+            if date_from: params["dateFrom"] = date_from if "T" in date_from else f"{date_from}T00:00:00"
+            if date_to: params["dateTo"] = date_to if "T" in date_to else f"{date_to}T23:59:59"
+            status_code, data = await _call_with_fallback(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+                environment=environment, method="GET", path=path, params=params, timeout=20,
+            )
+            # Dump the full response so we can see the shape Nomba is actually returning.
+            try:
+                import json as _json
+                import logging
+                logging.getLogger("nomba").info(
+                    f"list_transfers RAW {path} · status={status_code} · "
+                    f"top_keys={list(data.keys()) if isinstance(data, dict) else 'non-dict'} · "
+                    f"body_truncated={_json.dumps(data)[:600]!r}"
+                )
+            except Exception:
+                pass
+            items = data.get("data") or data.get("items") or data.get("transactions") or []
+            if isinstance(items, dict):
+                # Real Nomba shape: {"data": {"results": [...]}} — try every nested key.
+                items = (items.get("results") or items.get("items")
+                         or items.get("data") or items.get("transactions") or [])
+            if isinstance(items, list) and items:
+                # Guard: ignore endpoints that obviously return non-transaction items
+                # (e.g. the bank list, which has bankCode/bankName but no amount/transactionRef).
+                sample = items[0] if items else {}
+                if isinstance(sample, dict):
+                    has_txn_shape = any(
+                        sample.get(k) is not None for k in
+                        ("amount", "transactionAmount", "merchantTxRef", "transactionRef",
+                         "transactionId", "createdAt", "timeCreated", "accountNumber",
+                         "customerBillerId", "id")
+                    )
+                    if not has_txn_shape:
+                        try:
+                            import logging
+                            logging.getLogger("nomba").info(
+                                f"list_transfers SKIP {path}: sample is not transaction-shaped: keys={list(sample.keys())[:8]}"
+                            )
+                        except Exception:
+                            pass
+                        continue
+                try:
+                    import json as _json
+                    import logging
+                    logging.getLogger("nomba").info(
+                        f"list_transfers ok via {path} · page={page} · returned={len(items)} · "
+                        f"sample_keys={list(items[0].keys())[:10] if isinstance(items[0], dict) else 'non-dict'} · "
+                        f"sample_truncated={_json.dumps(items[0])[:400]!r}"
+                    )
+                except Exception:
+                    pass
+                return items
+        except Exception as e:
+            try:
+                import logging
+                logging.getLogger("nomba").info(f"list_transfers tried {path}: {e}")
+            except Exception:
+                pass
+            continue
+    return []
+
