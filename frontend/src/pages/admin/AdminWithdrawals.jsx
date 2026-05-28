@@ -834,11 +834,20 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
                   <>
                     <ToolButton onClick={() => onPay(w, "nomba")} icon={Smartphone} label="Pay via Nomba" tone="brand" testid="tool-pay-nomba" />
                     <ToolButton onClick={() => onPay(w, "paystack")} icon={Send} label="Pay via Paystack" tone="warn" testid="tool-pay-paystack" />
-                    <ToolButton onClick={() => onApprove(w)} icon={ClipboardCheck} label="Mark disbursed" tone="success" testid="tool-mark-disbursed" />
-                    <ToolButton onClick={() => onReject(w)} icon={Undo2} label="Refund to wallet" tone="error" testid="tool-refund" />
                   </>
                 )}
+                {/* Mark disbursed / Refund available for BOTH pending and processing */}
+                <ToolButton onClick={() => onApprove(w)} icon={ClipboardCheck} label="Mark disbursed" tone="success" testid="tool-mark-disbursed" />
+                <ToolButton onClick={() => onReject(w)} icon={Undo2} label="Refund to wallet" tone="error" testid="tool-refund" />
               </div>
+              {w.status === "processing" && (
+                <div className="mt-3 rounded-lg bg-[color:var(--gold-soft)]/40 border border-[color:var(--warning)]/30 p-3 text-[11px] text-[color:var(--text-secondary)] flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[color:var(--warning)] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-[color:var(--text-primary)]">Stuck in processing?</span> If the provider keeps reporting <span className="font-mono">PENDING</span> but the funds have arrived in the customer's bank, click <span className="font-bold">Mark disbursed</span>. If the funds never arrived and the provider won't return them, click <span className="font-bold">Refund to wallet</span>.
+                  </div>
+                </div>
+              )}
             </Section>
           )}
         </div>

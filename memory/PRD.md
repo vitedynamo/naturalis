@@ -1,5 +1,16 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 29)
+
+### Bug fix: withdrawals stuck in "processing" can now be resolved
+**Symptom**: After Pay via Nomba is initiated successfully, the withdrawal sits at `processing` indefinitely because Nomba's `/v1/transactions/accounts/single` endpoint keeps returning `PENDING` even when the funds have already landed in the recipient's bank. The Toolkit modal only exposed Mark-disbursed and Refund-to-wallet buttons for `status === "pending"`, so there was no UI to manually resolve stuck records. Also, every refresh appended a fresh "Nomba status: PENDING" suffix to `admin_note`, growing it to thousands of characters.
+
+**Fixes**:
+1. `_refresh_one_withdrawal` in `routes_admin.py` now strips prior trailing status-poll fragments (`Nomba status:`, `Paystack status:`, `Status poll error:`, `Confirmed via ...`, `Nomba reports`, `Paystack reports`) before appending the latest, so `admin_note` no longer grows unboundedly.
+2. `ToolkitModal` in `AdminWithdrawals.jsx` now shows **Mark disbursed** and **Refund to wallet** for BOTH `pending` and `processing` statuses. The duplicate "Pay via …" buttons stay hidden once a payout has already been initiated.
+3. A helpful warning banner ("Stuck in processing?") renders in the modal for `processing` withdrawals to guide the admin on how to manually resolve.
+4. Backend `approve` / `reject` endpoints already accepted both pending and processing — no change required there.
+
 ## Recent Changes (Feb 2026 — iteration 28)
 
 ### Keyboard shortcuts on all admin tables

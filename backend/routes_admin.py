@@ -1505,7 +1505,20 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
     if new_status != w.get("status"):
         update["status"] = new_status
     if note_extra:
+        # Strip any prior trailing "status poll" / "Nomba status" / "Paystack status" / "Confirmed via …" suffixes
+        # so the admin_note doesn't accumulate identical lines on every refresh.
         prev = (w.get("admin_note") or "").strip()
+        if prev:
+            for prefix in (
+                "Nomba status:", "Paystack status:", "Status poll error:",
+                "Confirmed via Nomba", "Confirmed via Paystack",
+                "Nomba reports", "Paystack reports",
+            ):
+                while True:
+                    idx = prev.rfind(f"· {prefix}")
+                    if idx < 0:
+                        break
+                    prev = prev[:idx].rstrip()
         update["admin_note"] = f"{prev} · {note_extra}" if prev else note_extra
     await db.withdrawals.update_one({"id": w["id"]}, {"$set": update})
 
