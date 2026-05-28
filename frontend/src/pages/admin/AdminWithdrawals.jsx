@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
-import { formatNaira, formatDate } from "@/lib/format";
+import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   User as UserIcon, Hourglass, CalendarDays, CheckCircle2, ClipboardCheck, Undo2,
 } from "lucide-react";
 import Pagination from "@/components/admin/Pagination";
+import LastPolledBadge from "@/components/admin/LastPolledBadge";
 import { Link } from "react-router-dom";
 
 /* ---------------------------------------------------------------------------
@@ -21,17 +22,6 @@ function avatarColor(seed = "") {
   const palette = ["#E5097F", "#5B5BD6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
   let h = 0; for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
   return palette[Math.abs(h) % palette.length];
-}
-
-function relativeTime(iso) {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return null;
-  const diff = (Date.now() - t) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function startOfLagosDayISO() {
@@ -573,7 +563,14 @@ export default function AdminWithdrawals() {
                       <div className="text-[color:var(--text-primary)] truncate font-semibold text-xs">{w.bank_name}</div>
                       <div className="font-mono text-[11px] text-[color:var(--text-primary)] truncate">{w.account_number}</div>
                     </td>
-                    <td className="p-4"><StatusPill w={w} /></td>
+                    <td className="p-4">
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusPill w={w} />
+                        {(w.status === "pending" || w.status === "processing") && (
+                          <LastPolledBadge iso={w.last_polled_at} testid={`last-polled-${w.id}`} />
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4 hidden xl:table-cell max-w-[160px]">
                       <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] truncate" title={ref || ""}>{ref || "—"}</div>
                     </td>

@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ArrowDownToLine, Search, Eye, BadgeCheck, Copy, CheckCircle2, Wallet, RefreshCw, X, ExternalLink, User as UserIcon, Activity, TrendingUp, Code2, Clock } from "lucide-react";
 import Pagination from "@/components/admin/Pagination";
+import LastPolledBadge from "@/components/admin/LastPolledBadge";
 
 function avatarColor(seed = "") {
   const palette = ["#E5097F", "#5B5BD6", "#06B6D4", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
@@ -237,7 +238,12 @@ export default function AdminDeposits() {
                       <span className="inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]">{d.method}</span>
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${pill.cls}`}>{pill.label}</span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${pill.cls}`}>{pill.label}</span>
+                        {d.status === "pending" && (
+                          <LastPolledBadge iso={d.last_polled_at} testid={`last-polled-${d.id}`} />
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-xs text-[color:var(--text-tertiary)] whitespace-nowrap hidden md:table-cell">{formatDate(d.created_at)}</td>
                     <td className="p-4">

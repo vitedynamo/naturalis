@@ -1,5 +1,15 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 34)
+
+### "Last polled" badge on Admin Withdrawals & Admin Deposits
+- New reusable component **`/app/frontend/src/components/admin/LastPolledBadge.jsx`** — tiny "polled Xs ago" pill that self-ticks every 1s so the relative time stays fresh without a refetch. Hover reveals the full ISO timestamp.
+- Shared `relativeTime` helper moved to `/app/frontend/src/lib/format.js`. Duplicate inline copy in `AdminWithdrawals.jsx` removed.
+- Withdrawals table: badge renders under the status pill for `pending` / `processing` rows.
+- Deposits table: badge renders under the status pill for `pending` rows.
+- No new API calls — reads the `last_polled_at` field already populated by the adaptive poller.
+- Verified live: stuck Marasoft `processing` withdrawal showed **🔄 POLLED 1M AGO** under the pill. Synthetic pending deposit got `last_polled_at` set within 35 s of insertion (will surface the badge as soon as the page is reloaded).
+
 ## Recent Changes (Feb 2026 — iteration 33)
 
 ### FIFO ordering on the adaptive poller
