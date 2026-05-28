@@ -1,5 +1,18 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 39)
+
+### Gateway Ref column now shows the actual Nomba/Paystack ID (not our app reference)
+**User report**: On Admin → Withdrawals the *Gateway Ref* column was rendering our internal `ntr_xxx` / `ptr_xxx` merchant reference (what we send to the gateway) instead of the provider's own transaction ID (Nomba's `AAP-WALLET_T-…` / Paystack's `TRF_…`).
+
+**Fix** (`AdminWithdrawals.jsx`):
+- Table column now resolves to `nomba_transaction_id || paystack_transfer_code` only. If the gateway-side ID hasn't been captured yet, a small `awaiting` pill is shown with a tooltip explaining it can be backfilled via the Backfill / Toolkit tools (instead of misleadingly displaying our `ntr_xxx`).
+- ToolkitModal "References" panel now clearly distinguishes three IDs:
+  1. **Our reference** — the withdrawal record id (`w_xxx`).
+  2. **Nomba transaction ID / Paystack transfer code** — gateway-side canonical ID. Shows a helpful note when missing.
+  3. **Merchant ref sent to gateway** — our `ntr_xxx` / `ptr_xxx` reference, still surfaced for debugging.
+- "Check status" button now also enables when only a merchant ref exists (so admins can still re-poll legacy records).
+
 ## Recent Changes (Feb 2026 — iteration 38)
 
 ### Two withdrawal UX fixes

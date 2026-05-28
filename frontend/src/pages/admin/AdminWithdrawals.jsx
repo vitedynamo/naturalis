@@ -640,8 +640,10 @@ export default function AdminWithdrawals() {
                 </td></tr>
               )}
               {pageItems.map((w) => {
-                const ref = w.nomba_transaction_id || w.paystack_transfer_ref || w.nomba_transfer_ref;
-                const gw = (w.nomba_transfer_ref || w.nomba_transaction_id) ? "nomba" : w.paystack_transfer_ref ? "paystack" : null;
+                // Gateway-side ID only (NOT our internal merchant ref like ntr_xxx / ptr_xxx).
+                // Nomba: `nomba_transaction_id` (AAP-WALLET...). Paystack: `paystack_transfer_code` (TRF_...).
+                const ref = w.nomba_transaction_id || w.paystack_transfer_code;
+                const gw = (w.nomba_transfer_ref || w.nomba_transaction_id) ? "nomba" : (w.paystack_transfer_ref || w.paystack_transfer_code) ? "paystack" : null;
                 return (
                   <tr key={w.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`withdrawal-row-${w.id}`}>
                     <td className="p-4 max-w-[200px]">
@@ -676,7 +678,19 @@ export default function AdminWithdrawals() {
                       </div>
                     </td>
                     <td className="p-4 hidden xl:table-cell max-w-[160px]">
-                      <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] truncate" title={ref || ""}>{ref || "—"}</div>
+                      {ref ? (
+                        <div className="font-mono text-[10px] text-[color:var(--text-tertiary)] truncate" title={ref}>{ref}</div>
+                      ) : gw ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)] border border-[color:var(--border-default)]"
+                          title={`Gateway-side ${gw === "paystack" ? "transfer_code" : "transactionId"} not captured yet. Use “Backfill from Nomba” or Toolkit to fetch it.`}
+                          data-testid={`gateway-ref-missing-${w.id}`}
+                        >
+                          awaiting
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[color:var(--text-tertiary)]">—</span>
+                      )}
                     </td>
                     <td className="p-4 hidden lg:table-cell text-[11px] text-[color:var(--text-tertiary)] whitespace-nowrap">{formatDate(w.created_at)}</td>
                     <td className="p-4 text-right">
@@ -811,8 +825,11 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
     : w.status === "rejected"
       ? "bg-[#3a0c12]/70 text-[#EF4444] border-[#EF4444]/30"
       : "bg-[#3f290a]/70 text-[#F59E0B] border-[#F59E0B]/30";
-  const gw = w.nomba_transfer_ref ? "nomba" : w.paystack_transfer_ref ? "paystack" : null;
-  const providerRef = w.nomba_transfer_ref || w.paystack_transfer_ref;
+  const gw = (w.nomba_transfer_ref || w.nomba_transaction_id) ? "nomba" : (w.paystack_transfer_ref || w.paystack_transfer_code) ? "paystack" : null;
+  // Gateway-side ID (Nomba transactionId / Paystack transfer_code) — NOT our merchant ref.
+  const providerRef = w.nomba_transaction_id || w.paystack_transfer_code;
+  // Our app-side merchant reference (what we sent the gateway).
+  const merchantRef = w.nomba_transfer_ref || w.paystack_transfer_ref;
 
   return (
     <Dialog open={!!w} onOpenChange={(o) => !o && onClose()}>
@@ -892,13 +909,29 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
               </div>
               <div className="card-soft p-3">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">
-                  {gw === "paystack" ? "Paystack reference" : "Nomba reference"}
+                  {gw === "paystack" ? "Paystack transfer code" : "Nomba transaction ID"}
                 </div>
                 <div className="flex items-center mt-1 min-w-0">
                   <span className="font-mono text-xs text-[color:var(--text-primary)] truncate" data-testid="toolkit-provider-ref">{providerRef || "—"}</span>
                   {providerRef && <CopyButton text={providerRef} testid="toolkit-copy-provider-ref" />}
                 </div>
+                {!providerRef && gw && (
+                  <div className="text-[10px] text-[color:var(--text-tertiary)] mt-1">
+                    Not captured yet — use {gw === "nomba" ? "the recovery tool below" : "Toolkit"} to backfill.
+                  </div>
+                )}
               </div>
+              {merchantRef && (
+                <div className="card-soft p-3 sm:col-span-2">
+                  <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">
+                    Merchant ref sent to {gw === "paystack" ? "Paystack" : "Nomba"}
+                  </div>
+                  <div className="flex items-center mt-1 min-w-0">
+                    <span className="font-mono text-xs text-[color:var(--text-primary)] truncate" data-testid="toolkit-merchant-ref">{merchantRef}</span>
+                    <CopyButton text={merchantRef} testid="toolkit-copy-merchant-ref" />
+                  </div>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -924,7 +957,7 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
           {!isFinal && (
             <Section icon={RefreshCw} label="Resolution tools">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {providerRef && (
+                {(providerRef || merchantRef) && (
                   <ToolButton
                     onClick={() => onRefresh(w)}
                     busy={refreshingId === w.id}
