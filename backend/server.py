@@ -180,6 +180,7 @@ async def on_startup():
     FAST_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_FAST_CADENCE_SEC", "30")))
     MED_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_MED_CADENCE_SEC", "60")))
     SLOW_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_SLOW_CADENCE_SEC", "300")))
+    CONCURRENCY = max(1, int(os.environ.get("POLLER_CONCURRENCY", "10")))
 
     def _parse_iso(s):
         if not s:
@@ -197,14 +198,44 @@ async def on_startup():
         return SLOW_CADENCE
 
     def _is_due(record, now):
+        # If the record has never been polled before, poll it on the very next tick.
+        last_str = record.get("last_polled_at")
+        if not last_str:
+            return True
         created = _parse_iso(record.get("created_at")) or now
-        last = _parse_iso(record.get("last_polled_at")) or _parse_iso(record.get("updated_at")) or created
+        last = _parse_iso(last_str) or created
         age = now - created
         cadence = _cadence_for(age)
         return (now - last) >= cadence
 
     async def _withdrawal_status_poller():
         from routes_admin import _refresh_one_withdrawal, _refresh_pending_deposit
+        sem = asyncio.Semaphore(CONCURRENCY)
+
+        async def _refresh_withdrawal(w, now):
+            async with sem:
+                try:
+                    await _refresh_one_withdrawal(db, w)
+                    await db.withdrawals.update_one(
+                        {"id": w["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
+                    )
+                    return True
+                except Exception as inner:
+                    logger.warning(f"Poller: withdrawal refresh {w.get('id')} failed: {inner}")
+                    return False
+
+        async def _refresh_deposit(d, now):
+            async with sem:
+                try:
+                    await _refresh_pending_deposit(db, d)
+                    await db.deposits.update_one(
+                        {"id": d["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
+                    )
+                    return True
+                except Exception as inner:
+                    logger.warning(f"Poller: deposit refresh {d.get('id')} failed: {inner}")
+                    return False
+
         while True:
             try:
                 await asyncio.sleep(TICK_SEC)
@@ -215,42 +246,37 @@ async def on_startup():
                     {"status": {"$in": ["pending", "processing"]}},
                     {"_id": 0},
                 ).to_list(500)
-                touched = 0
-                for w in pendings:
-                    if not (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref")):
-                        continue
-                    if not _is_due(w, now):
-                        continue
-                    try:
-                        await _refresh_one_withdrawal(db, w)
-                        await db.withdrawals.update_one(
-                            {"id": w["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
-                        )
-                        touched += 1
-                    except Exception as inner:
-                        logger.warning(f"Poller: withdrawal refresh {w.get('id')} failed: {inner}")
+                due_w = [
+                    w for w in pendings
+                    if (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"))
+                    and _is_due(w, now)
+                ]
 
                 # ----- Deposits -----
                 pending_deps = await db.deposits.find(
                     {"status": "pending"}, {"_id": 0},
                 ).to_list(500)
-                dep_touched = 0
-                for d in pending_deps:
-                    if d.get("method") not in ("marasoft", "paystack"):
-                        continue
-                    if not _is_due(d, now):
-                        continue
-                    try:
-                        await _refresh_pending_deposit(db, d)
-                        await db.deposits.update_one(
-                            {"id": d["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
-                        )
-                        dep_touched += 1
-                    except Exception as inner:
-                        logger.warning(f"Poller: deposit refresh {d.get('id')} failed: {inner}")
+                due_d = [
+                    d for d in pending_deps
+                    if d.get("method") in ("marasoft", "paystack") and _is_due(d, now)
+                ]
 
+                if not due_w and not due_d:
+                    continue
+
+                # Fan out under the semaphore — bounded concurrency caps in-flight calls.
+                w_results, d_results = await asyncio.gather(
+                    asyncio.gather(*(_refresh_withdrawal(w, now) for w in due_w), return_exceptions=False),
+                    asyncio.gather(*(_refresh_deposit(d, now) for d in due_d), return_exceptions=False),
+                )
+                touched = sum(1 for r in w_results if r)
+                dep_touched = sum(1 for r in d_results if r)
                 if touched or dep_touched:
-                    logger.info(f"Status poller: refreshed {touched} withdrawal(s) + {dep_touched} deposit(s)")
+                    logger.info(
+                        f"Status poller: refreshed {touched}/{len(due_w)} withdrawal(s) "
+                        f"+ {dep_touched}/{len(due_d)} deposit(s) "
+                        f"(concurrency={CONCURRENCY})"
+                    )
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -258,7 +284,7 @@ async def on_startup():
 
     app.state._withdrawal_poller_task = asyncio.create_task(_withdrawal_status_poller())
     logger.info(
-        f"Status poller online · tick={TICK_SEC}s · cadence: "
+        f"Status poller online · tick={TICK_SEC}s · concurrency={CONCURRENCY} · cadence: "
         f"fast={int(FAST_CADENCE.total_seconds())}s ≤{int(FAST_WINDOW.total_seconds()/60)}m, "
         f"med={int(MED_CADENCE.total_seconds())}s ≤{int(MED_WINDOW.total_seconds()/60)}m, "
         f"slow={int(SLOW_CADENCE.total_seconds())}s"

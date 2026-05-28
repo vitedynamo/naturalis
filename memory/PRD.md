@@ -1,5 +1,14 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 32)
+
+### Bounded concurrency on the adaptive poller
+- The poller's per-tick refresh loop now uses `asyncio.Semaphore(POLLER_CONCURRENCY)` (default **10**) with `asyncio.gather` to fan out withdrawal + deposit refreshes in parallel rather than serially.
+- New env knob: `POLLER_CONCURRENCY` (defaults to 10, min 1).
+- `_is_due` was tightened: records with no prior `last_polled_at` are now polled on the very next tick (instead of waiting one full cadence), so brand-new records get sub-30s first-confirmation feedback.
+- Logs now print `refreshed X/Y withdrawal(s) + A/B deposit(s) (concurrency=N)` so spikes are visible.
+- Verified live: 8 synthetic processing withdrawals inserted simultaneously were refreshed in a single tick — all `last_polled_at` timestamps identical to the millisecond, confirming gather-with-semaphore stamped them in the same atomic batch.
+
 ## Recent Changes (Feb 2026 — iteration 31)
 
 ### Adaptive poller cadence
