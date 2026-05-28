@@ -23,7 +23,7 @@ export default function AdminLogin() {
         setLoading(false);
         return;
       }
-      setSession(data.token, data.user);
+      setSession(data.token, data.user, "admin");
       navigate("/admin", { replace: true });
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Invalid credentials");
