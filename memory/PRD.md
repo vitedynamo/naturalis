@@ -1,5 +1,19 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 46)
+
+### Admin Referrals page — full redesign
+**Backend** (`routes_admin.py`):
+- `GET /api/admin/referrals` now hydrates each row with `bonus_paid` (aggregated from `transactions` matching `type:referral` + `meta.from_user_id`), `referred_invested` + `referred_investment_count` (aggregated from `investments`), and a derived `status` of `earned`/`pending`. All hydration done via three batched aggregations — keeps it O(N) round-trips.
+
+**Frontend** (`AdminReferrals.jsx`, full rewrite):
+- **Brand-coherent magenta hero** with a network-graph SVG (nodes + arcs) behind the title and an **embedded radial Conversion ring** showing the share of referrals that became investors — unique vs the reference design.
+- **2×2 KPI grid** (Total / Bonus paid / Referred capital / Pending) PLUS a dedicated **Top Earners leaderboard panel** to the right (podium + ranked list of referrers by bonus paid, linked to their profiles).
+- **Tab-style** Level switcher (All / L1 direct / L2) with a separate Status dropdown.
+- **Each table row** shows avatars for both referrer and referred user, an arrow connector between them, bonus column (green when paid, "none yet" otherwise), referred user's invested amount + plan count, an `EARNED`/`PENDING` pill (pending pulses gold), and a dual date column (absolute + `7d ago`).
+- **L1 / L2 badge**: L1 gets a gradient-pink pill with a crown icon; L2 a subtle accent pill. Reinforces commission tier visually.
+- Verified light + dark mode via screenshots.
+
 ## Recent Changes (Feb 2026 — iteration 45)
 
 ### Auto-resume scheduled pauses

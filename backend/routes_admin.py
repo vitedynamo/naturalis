@@ -1528,13 +1528,46 @@ async def admin_bulk_resume_investments(
 async def list_referrals(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     items = await db.referrals.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+
+    # Hydrate per-row computations in batch to keep this O(N) round-trips, not O(N²).
+    referrer_ids = {it["referrer_id"] for it in items}
+    referred_ids = {it["referred_id"] for it in items}
+    user_ids = list(referrer_ids | referred_ids)
+    users = await db.users.find(
+        {"id": {"$in": user_ids}},
+        {"_id": 0, "id": 1, "name": 1, "phone": 1},
+    ).to_list(len(user_ids) or 1)
+    user_map = {u["id"]: u for u in users}
+
+    # Aggregate referral bonuses by (referrer_id, from_user_id).
+    bonus_rows = await db.transactions.aggregate([
+        {"$match": {"type": "referral"}},
+        {"$group": {
+            "_id": {"referrer": "$user_id", "from": "$meta.from_user_id"},
+            "total": {"$sum": "$amount"},
+        }},
+    ]).to_list(20000)
+    bonus_map = {(r["_id"]["referrer"], r["_id"]["from"]): float(r["total"]) for r in bonus_rows if r["_id"].get("from")}
+
+    # Aggregate referred-user invested totals.
+    inv_rows = await db.investments.aggregate([
+        {"$match": {"user_id": {"$in": list(referred_ids)}}},
+        {"$group": {"_id": "$user_id", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(20000)
+    inv_map = {r["_id"]: {"total": float(r["total"]), "count": int(r["count"])} for r in inv_rows}
+
     for it in items:
-        r = await db.users.find_one({"id": it["referrer_id"]}, {"_id": 0, "name": 1, "phone": 1})
-        d = await db.users.find_one({"id": it["referred_id"]}, {"_id": 0, "name": 1, "phone": 1})
-        it["referrer_name"] = r["name"] if r else "—"
-        it["referrer_phone"] = r["phone"] if r else "—"
-        it["referred_name"] = d["name"] if d else "—"
-        it["referred_phone"] = d["phone"] if d else "—"
+        rr = user_map.get(it["referrer_id"])
+        rd = user_map.get(it["referred_id"])
+        it["referrer_name"] = rr["name"] if rr else "—"
+        it["referrer_phone"] = rr["phone"] if rr else "—"
+        it["referred_name"] = rd["name"] if rd else "—"
+        it["referred_phone"] = rd["phone"] if rd else "—"
+        it["bonus_paid"] = bonus_map.get((it["referrer_id"], it["referred_id"]), 0.0)
+        inv = inv_map.get(it["referred_id"], {"total": 0.0, "count": 0})
+        it["referred_invested"] = inv["total"]
+        it["referred_investment_count"] = inv["count"]
+        it["status"] = "earned" if (it["bonus_paid"] > 0 or it["referred_invested"] > 0) else "pending"
     return items
 
 
