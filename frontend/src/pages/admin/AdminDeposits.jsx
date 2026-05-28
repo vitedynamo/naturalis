@@ -63,7 +63,8 @@ export default function AdminDeposits() {
   const [polling, setPolling] = useState(false);
   const [refreshingId, setRefreshingId] = useState(null);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
+  const [pageSize, setPageSize] = useState(20);
+  const QUICK_SIZES = [5, 20, 50, 100, "all"];
 
   const load = () => api.get("/admin/deposits").then(({ data }) => setItems(data));
   useEffect(() => { load(); }, []);
@@ -124,14 +125,15 @@ export default function AdminDeposits() {
     return r;
   }, [items, filter, q]);
 
-  // Reset to page 1 whenever filter/search changes
-  useEffect(() => { setPage(1); }, [filter, q]);
+  // Reset to page 1 whenever filter/search/page-size changes
+  useEffect(() => { setPage(1); }, [filter, q, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const effSize = pageSize === "all" ? Math.max(1, filtered.length) : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / effSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
-    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filtered, safePage],
+    () => filtered.slice((safePage - 1) * effSize, safePage * effSize),
+    [filtered, safePage, effSize],
   );
 
   const stats = useMemo(() => ({
@@ -208,6 +210,29 @@ export default function AdminDeposits() {
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] disabled:opacity-50">
           <Wallet className={`w-4 h-4 ${backfilling ? "animate-pulse" : ""}`} /> {backfilling ? "Backfilling…" : "Backfill gateway IDs"}
         </button>
+      </div>
+
+      {/* Rows-per-page picker (matches Manual Adjustments) */}
+      <div className="card-soft p-3 mt-3 flex items-center gap-3 flex-wrap" data-testid="deposits-quickrows">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)]">Rows per page</span>
+        {QUICK_SIZES.map((n) => {
+          const active = pageSize === n;
+          return (
+            <button
+              key={String(n)}
+              onClick={() => setPageSize(n)}
+              data-testid={`deposits-quick-size-${n}`}
+              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors ${active
+                ? "bg-[color:var(--brand)] text-white"
+                : "bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]/70"}`}
+            >
+              {n === "all" ? "All" : n}
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[11px] text-[color:var(--text-tertiary)]">
+          Showing <span className="font-bold text-[color:var(--text-primary)] tabular-nums">{pageItems.length}</span> of <span className="font-bold text-[color:var(--text-primary)] tabular-nums">{filtered.length}</span>
+        </span>
       </div>
 
       {/* Table */}
@@ -309,12 +334,12 @@ export default function AdminDeposits() {
             </tbody>
           </table>
         </div>
-        {filtered.length > 0 && (
+        {filtered.length > 0 && pageSize !== "all" && (
           <Pagination
             page={safePage}
             setPage={setPage}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={effSize}
             testidPrefix="deposits-page"
           />
         )}

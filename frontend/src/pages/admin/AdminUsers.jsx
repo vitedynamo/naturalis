@@ -52,7 +52,8 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
+  const [pageSize, setPageSize] = useState(20);
+  const QUICK_SIZES = [5, 20, 50, 100, "all"];
   const [adjustModal, setAdjustModal] = useState(null); // { user, kind: 'add'|'deduct' }
   const [adjust, setAdjust] = useState({ amount: "", note: "" });
   const [pwdModal, setPwdModal] = useState(null);
@@ -60,15 +61,17 @@ export default function AdminUsers() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+    const effSize = pageSize === "all" ? 10000 : pageSize;
+    const params = new URLSearchParams({ page: String(page), page_size: String(effSize) });
     if (q) params.set("q", q);
     api.get(`/admin/users?${params}`)
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false));
-  }, [page, q]);
+  }, [page, q, pageSize]);
   useEffect(() => { load(); }, [load]);
 
-  // Debounce search
+  // Debounce search + reset to page 1 when search or pageSize changes
+  useEffect(() => { setPage(1); }, [pageSize]);
   useEffect(() => { const t = setTimeout(() => { if (page !== 1) setPage(1); else load(); }, 350); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [q]);
 
   const onAdjust = async (e) => {
@@ -176,6 +179,29 @@ export default function AdminUsers() {
         </button>
       </div>
 
+      {/* Rows-per-page picker (matches Manual Adjustments) */}
+      <div className="card-soft p-3 mt-3 flex items-center gap-3 flex-wrap" data-testid="users-quickrows">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)]">Rows per page</span>
+        {QUICK_SIZES.map((n) => {
+          const active = pageSize === n;
+          return (
+            <button
+              key={String(n)}
+              onClick={() => setPageSize(n)}
+              data-testid={`users-quick-size-${n}`}
+              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors ${active
+                ? "bg-[color:var(--brand)] text-white"
+                : "bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]/70"}`}
+            >
+              {n === "all" ? "All" : n}
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[11px] text-[color:var(--text-tertiary)]">
+          Showing <span className="font-bold text-[color:var(--text-primary)] tabular-nums">{data.items.length}</span> of <span className="font-bold text-[color:var(--text-primary)] tabular-nums">{data.total || 0}</span>
+        </span>
+      </div>
+
       {/* Table */}
       <div className="card-soft overflow-hidden mt-5">
         <div className="overflow-x-auto">
@@ -235,12 +261,12 @@ export default function AdminUsers() {
         </div>
 
         {/* Pagination — shared component (matches Admin Deposits / Withdrawals) */}
-        {data.total > 0 && (
+        {data.total > 0 && pageSize !== "all" && (
           <Pagination
             page={page}
             setPage={setPage}
             totalItems={data.total || 0}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             testidPrefix="users-page"
           />
         )}
