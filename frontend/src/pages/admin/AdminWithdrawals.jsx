@@ -640,7 +640,7 @@ export default function AdminWithdrawals() {
                 </td></tr>
               )}
               {pageItems.map((w) => {
-                const ref = w.nomba_transfer_ref || w.paystack_transfer_ref || w.nomba_transaction_id;
+                const ref = w.nomba_transaction_id || w.paystack_transfer_ref || w.nomba_transfer_ref;
                 const gw = (w.nomba_transfer_ref || w.nomba_transaction_id) ? "nomba" : w.paystack_transfer_ref ? "paystack" : null;
                 return (
                   <tr key={w.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`withdrawal-row-${w.id}`}>
