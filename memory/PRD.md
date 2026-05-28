@@ -1,5 +1,16 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 50)
+
+### Admin Manual Adjustments — full redesign + Withdrawals-style pagination
+**Frontend** (`AdminManualAdjustments.jsx` full rewrite):
+- **Brand-magenta hero** with sliders/scales SVG decoration (replaces the plain heading) and a stat strip ("20 total adjustments · 18 credits · 2 debits").
+- 4 KPI cards with per-tone glow blobs: **Total credited / Total debited / Net adjustment / Records on view**. Net switches between accent (positive) and warn (negative) tones automatically.
+- Filter dropdown (`All / Credits only / Debits only / Bonus / Refunds`) + search across name / phone / note / transaction ID.
+- **Same row-size pill toolbar** as Admin Withdrawals (5 · 20 · 50 · 100 · All) with the same "Showing X of Y" counter, and **the same `Pagination` component** at the bottom (Previous · Page N of M · Jump-to · Next + keyboard shortcuts).
+- Each adjustment renders as a **card with a coloured side accent strip** (green for credit, red for debit), up/down arrow well, avatar with initial, name + phone + credit/debit/refund pill, italic description, **balance-delta footer** `₦6,000 ↗ ₦11,000 · reason` showing the before→after trail (unique signature vs the reference), and a right-side block with big coloured amount + absolute date + **relative time** ("2h ago") + profile-jump button.
+- Verified via screenshot.
+
 ## Recent Changes (Feb 2026 — iteration 49)
 
 ### Fix: Referrals tab on Admin User Detail returning empty
