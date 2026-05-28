@@ -1114,12 +1114,14 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     logger.warning(f"Nomba balance check failed: {be}")
                     available = None
                 if available is not None and available < float(data.amount):
-                    # Insufficient float — silently hold the withdrawal as plain pending.
-                    # No special flags / red warning; admin sees it as a normal pending payout.
+                    # Insufficient float — keep as pending. Admin gets a clear flag
+                    # (red INSUFFICIENT FLOAT pill), users just see "pending".
                     await db.withdrawals.update_one(
                         {"id": wid},
                         {"$set": {
                             "status": "pending",
+                            "insufficient_float": True,
+                            "float_balance_at_request": available,
                             "admin_note": f"Auto-payout deferred (Nomba float ₦{available:,.2f} < requested ₦{float(data.amount):,.2f}). Top up Nomba and retry, or pay manually.",
                             "updated_at": _now_iso(),
                         }},

@@ -42,7 +42,7 @@ export default function Withdraw() {
     } finally { setBusy(false); }
   };
 
-  const bankReady = user?.bank_name && user?.account_number && user?.account_name;
+  const bankReady = user?.bank_name && user?.account_number && user?.account_name && user?.bank_code;
 
   // Compute window state from settings (Lagos time = UTC + 1)
   const windowState = (() => {
@@ -118,8 +118,15 @@ export default function Withdraw() {
 
         <button type="submit" disabled={busy || !bankReady || !windowState.open || !hasPin || pin.length !== 4}
           data-testid="withdraw-submit-btn"
-          className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60">
-          <ArrowUpFromLine className="w-4 h-4" /> {busy ? "Processing…" : "Submit request"}
+          title={
+            !bankReady ? "Add complete bank details first"
+            : !hasPin ? "Set your 4-digit withdrawal PIN first"
+            : !windowState.open ? (windowState.reason || "Withdrawals closed")
+            : pin.length !== 4 ? "Enter your 4-digit PIN"
+            : ""
+          }
+          className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60 disabled:cursor-not-allowed">
+          <ArrowUpFromLine className="w-4 h-4" /> {busy ? "Processing…" : !bankReady ? "Add complete bank details first" : "Submit request"}
         </button>
       </form>
 

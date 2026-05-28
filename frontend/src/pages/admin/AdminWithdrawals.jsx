@@ -201,6 +201,9 @@ function GatewayStatusCard({ name, last, pendingCount, doneCount, tone, balance,
  * -------------------------------------------------------------------------*/
 
 function StatusPill({ w }) {
+  if (w.insufficient_float && w.status === "pending") {
+    return <span className="pill pill-error" data-testid={`status-${w.id}`}>insufficient float</span>;
+  }
   // Map "paid" -> "disbursed" visually to match the new design language.
   if (w.status === "paid") return <span className="pill pill-success" data-testid={`status-${w.id}`}>disbursed</span>;
   if (w.status === "rejected") return <span className="pill pill-error" data-testid={`status-${w.id}`}>rejected</span>;
