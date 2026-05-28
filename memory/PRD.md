@@ -1,5 +1,20 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 41)
+
+### Admin Investments page — full redesign
+**User request**: redesign with a richer, more unique aesthetic than the reference design.
+
+**What's new** (`AdminInvestments.jsx`, full rewrite):
+- **Brand-coherent hero** (magenta gradient with subtle SVG wave + radial glow blobs) instead of the reference's generic purple. Includes a contextual stat strip (`14 investments · 14 active · ₦81K capital working`) and an embedded "Drops due now" pulse badge that flashes when payouts are overdue.
+- **Four KPI cards** with per-tone radial-glow blobs (no purple cliché): Capital invested · Profit paid (with % of projected) · Projected return · Active plans.
+- **Live SVG radial-countdown ring** per row showing time until each user's next 24h payout. Rows where a drop is overdue get a soft pink highlight and a pulsing "DUE" label.
+- **Inline progress bar** in the *Earned · Expected* column (days_paid/duration with gradient fill).
+- **Plan badge** (product name + daily%) for instant tier recognition.
+- **Two filters** (status + plan) + search + adaptive row-size selector (5/20/50/100/All).
+- **Detail modal** with header gradient adapted to status, customer card linking to profile, four money tiles (invested/earned/daily-drop/expected), progress card with start/end/next-drop, timeline & identifiers.
+- Status pill animates its dot when the investment is active.
+
 ## Recent Changes (Feb 2026 — iteration 40)
 
 ### AdminDeposits gateway-id parity with Withdrawals
