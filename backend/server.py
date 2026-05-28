@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from auth import hash_password, gen_referral_code
 from routes_user import router as user_router
@@ -167,40 +167,88 @@ async def on_startup():
             })
         logger.info("Seeded default products")
 
-    # Background poller: every 5 minutes, refresh the status of every non-final withdrawal.
-    # No external scheduler dependency — uses asyncio.
+    # Background poller: adaptive cadence per record (no webhook required).
+    #   - Newly-created records (age < 3 min)  → re-checked every 30s
+    #   - Recent records (age < 30 min)        → re-checked every 60s
+    #   - Older records                        → re-checked every 5 min
+    # The loop itself ticks every TICK_SEC; each record is only refreshed when its
+    # individual `last_polled_at + cadence` is due. No external scheduler dependency.
     import asyncio
-    POLL_INTERVAL_SEC = int(os.environ.get("WITHDRAWAL_POLL_INTERVAL", "300"))
+    TICK_SEC = int(os.environ.get("POLLER_TICK_SEC", "30"))
+    FAST_WINDOW = timedelta(minutes=int(os.environ.get("POLLER_FAST_WINDOW_MIN", "3")))
+    MED_WINDOW = timedelta(minutes=int(os.environ.get("POLLER_MED_WINDOW_MIN", "30")))
+    FAST_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_FAST_CADENCE_SEC", "30")))
+    MED_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_MED_CADENCE_SEC", "60")))
+    SLOW_CADENCE = timedelta(seconds=int(os.environ.get("POLLER_SLOW_CADENCE_SEC", "300")))
+
+    def _parse_iso(s):
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    def _cadence_for(age: timedelta) -> timedelta:
+        if age <= FAST_WINDOW:
+            return FAST_CADENCE
+        if age <= MED_WINDOW:
+            return MED_CADENCE
+        return SLOW_CADENCE
+
+    def _is_due(record, now):
+        created = _parse_iso(record.get("created_at")) or now
+        last = _parse_iso(record.get("last_polled_at")) or _parse_iso(record.get("updated_at")) or created
+        age = now - created
+        cadence = _cadence_for(age)
+        return (now - last) >= cadence
 
     async def _withdrawal_status_poller():
         from routes_admin import _refresh_one_withdrawal, _refresh_pending_deposit
         while True:
             try:
-                await asyncio.sleep(POLL_INTERVAL_SEC)
+                await asyncio.sleep(TICK_SEC)
+                now = datetime.now(timezone.utc)
+
+                # ----- Withdrawals -----
                 pendings = await db.withdrawals.find(
                     {"status": {"$in": ["pending", "processing"]}},
                     {"_id": 0},
                 ).to_list(500)
                 touched = 0
                 for w in pendings:
-                    if w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref"):
-                        try:
-                            await _refresh_one_withdrawal(db, w)
-                            touched += 1
-                        except Exception as inner:
-                            logger.warning(f"Poller: withdrawal refresh {w.get('id')} failed: {inner}")
-                # Also poll pending deposits (Marasoft / Paystack — same cycle)
+                    if not (w.get("nomba_transfer_ref") or w.get("paystack_transfer_ref")):
+                        continue
+                    if not _is_due(w, now):
+                        continue
+                    try:
+                        await _refresh_one_withdrawal(db, w)
+                        await db.withdrawals.update_one(
+                            {"id": w["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
+                        )
+                        touched += 1
+                    except Exception as inner:
+                        logger.warning(f"Poller: withdrawal refresh {w.get('id')} failed: {inner}")
+
+                # ----- Deposits -----
                 pending_deps = await db.deposits.find(
                     {"status": "pending"}, {"_id": 0},
                 ).to_list(500)
                 dep_touched = 0
                 for d in pending_deps:
-                    if d.get("method") in ("marasoft", "paystack"):
-                        try:
-                            await _refresh_pending_deposit(db, d)
-                            dep_touched += 1
-                        except Exception as inner:
-                            logger.warning(f"Poller: deposit refresh {d.get('id')} failed: {inner}")
+                    if d.get("method") not in ("marasoft", "paystack"):
+                        continue
+                    if not _is_due(d, now):
+                        continue
+                    try:
+                        await _refresh_pending_deposit(db, d)
+                        await db.deposits.update_one(
+                            {"id": d["id"]}, {"$set": {"last_polled_at": now.isoformat()}},
+                        )
+                        dep_touched += 1
+                    except Exception as inner:
+                        logger.warning(f"Poller: deposit refresh {d.get('id')} failed: {inner}")
+
                 if touched or dep_touched:
                     logger.info(f"Status poller: refreshed {touched} withdrawal(s) + {dep_touched} deposit(s)")
             except asyncio.CancelledError:
@@ -209,7 +257,12 @@ async def on_startup():
                 logger.warning(f"Status poller crashed (will retry): {e}")
 
     app.state._withdrawal_poller_task = asyncio.create_task(_withdrawal_status_poller())
-    logger.info(f"Withdrawal status poller scheduled every {POLL_INTERVAL_SEC}s")
+    logger.info(
+        f"Status poller online · tick={TICK_SEC}s · cadence: "
+        f"fast={int(FAST_CADENCE.total_seconds())}s ≤{int(FAST_WINDOW.total_seconds()/60)}m, "
+        f"med={int(MED_CADENCE.total_seconds())}s ≤{int(MED_WINDOW.total_seconds()/60)}m, "
+        f"slow={int(SLOW_CADENCE.total_seconds())}s"
+    )
 
 
 @app.on_event("shutdown")

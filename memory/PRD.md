@@ -1,5 +1,21 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 31)
+
+### Adaptive poller cadence
+`server.py` now runs a **single 30s tick loop** that decides per-record whether to refresh:
+
+| Record age (from `created_at`) | Refresh cadence |
+|---|---|
+| ≤ 3 minutes  | **30 seconds** |
+| ≤ 30 minutes | **60 seconds** |
+| > 30 minutes | **5 minutes** |
+
+- A new `last_polled_at` field on each withdrawal/deposit drives the next-due decision (falls back to `updated_at` then `created_at` for legacy records).
+- Same rule applies to deposits (Marasoft / Paystack pending records).
+- All tunable via env: `POLLER_TICK_SEC`, `POLLER_FAST_WINDOW_MIN`, `POLLER_MED_WINDOW_MIN`, `POLLER_FAST_CADENCE_SEC`, `POLLER_MED_CADENCE_SEC`, `POLLER_SLOW_CADENCE_SEC`.
+- Verified live: a synthetic processing withdrawal got refreshed within 40s of creation (fast cadence honored). Legacy stuck record continues to refresh on the 5-min slow cadence (confirmed via logs).
+
 ## Recent Changes (Feb 2026 — iteration 30)
 
 ### Nomba auto-polling fixed (no webhook required)
