@@ -20,7 +20,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="Naija Invest API")
+app = FastAPI(title="Evoque-Nova API")
 app.state.db = db
 
 api_router = APIRouter(prefix="/api")
@@ -28,7 +28,7 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.get("/")
 async def root():
-    return {"message": "Naija Invest API", "ts": datetime.now(timezone.utc).isoformat()}
+    return {"message": "Evoque-Nova API", "ts": datetime.now(timezone.utc).isoformat()}
 
 
 @api_router.get("/health")

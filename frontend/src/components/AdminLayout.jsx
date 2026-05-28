@@ -33,7 +33,7 @@ function Brand() {
         NI
       </div>
       <div className="leading-tight">
-        <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">NAIJAINVEST</div>
+        <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">EVOQUE-NOVA</div>
         <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--text-tertiary)] mt-0.5">Admin Panel</div>
       </div>
     </div>

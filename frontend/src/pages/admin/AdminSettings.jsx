@@ -316,7 +316,7 @@ export default function AdminSettings() {
                     type="text"
                     value={s.transfer_description_template || ""}
                     onChange={(e) => setS({ ...s, transfer_description_template: e.target.value })}
-                    placeholder="NaijaInvest deposit"
+                    placeholder="Evoque-Nova deposit"
                     data-testid="transfer-desc-input"
                     className="w-full input-base"
                   />

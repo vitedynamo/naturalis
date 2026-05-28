@@ -694,7 +694,7 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                     "https://api.paystack.co/transaction/initialize",
                     headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
                     json={
-                        "email": f"{user['phone']}@naijainvest.local",
+                        "email": f"{user['phone']}@evoque-nova.local",
                         "amount": amount_kobo,
                         "reference": reference,
                         "callback_url": callback_url,
@@ -1406,7 +1406,7 @@ async def public_settings(request: Request):
         "auto_payout_enabled": s.get("auto_payout_enabled", False),
         # Iteration 52 — exposed for user-side rendering
         "deposit_bonus_percent": s.get("deposit_bonus_percent", 0.0),
-        "transfer_description_template": s.get("transfer_description_template", "NaijaInvest deposit"),
+        "transfer_description_template": s.get("transfer_description_template", "Evoque-Nova deposit"),
         "multi_gateway_enabled": s.get("multi_gateway_enabled", False),
         "let_users_choose_gateway": s.get("let_users_choose_gateway", False),
         "quick_deposit_amounts": s.get("quick_deposit_amounts") or [3000, 5000, 10000, 25000, 50000, 100000],

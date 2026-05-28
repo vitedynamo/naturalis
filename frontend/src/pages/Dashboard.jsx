@@ -255,7 +255,7 @@ export default function Dashboard() {
                   const firstName = user?.name?.split(" ")[0] || "there";
                   const tpl = settings.welcome_modal_title;
                   if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
-                  return `Hi ${firstName} — welcome to NaijaInvest`;
+                  return `Hi ${firstName} — welcome to Evoque-Nova`;
                 })()}
               </DialogTitle>
             </DialogHeader>

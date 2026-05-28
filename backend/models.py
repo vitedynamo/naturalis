@@ -356,7 +356,7 @@ class Settings(BaseModel):
     # Deposits
     deposit_bonus_percent: float = 0.0
     deposit_bonus_limit_per_user: float = 0.0  # 0 = unlimited
-    transfer_description_template: str = "NaijaInvest deposit"
+    transfer_description_template: str = "Evoque-Nova deposit"
     multi_gateway_enabled: bool = False
     let_users_choose_gateway: bool = False
     quick_deposit_amounts: list = Field(default_factory=lambda: [3000, 5000, 10000, 25000, 50000, 100000])
