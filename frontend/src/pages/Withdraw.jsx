@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 
 export default function Withdraw() {
   const { user, refresh } = useAuth();
-  const [amount, setAmount] = useState("1000");
+  const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const [history, setHistory] = useState([]);
   const [settings, setSettings] = useState({ min_withdrawal: 1000 });
@@ -98,6 +98,7 @@ export default function Withdraw() {
         <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
         <input
           type="number" min={settings.min_withdrawal} max={user?.wallet_balance} value={amount} onChange={(e)=>setAmount(e.target.value)} required
+          placeholder={`Min ₦${Number(settings.min_withdrawal || 1000).toLocaleString()}`}
           data-testid="withdraw-amount-input"
           className="w-full mt-2 px-3 py-3 input-base"
         />
