@@ -14,7 +14,8 @@ export default function Deposit() {
   const [amount, setAmount] = useState("3000");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock" });
+  const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock", quick_deposit_amounts: [3000, 5000, 10000, 25000, 50000, 100000] });
+  const [chosenGateway, setChosenGateway] = useState("");
   const [highlightRef, setHighlightRef] = useState(null);
   const [rechecking, setRechecking] = useState({}); // { [reference]: true }
   const cardRefs = useRef({});
@@ -48,7 +49,11 @@ export default function Deposit() {
     setBusy(true);
     try {
       const callback_url = `${window.location.origin}/payment/callback`;
-      const { data } = await api.post("/deposit/initialize", { amount: Number(amount), callback_url });
+      const body = { amount: Number(amount), callback_url };
+      if (settings.multi_gateway_enabled && settings.let_users_choose_gateway && chosenGateway) {
+        body.gateway = chosenGateway;
+      }
+      const { data } = await api.post("/deposit/initialize", body);
       if (data.type === "bank_transfer") {
         // Marasoft dynamic account — navigate to dedicated transfer page
         navigate(`/deposit/transfer/${data.reference}`);
@@ -125,7 +130,10 @@ export default function Deposit() {
             className="w-full mt-2 px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
           />
           <div className="flex gap-2 mt-3 flex-wrap">
-            {[3000, 5000, 10000, 20000, 50000].map(v => (
+            {(settings.quick_deposit_amounts && settings.quick_deposit_amounts.length > 0
+              ? settings.quick_deposit_amounts
+              : [3000, 5000, 10000, 20000, 50000]
+            ).map(v => (
               <button type="button" key={v} onClick={() => setAmount(String(v))}
                 data-testid={`quick-amount-${v}`}
                 className="px-3 py-1.5 rounded-full text-sm border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)]">
@@ -133,6 +141,35 @@ export default function Deposit() {
               </button>
             ))}
           </div>
+
+          {settings.multi_gateway_enabled && settings.let_users_choose_gateway && (
+            <div className="mt-5" data-testid="deposit-gateway-picker">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">Payment method</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { v: "paystack", label: "Card", sub: "Paystack" },
+                  { v: "nomba",    label: "Wallet", sub: "Nomba" },
+                  { v: "marasoft", label: "Transfer", sub: "Marasoft" },
+                ].map((g) => {
+                  const sel = chosenGateway === g.v || (!chosenGateway && settings.deposit_gateway === g.v);
+                  return (
+                    <button type="button" key={g.v} onClick={() => setChosenGateway(g.v)}
+                      data-testid={`pick-gateway-${g.v}`}
+                      className={`p-3 rounded-xl border-2 text-left transition-colors ${sel ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)]" : "border-[color:var(--border-default)] hover:border-[color:var(--brand)]/40"}`}>
+                      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">{g.label}</div>
+                      <div className={`font-display font-bold text-sm mt-0.5 ${sel ? "text-[color:var(--brand)]" : "text-[color:var(--text-primary)]"}`}>{g.sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {settings.transfer_description_template && (
+            <div className="mt-4 rounded-md bg-[color:var(--surface-alt)] p-2.5 text-[11px] text-[color:var(--text-secondary)]">
+              <span className="font-bold text-[color:var(--text-primary)]">Transfer narration:</span> use <span className="font-mono">"{settings.transfer_description_template}"</span> when funding by bank transfer.
+            </div>
+          )}
           <button type="submit" disabled={busy}
             data-testid="deposit-submit-btn"
             className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-lg font-semibold disabled:opacity-60">

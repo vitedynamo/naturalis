@@ -29,10 +29,18 @@ export default function Withdraw() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!/^\d{4}$/.test(pin)) { toast.error("Enter your 4-digit PIN"); return; }
+    const requirePin = settings.require_withdrawal_pin !== false;
+    if (requirePin && !/^\d{4}$/.test(pin)) { toast.error("Enter your 4-digit PIN"); return; }
+    const amt = Number(amount);
+    if (settings.max_withdrawal && amt > settings.max_withdrawal) {
+      toast.error(`Max withdrawal is ₦${Number(settings.max_withdrawal).toLocaleString()}`);
+      return;
+    }
     setBusy(true);
     try {
-      await api.post("/withdrawal/request", { amount: Number(amount), method: "manual", pin });
+      const body = { amount: amt, method: "manual" };
+      if (requirePin) body.pin = pin;
+      await api.post("/withdrawal/request", body);
       toast.success("Withdrawal request submitted");
       setPin("");
       await refresh();
@@ -65,7 +73,13 @@ export default function Withdraw() {
     <UserLayout>
       <div className="text-label">Funds</div>
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">Withdraw</h1>
-      <p className="text-sm text-[color:var(--text-secondary)] mt-1">Minimum withdrawal: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.min_withdrawal)}</span></p>
+      <p className="text-sm text-[color:var(--text-secondary)] mt-1">
+        Limits: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.min_withdrawal)}</span>
+        {settings.max_withdrawal ? <> – <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.max_withdrawal)}</span></> : null}
+        {settings.auto_payout_max_amount > 0 && (
+          <> · auto-payout up to <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.auto_payout_max_amount)}</span> (larger requests need admin approval)</>
+        )}
+      </p>
 
       {!bankReady && (
         <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="bank-missing-warn">
@@ -97,33 +111,46 @@ export default function Withdraw() {
       <form onSubmit={submit} className="card-soft p-6 mt-6" data-testid="withdraw-form">
         <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
         <input
-          type="number" min={settings.min_withdrawal} max={user?.wallet_balance} value={amount} onChange={(e)=>setAmount(e.target.value)} required
+          type="number"
+          min={settings.min_withdrawal}
+          max={Math.min(user?.wallet_balance ?? Infinity, settings.max_withdrawal || Infinity)}
+          value={amount} onChange={(e)=>setAmount(e.target.value)} required
           placeholder={`Min ₦${Number(settings.min_withdrawal || 1000).toLocaleString()}`}
           data-testid="withdraw-amount-input"
           className="w-full mt-2 px-3 py-3 input-base"
         />
 
-        <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mt-4 flex items-center gap-1.5">
-          <KeyRound className="w-3 h-3" /> Withdrawal PIN
-        </label>
-        <input
-          type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          disabled={!hasPin}
-          required
-          placeholder={hasPin ? "••••" : "Set PIN on Profile first"}
-          data-testid="withdraw-pin-input"
-          className="w-full mt-2 px-3 py-3 input-base font-mono tracking-[0.5em] text-center"
-        />
+        {settings.require_withdrawal_pin !== false && (
+          <>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mt-4 flex items-center gap-1.5">
+              <KeyRound className="w-3 h-3" /> Withdrawal PIN
+            </label>
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              disabled={!hasPin}
+              required
+              placeholder={hasPin ? "••••" : "Set PIN on Profile first"}
+              data-testid="withdraw-pin-input"
+              className="w-full mt-2 px-3 py-3 input-base font-mono tracking-[0.5em] text-center"
+            />
+          </>
+        )}
 
-        <button type="submit" disabled={busy || !bankReady || !windowState.open || !hasPin || pin.length !== 4}
+        {settings.auto_payout_max_amount > 0 && Number(amount) > settings.auto_payout_max_amount && (
+          <div className="mt-3 rounded-md bg-[color:var(--gold-soft)] text-[color:var(--warning)] p-2.5 text-[11px]" data-testid="manual-approval-hint">
+            Amounts above {formatNaira(settings.auto_payout_max_amount)} need admin approval and may take a little longer.
+          </div>
+        )}
+
+        <button type="submit" disabled={busy || !bankReady || !windowState.open || (settings.require_withdrawal_pin !== false && (!hasPin || pin.length !== 4))}
           data-testid="withdraw-submit-btn"
           title={
             !bankReady ? "Add complete bank details first"
-            : !hasPin ? "Set your 4-digit withdrawal PIN first"
+            : (settings.require_withdrawal_pin !== false && !hasPin) ? "Set your 4-digit withdrawal PIN first"
             : !windowState.open ? (windowState.reason || "Withdrawals closed")
-            : pin.length !== 4 ? "Enter your 4-digit PIN"
+            : (settings.require_withdrawal_pin !== false && pin.length !== 4) ? "Enter your 4-digit PIN"
             : ""
           }
           className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60 disabled:cursor-not-allowed">

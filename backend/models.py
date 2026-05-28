@@ -160,6 +160,7 @@ class Deposit(BaseModel):
 class DepositInitRequest(BaseModel):
     amount: float
     callback_url: Optional[str] = None
+    gateway: Optional[str] = None  # paystack | nomba | marasoft — honoured only when multi_gateway_enabled + let_users_choose_gateway
 
 
 # ----- Withdrawal -----

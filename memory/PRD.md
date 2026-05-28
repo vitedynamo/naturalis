@@ -1,5 +1,23 @@
 # Naija Invest — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 53)
+
+### User-facing pages wired to new settings + Daily Claim end-to-end
+**Backend** (`routes_user.py`, `models.py`):
+- `DepositInitRequest` accepts optional `gateway`. Honoured by `/deposit/initialize` only when both `multi_gateway_enabled` and `let_users_choose_gateway` are ON; otherwise the global `deposit_gateway` setting wins.
+- `/withdrawal/request` now:
+  - Skips the PIN block entirely when `require_withdrawal_pin = false` (admin override).
+  - Rejects amounts above `max_withdrawal` (when configured) with a 400.
+  - Forces manual approval (skips auto-payout, leaves status pending) when `auto_payout_max_amount > 0` and the request equals/exceeds it.
+- New endpoints `/daily-claim/status` (returns enabled/amount/cooldown) and `/daily-claim/claim` (24h cooldown; credits wallet + writes `daily_claim` transaction). User doc gains `last_daily_claim_at`.
+
+**Frontend** (`Deposit.jsx`, `Withdraw.jsx`, `Dashboard.jsx`):
+- Deposit: Quick-amount chips now read from `settings.quick_deposit_amounts` (fallback retained); a new gateway-picker grid appears below when both `multi_gateway_enabled` + `let_users_choose_gateway` are ON; transfer-description template surfaced as a "narration to use" hint.
+- Withdraw: Limits row now shows `min – max` and an extra hint about auto-payout cap; PIN input is conditionally rendered + the submit gating bypasses PIN checks when not required; in-form warning when requested amount exceeds the auto-payout cap (admin-approval needed); `max` attribute set on amount input.
+- Dashboard: New **DailyClaimCard** (brand-magenta gradient) appears above the featured plan when daily claim is enabled. Shows the amount, a live 24h countdown when on cooldown, and a one-click Claim button that credits the wallet via the new endpoint.
+
+Verified e2e: daily-claim status + claim + re-claim (429); deposit init with gateway override produces a deposit (logged as "mock" in mock-mode as expected); screenshots confirm new Limits row on Withdraw and dashboard daily-claim flow.
+
 ## Recent Changes (Feb 2026 — iteration 52)
 
 ### Settings expansion + Danger-zone tools + Reverse adjustment + Admin password

@@ -614,6 +614,13 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     reference = gen_reference("dep")
     mode = settings.get("payment_mode", "mock")
     gateway = settings.get("deposit_gateway", "paystack")
+    # If multi-gateway + user-choose are both enabled, honour the client-provided gateway
+    if (
+        settings.get("multi_gateway_enabled")
+        and settings.get("let_users_choose_gateway")
+        and data.gateway in ("paystack", "nomba", "marasoft")
+    ):
+        gateway = data.gateway
 
     # Decide which gateway to use based on settings
     use_marasoft = gateway == "marasoft" and bool(settings.get("marasoft_public_key"))
@@ -1023,38 +1030,38 @@ def _is_within_window(start_hhmm: str, end_hhmm: str) -> bool:
 async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
     settings = await _settings(db)
+    require_pin = settings.get("require_withdrawal_pin", True) is not False
 
-    # Withdrawal PIN — REQUIRED for every withdrawal
-    if not user.get("withdrawal_pin_hash"):
+    # Withdrawal PIN — REQUIRED only when the admin setting demands it
+    if require_pin and not user.get("withdrawal_pin_hash"):
         raise HTTPException(400, "Please set your 4-digit withdrawal PIN on your Profile page before withdrawing.")
-    # Brute-force protection: 5 fails → 15 min lock
-    locked = user.get("withdrawal_pin_locked_until")
-    if locked:
-        try:
-            locked_until = datetime.fromisoformat(locked.replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) < locked_until:
-                mins = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
-                raise HTTPException(429, f"Too many wrong PIN attempts. Try again in {mins} min.")
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-    if not data.pin or not verify_password(data.pin.strip(), user["withdrawal_pin_hash"]):
-        # increment fail counter
-        new_fail = int(user.get("withdrawal_pin_failed", 0)) + 1
-        update = {"withdrawal_pin_failed": new_fail}
-        from datetime import timedelta as _td
-        if new_fail >= 5:
-            update["withdrawal_pin_locked_until"] = (datetime.now(timezone.utc) + _td(minutes=15)).isoformat()
-            update["withdrawal_pin_failed"] = 0
+    if require_pin:
+        # Brute-force protection: 5 fails → 15 min lock
+        locked = user.get("withdrawal_pin_locked_until")
+        if locked:
+            try:
+                locked_until = datetime.fromisoformat(locked.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) < locked_until:
+                    mins = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+                    raise HTTPException(429, f"Too many wrong PIN attempts. Try again in {mins} min.")
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+        if not data.pin or not verify_password(data.pin.strip(), user["withdrawal_pin_hash"]):
+            new_fail = int(user.get("withdrawal_pin_failed", 0)) + 1
+            update = {"withdrawal_pin_failed": new_fail}
+            from datetime import timedelta as _td
+            if new_fail >= 5:
+                update["withdrawal_pin_locked_until"] = (datetime.now(timezone.utc) + _td(minutes=15)).isoformat()
+                update["withdrawal_pin_failed"] = 0
+                await db.users.update_one({"id": user["id"]}, {"$set": update})
+                raise HTTPException(429, "Too many wrong PIN attempts. PIN locked for 15 minutes.")
             await db.users.update_one({"id": user["id"]}, {"$set": update})
-            raise HTTPException(429, "Too many wrong PIN attempts. PIN locked for 15 minutes.")
-        await db.users.update_one({"id": user["id"]}, {"$set": update})
-        remaining = 5 - new_fail
-        raise HTTPException(400, f"Invalid PIN. {remaining} attempt{'s' if remaining != 1 else ''} remaining.")
-    # PIN ok — reset fail counter
-    if user.get("withdrawal_pin_failed"):
-        await db.users.update_one({"id": user["id"]}, {"$set": {"withdrawal_pin_failed": 0, "withdrawal_pin_locked_until": None}})
+            remaining = 5 - new_fail
+            raise HTTPException(400, f"Invalid PIN. {remaining} attempt{'s' if remaining != 1 else ''} remaining.")
+        if user.get("withdrawal_pin_failed"):
+            await db.users.update_one({"id": user["id"]}, {"$set": {"withdrawal_pin_failed": 0, "withdrawal_pin_locked_until": None}})
 
     # Master kill-switch
     if not settings.get("withdrawals_open", True):
@@ -1068,6 +1075,9 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
     min_w = settings.get("min_withdrawal", 1000)
     if data.amount < min_w:
         raise HTTPException(400, f"Minimum withdrawal is ₦{min_w:,.2f}")
+    max_w = float(settings.get("max_withdrawal") or 0)
+    if max_w > 0 and data.amount > max_w:
+        raise HTTPException(400, f"Maximum withdrawal is ₦{max_w:,.2f}")
     if user["wallet_balance"] < data.amount:
         raise HTTPException(400, "Insufficient wallet balance")
     if not (user.get("bank_name") and user.get("account_number") and user.get("account_name") and user.get("bank_code")):
@@ -1110,6 +1120,10 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
 
     # Try auto-payout — enabled by default. Admins can disable via Settings if they want manual approval.
     auto = bool(settings.get("auto_payout_enabled", True))
+    auto_cap = float(settings.get("auto_payout_max_amount") or 0)
+    if auto_cap > 0 and float(data.amount) >= auto_cap:
+        # Above the cap → manual approval. Skip auto-payout, leave status pending.
+        auto = False
     if auto and user.get("bank_code"):
         payout_gateway = settings.get("payout_gateway", "paystack")
         mode = settings.get("payment_mode", "mock")
@@ -1479,4 +1493,77 @@ async def user_dismiss_announcement(ann_id: str, request: Request, current=Depen
         upsert=True,
     )
     return {"status": "ok"}
+
+
+
+# ============================================================================
+# Daily claim
+# ============================================================================
+
+@router.get("/daily-claim/status")
+async def daily_claim_status(request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    settings = await _settings(db)
+    enabled = bool(settings.get("daily_claim_enabled"))
+    amount = float(settings.get("daily_claim_amount") or 0)
+    last = user.get("last_daily_claim_at")
+    cooldown_remaining_sec = 0
+    if last:
+        try:
+            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00")) if isinstance(last, str) else last
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
+            cooldown_remaining_sec = max(0, 24 * 3600 - int(elapsed))
+        except Exception:
+            cooldown_remaining_sec = 0
+    return {
+        "enabled": enabled,
+        "amount": amount,
+        "can_claim": enabled and amount > 0 and cooldown_remaining_sec == 0,
+        "cooldown_remaining_sec": cooldown_remaining_sec,
+        "last_claim_at": last,
+    }
+
+
+@router.post("/daily-claim/claim")
+async def daily_claim_claim(request: Request, user=Depends(get_current_user)):
+    db = request.app.state.db
+    settings = await _settings(db)
+    if not settings.get("daily_claim_enabled"):
+        raise HTTPException(400, "Daily claim is disabled")
+    amount = float(settings.get("daily_claim_amount") or 0)
+    if amount <= 0:
+        raise HTTPException(400, "Daily claim amount is zero")
+    last = user.get("last_daily_claim_at")
+    if last:
+        try:
+            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00")) if isinstance(last, str) else last
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - last_dt).total_seconds() < 24 * 3600:
+                raise HTTPException(429, "You've already claimed today. Come back in 24 hours.")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+    now = _now_iso()
+    new_user = await db.users.find_one_and_update(
+        {"id": user["id"]},
+        {"$inc": {"wallet_balance": amount, "total_earnings": amount},
+         "$set": {"last_daily_claim_at": now}},
+        return_document=True,
+        projection={"_id": 0, "wallet_balance": 1},
+    )
+    await db.transactions.insert_one({
+        "id": gen_reference("tx"),
+        "user_id": user["id"],
+        "type": "daily_claim",
+        "amount": amount,
+        "description": "Daily sign-in bonus",
+        "balance_after": new_user["wallet_balance"],
+        "meta": {"source": "daily_claim"},
+        "created_at": now,
+    })
+    return {"status": "ok", "amount": amount, "new_balance": new_user["wallet_balance"]}
 

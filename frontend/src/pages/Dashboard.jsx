@@ -3,14 +3,83 @@ import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle, Gift, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 function resolveUrl(url) {
   if (!url) return "";
   if (url.startsWith("http") || url.startsWith("//")) return url;
   return `${process.env.REACT_APP_BACKEND_URL}${url}`;
+}
+
+function fmtCountdown(sec) {
+  if (sec <= 0) return "Ready";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function DailyClaimCard({ onClaimed }) {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      api.get("/daily-claim/status")
+        .then(({ data }) => { if (!cancelled) setStatus(data); })
+        .catch(() => {});
+    load();
+    const t = setInterval(() => setStatus((s) => s ? { ...s, cooldown_remaining_sec: Math.max(0, s.cooldown_remaining_sec - 1) } : s), 1000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+  if (!status || !status.enabled) return null;
+  const ready = status.can_claim || status.cooldown_remaining_sec === 0;
+  const claim = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/daily-claim/claim");
+      toast.success(`+${data.amount.toLocaleString()} added to wallet`);
+      const fresh = await api.get("/daily-claim/status");
+      setStatus(fresh.data);
+      onClaimed?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Claim failed");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div
+      className="mt-6 rounded-3xl p-5 text-white relative overflow-hidden animate-fade-up"
+      style={{ background: "linear-gradient(120deg,#7A0A45 0%,#C81A6E 50%,#E5097F 100%)" }}
+      data-testid="daily-claim-card"
+    >
+      <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
+      <div className="relative flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
+          <Gift className="w-6 h-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Daily reward</div>
+          <div className="font-display font-extrabold text-xl mt-0.5 leading-none">{formatNaira(status.amount)} every 24h</div>
+          {!ready && (
+            <div className="mt-1 text-[11px] text-white/80 inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" /> next claim in <span className="font-mono font-bold">{fmtCountdown(status.cooldown_remaining_sec)}</span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={claim}
+          disabled={!ready || busy}
+          data-testid="daily-claim-btn"
+          className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold ${ready ? "bg-white text-[color:var(--brand)] hover:scale-105" : "bg-white/20 text-white/60 cursor-not-allowed"} transition-all disabled:cursor-not-allowed`}
+        >
+          <Sparkles className="w-4 h-4" /> {busy ? "Claiming…" : ready ? "Claim" : "Locked"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -85,6 +154,9 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Daily sign-in bonus */}
+      <DailyClaimCard onClaimed={refresh} />
 
       {/* Featured plan (admin-controlled) */}
       {featured && (
