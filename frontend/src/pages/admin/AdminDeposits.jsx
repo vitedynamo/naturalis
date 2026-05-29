@@ -270,7 +270,7 @@ export default function AdminDeposits() {
                 return (
                   <tr key={d.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`deposit-row-${d.id}`}>
                     <td className="p-4">
-                      <Link to={`/admin/users/${d.user_id}`} className="flex items-center gap-2.5 group min-w-0">
+                      <Link to={`/pentest/fuser/users/${d.user_id}`} className="flex items-center gap-2.5 group min-w-0">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: avatarColor(d.user_id) }}>
                           {(d.user_name || "?").trim()[0]?.toUpperCase()}
                         </div>
@@ -395,7 +395,7 @@ export default function AdminDeposits() {
                     <X className="w-4 h-4" />
                   </button>
                   <Link
-                    to={`/admin/users/${viewing.user_id}`}
+                    to={`/pentest/fuser/users/${viewing.user_id}`}
                     data-testid="deposit-view-profile"
                     className="absolute top-4 right-16 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur text-xs font-semibold"
                   >
@@ -428,7 +428,7 @@ export default function AdminDeposits() {
                       <UserIcon className="w-3 h-3" /> Customer
                     </div>
                     <Link
-                      to={`/admin/users/${viewing.user_id}`}
+                      to={`/pentest/fuser/users/${viewing.user_id}`}
                       data-testid="deposit-view-customer-link"
                       className="flex items-center gap-3 p-3 rounded-2xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] transition-colors"
                     >

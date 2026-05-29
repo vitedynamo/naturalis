@@ -765,7 +765,7 @@ function DangerZone({ s, setS }) {
         const { data } = await api.post("/admin/system/clear-database", { confirm_token: confirmText });
         toast.success(`Database cleared · ${Object.values(data.deleted || {}).reduce((a, b) => a + b, 0)} records removed`);
         // After a nuke, navigate away to avoid stale state
-        setTimeout(() => navigate("/admin"), 800);
+        setTimeout(() => navigate("/pentest/fuser"), 800);
       }
       setConfirmKind(null);
       setConfirmText("");

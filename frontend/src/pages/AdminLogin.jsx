@@ -26,7 +26,7 @@ export default function AdminLogin() {
         return;
       }
       setSession(data.token, data.user, "admin");
-      navigate("/admin", { replace: true });
+      navigate("/pentest/fuser", { replace: true });
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Invalid credentials");
       setLoading(false);

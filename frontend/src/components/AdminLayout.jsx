@@ -10,21 +10,21 @@ import { useBranding } from "@/context/BrandingContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const items = [
-  { to: "/admin", icon: LayoutGrid, label: "Dashboard", end: true },
-  { to: "/admin/users", icon: Users, label: "Users" },
-  { to: "/admin/products", icon: Package, label: "Products" },
-  { to: "/admin/deposits", icon: ArrowDownToLine, label: "Deposits" },
-  { to: "/admin/withdrawals", icon: ArrowUpFromLine, label: "Withdrawals" },
-  { to: "/admin/investments", icon: TrendingUp, label: "Investments" },
-  { to: "/admin/referrals", icon: Share2, label: "Referrals" },
-  { to: "/admin/coupons", icon: Ticket, label: "Coupons" },
-  { to: "/admin/announcements", icon: Megaphone, label: "Announcements" },
-  { to: "/admin/manual-adjustments", icon: SlidersHorizontal, label: "Manual Adjustments" },
-  { to: "/admin/fraud-monitor", icon: ShieldAlert, label: "Fraud Monitor" },
-  { to: "/admin/activity-log", icon: History, label: "Activity Log" },
-  { to: "/admin/financial-report", icon: FileBarChart2, label: "Financial Report" },
-  { to: "/admin/password-resets", icon: KeyRound, label: "Password Resets" },
-  { to: "/admin/settings", icon: SettingsIcon, label: "Settings" },
+  { to: "/pentest/fuser", icon: LayoutGrid, label: "Dashboard", end: true },
+  { to: "/pentest/fuser/users", icon: Users, label: "Users" },
+  { to: "/pentest/fuser/products", icon: Package, label: "Products" },
+  { to: "/pentest/fuser/deposits", icon: ArrowDownToLine, label: "Deposits" },
+  { to: "/pentest/fuser/withdrawals", icon: ArrowUpFromLine, label: "Withdrawals" },
+  { to: "/pentest/fuser/investments", icon: TrendingUp, label: "Investments" },
+  { to: "/pentest/fuser/referrals", icon: Share2, label: "Referrals" },
+  { to: "/pentest/fuser/coupons", icon: Ticket, label: "Coupons" },
+  { to: "/pentest/fuser/announcements", icon: Megaphone, label: "Announcements" },
+  { to: "/pentest/fuser/manual-adjustments", icon: SlidersHorizontal, label: "Manual Adjustments" },
+  { to: "/pentest/fuser/fraud-monitor", icon: ShieldAlert, label: "Fraud Monitor" },
+  { to: "/pentest/fuser/activity-log", icon: History, label: "Activity Log" },
+  { to: "/pentest/fuser/financial-report", icon: FileBarChart2, label: "Financial Report" },
+  { to: "/pentest/fuser/password-resets", icon: KeyRound, label: "Password Resets" },
+  { to: "/pentest/fuser/settings", icon: SettingsIcon, label: "Settings" },
 ];
 
 function Brand() {

@@ -342,7 +342,7 @@ function InvestmentDetailModal({ inv, onClose, onCancelled, onChanged }) {
               <UserIcon className="w-3 h-3" /> Customer
             </div>
             <Link
-              to={`/admin/users/${inv.user_id}`}
+              to={`/pentest/fuser/users/${inv.user_id}`}
               data-testid="investment-detail-customer"
               className="flex items-center gap-3 p-3 rounded-2xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--brand-soft)] transition-colors group"
             >
@@ -1080,7 +1080,7 @@ export default function AdminInvestments() {
                     </td>
                     {/* User */}
                     <td className="p-4 max-w-[220px]">
-                      <Link to={`/admin/users/${i.user_id}`} className="flex items-center gap-2.5 group min-w-0">
+                      <Link to={`/pentest/fuser/users/${i.user_id}`} className="flex items-center gap-2.5 group min-w-0">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: avatarColor(i.user_id) }}>
                           {(i.user_name || "?").trim()[0]?.toUpperCase()}
                         </div>

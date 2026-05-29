@@ -57,7 +57,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/payment/callback" element={<PaymentCallback />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/pentest/fuser/login" element={<AdminLogin />} />
 
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
               <Route path="/invest" element={<Protected><Invest /></Protected>} />
@@ -71,24 +71,24 @@ function App() {
               <Route path="/history" element={<Protected><History /></Protected>} />
               <Route path="/profile" element={<Protected><Profile /></Protected>} />
 
-              <Route path="/admin" element={<Protected admin><AdminDashboard /></Protected>} />
-              <Route path="/admin/users" element={<Protected admin><AdminUsers /></Protected>} />
-              <Route path="/admin/users/:id" element={<Protected admin><AdminUserDetail /></Protected>} />
-              <Route path="/admin/products" element={<Protected admin><AdminProducts /></Protected>} />
-              <Route path="/admin/deposits" element={<Protected admin><AdminDeposits /></Protected>} />
-              <Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals /></Protected>} />
-              <Route path="/admin/investments" element={<Protected admin><AdminInvestments /></Protected>} />
-              <Route path="/admin/referrals" element={<Protected admin><AdminReferrals /></Protected>} />
-              <Route path="/admin/coupons" element={<Protected admin><AdminCoupons /></Protected>} />
-              <Route path="/admin/announcements" element={<Protected admin><AdminAnnouncements /></Protected>} />
-              <Route path="/admin/manual-adjustments" element={<Protected admin><AdminManualAdjustments /></Protected>} />
-              <Route path="/admin/fraud-monitor" element={<Protected admin><AdminFraudMonitor /></Protected>} />
-              <Route path="/admin/activity-log" element={<Protected admin><AdminActivityLog /></Protected>} />
-              <Route path="/admin/profit-breakdown" element={<Protected admin><AdminProfitBreakdown /></Protected>} />
-              <Route path="/admin/payout-projection" element={<Protected admin><AdminPayoutProjection /></Protected>} />
-              <Route path="/admin/financial-report" element={<Protected admin><AdminFinancialReport /></Protected>} />
-              <Route path="/admin/password-resets" element={<Protected admin><AdminPasswordResets /></Protected>} />
-              <Route path="/admin/settings" element={<Protected admin><AdminSettings /></Protected>} />
+              <Route path="/pentest/fuser" element={<Protected admin><AdminDashboard /></Protected>} />
+              <Route path="/pentest/fuser/users" element={<Protected admin><AdminUsers /></Protected>} />
+              <Route path="/pentest/fuser/users/:id" element={<Protected admin><AdminUserDetail /></Protected>} />
+              <Route path="/pentest/fuser/products" element={<Protected admin><AdminProducts /></Protected>} />
+              <Route path="/pentest/fuser/deposits" element={<Protected admin><AdminDeposits /></Protected>} />
+              <Route path="/pentest/fuser/withdrawals" element={<Protected admin><AdminWithdrawals /></Protected>} />
+              <Route path="/pentest/fuser/investments" element={<Protected admin><AdminInvestments /></Protected>} />
+              <Route path="/pentest/fuser/referrals" element={<Protected admin><AdminReferrals /></Protected>} />
+              <Route path="/pentest/fuser/coupons" element={<Protected admin><AdminCoupons /></Protected>} />
+              <Route path="/pentest/fuser/announcements" element={<Protected admin><AdminAnnouncements /></Protected>} />
+              <Route path="/pentest/fuser/manual-adjustments" element={<Protected admin><AdminManualAdjustments /></Protected>} />
+              <Route path="/pentest/fuser/fraud-monitor" element={<Protected admin><AdminFraudMonitor /></Protected>} />
+              <Route path="/pentest/fuser/activity-log" element={<Protected admin><AdminActivityLog /></Protected>} />
+              <Route path="/pentest/fuser/profit-breakdown" element={<Protected admin><AdminProfitBreakdown /></Protected>} />
+              <Route path="/pentest/fuser/payout-projection" element={<Protected admin><AdminPayoutProjection /></Protected>} />
+              <Route path="/pentest/fuser/financial-report" element={<Protected admin><AdminFinancialReport /></Protected>} />
+              <Route path="/pentest/fuser/password-resets" element={<Protected admin><AdminPasswordResets /></Protected>} />
+              <Route path="/pentest/fuser/settings" element={<Protected admin><AdminSettings /></Protected>} />
 
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

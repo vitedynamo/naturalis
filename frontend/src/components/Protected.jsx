@@ -11,7 +11,7 @@ export function Protected({ children, admin = false }) {
       </div>
     );
   }
-  if (!user) return <Navigate to={admin ? "/admin/login" : "/login"} replace />;
+  if (!user) return <Navigate to={admin ? "/pentest/fuser/login" : "/login"} replace />;
   if (admin && !user.is_admin) return <Navigate to="/dashboard" replace />;
   // Admins can preview user routes — they're authorised for both surfaces.
   return children;

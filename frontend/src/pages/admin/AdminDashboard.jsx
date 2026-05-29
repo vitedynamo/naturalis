@@ -146,7 +146,7 @@ export default function AdminDashboard() {
 
       {/* Hero: Platform profit + Next 24h payout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-        <Link to="/admin/profit-breakdown" className="rounded-3xl p-6 md:p-8 text-white relative overflow-hidden bg-gradient-to-br from-[color:var(--accent-main)] via-[#E11D74] to-[color:var(--brand)] shadow-xl shadow-[color:var(--accent-main)]/30 hover:shadow-2xl hover:scale-[1.01] transition-all" data-testid="platform-profit-card">
+        <Link to="/pentest/fuser/profit-breakdown" className="rounded-3xl p-6 md:p-8 text-white relative overflow-hidden bg-gradient-to-br from-[color:var(--accent-main)] via-[#E11D74] to-[color:var(--brand)] shadow-xl shadow-[color:var(--accent-main)]/30 hover:shadow-2xl hover:scale-[1.01] transition-all" data-testid="platform-profit-card">
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/15 blur-2xl" />
           <div className="relative flex items-start justify-between gap-3">
             <div>
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
           </div>
         </Link>
 
-        <Link to="/admin/payout-projection" className="card-soft p-6 md:p-8 relative hover:scale-[1.01] hover:shadow-lg transition-all block" data-testid="next-payout-card">
+        <Link to="/pentest/fuser/payout-projection" className="card-soft p-6 md:p-8 relative hover:scale-[1.01] hover:shadow-lg transition-all block" data-testid="next-payout-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-label">Next 24h payout</div>
@@ -341,10 +341,10 @@ export default function AdminDashboard() {
       <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mt-8 mb-2">Quick actions</div>
       <div className="grid grid-cols-2 lg:grid-cols-4 sm:gap-4 gap-3">
         {[
-          { to: "/admin/users", icon: Users, label: "Manage Users", tone: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]" },
-          { to: "/admin/products", icon: TrendingUp, label: "Products", tone: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]" },
-          { to: "/admin/deposits", icon: ArrowDownToLine, label: "Deposits", tone: "bg-[color:var(--success-soft)] text-[color:var(--success)]" },
-          { to: "/admin/withdrawals", icon: Banknote, label: "Withdrawals", tone: "bg-[color:var(--gold-soft)] text-[color:var(--warning)]" },
+          { to: "/pentest/fuser/users", icon: Users, label: "Manage Users", tone: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]" },
+          { to: "/pentest/fuser/products", icon: TrendingUp, label: "Products", tone: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]" },
+          { to: "/pentest/fuser/deposits", icon: ArrowDownToLine, label: "Deposits", tone: "bg-[color:var(--success-soft)] text-[color:var(--success)]" },
+          { to: "/pentest/fuser/withdrawals", icon: Banknote, label: "Withdrawals", tone: "bg-[color:var(--gold-soft)] text-[color:var(--warning)]" },
         ].map((q) => (
           <Link key={q.to} to={q.to} data-testid={`quick-${q.to.split("/").pop()}`}
             className="card-soft p-4 flex items-center justify-between gap-3 hover:-translate-y-0.5 transition-transform">

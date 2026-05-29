@@ -241,7 +241,7 @@ export default function AdminManualAdjustments() {
               {q || filter !== "All" ? "No adjustments match this filter." : "No manual adjustments yet"}
             </div>
             <div className="text-xs text-[color:var(--text-tertiary)] mt-1">
-              Adjust user balances from the <Link to="/admin/users" className="text-[color:var(--brand)] font-bold hover:underline">Users page</Link>.
+              Adjust user balances from the <Link to="/pentest/fuser/users" className="text-[color:var(--brand)] font-bold hover:underline">Users page</Link>.
             </div>
           </div>
         )}
@@ -269,7 +269,7 @@ export default function AdminManualAdjustments() {
                 {/* Identity + note — username font matches AdminUsers (semibold, base sans) */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link to={`/admin/users/${t.user_id}`} className="font-semibold text-sm text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate" data-testid={`adj-user-${t.id}`}>
+                    <Link to={`/pentest/fuser/users/${t.user_id}`} className="font-semibold text-sm text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate" data-testid={`adj-user-${t.id}`}>
                       {t.user_name || "—"}
                     </Link>
                     <span className="font-mono text-[10px] text-[color:var(--text-tertiary)]">{t.user_phone}</span>
@@ -299,7 +299,7 @@ export default function AdminManualAdjustments() {
                 </div>
                 {/* Open profile */}
                 <Link
-                  to={`/admin/users/${t.user_id}`}
+                  to={`/pentest/fuser/users/${t.user_id}`}
                   data-testid={`adj-open-${t.id}`}
                   className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] hover:opacity-90"
                   title="Open user profile"

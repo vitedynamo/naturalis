@@ -647,7 +647,7 @@ export default function AdminWithdrawals() {
                 return (
                   <tr key={w.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`withdrawal-row-${w.id}`}>
                     <td className="p-4 max-w-[200px]">
-                      <Link to={`/admin/users/${w.user_id}`} className="flex items-center gap-2.5 group min-w-0">
+                      <Link to={`/pentest/fuser/users/${w.user_id}`} className="flex items-center gap-2.5 group min-w-0">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: avatarColor(w.user_id) }}>
                           {(w.user_name || "?").trim()[0]?.toUpperCase()}
                         </div>
@@ -837,7 +837,7 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
         {/* Gradient header */}
         <div className={`relative bg-gradient-to-br ${headerTone} text-white p-6`}>
           <div className="absolute top-3 right-3 flex items-center gap-2">
-            <Link to={`/admin/users/${w.user_id}`}
+            <Link to={`/pentest/fuser/users/${w.user_id}`}
               data-testid="toolkit-profile-link"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white/15 backdrop-blur hover:bg-white/25 text-white">
               <UserIcon className="w-3.5 h-3.5" /> Profile
@@ -872,7 +872,7 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
         <div className="max-h-[60vh] overflow-y-auto p-5 space-y-5 bg-[color:var(--surface)]">
           {/* Customer */}
           <Section icon={UserIcon} label="Customer">
-            <Link to={`/admin/users/${w.user_id}`}
+            <Link to={`/pentest/fuser/users/${w.user_id}`}
               data-testid="toolkit-customer-link"
               className="card-soft p-3 flex items-center gap-3 group hover:bg-[color:var(--surface-alt)]/60 transition-colors">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shrink-0" style={{ backgroundColor: avatarColor(w.user_id) }}>

@@ -170,14 +170,14 @@ export default function AdminUserDetail() {
 
   if (!data) return (
     <AdminLayout title="">
-      <Link to="/admin/users" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]"><ArrowLeft className="w-4 h-4" /> Back to users</Link>
+      <Link to="/pentest/fuser/users" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]"><ArrowLeft className="w-4 h-4" /> Back to users</Link>
       <div className="card-soft p-12 mt-6 text-center text-[color:var(--text-tertiary)]">Loading…</div>
     </AdminLayout>
   );
 
   return (
     <AdminLayout title="">
-      <Link to="/admin/users" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]" data-testid="back-to-users">
+      <Link to="/pentest/fuser/users" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]" data-testid="back-to-users">
         <ArrowLeft className="w-4 h-4" /> Back to users
       </Link>
 
@@ -512,7 +512,7 @@ function TabBody({ tab, items }) {
       {items.map((r) => (
         <tr key={r.id} className="border-t border-[color:var(--border-default)]">
           <td className="p-3 font-semibold text-[color:var(--text-primary)]">
-            <Link to={`/admin/users/${r.id}`} className="hover:text-[color:var(--brand)]">{r.name || "—"}</Link>
+            <Link to={`/pentest/fuser/users/${r.id}`} className="hover:text-[color:var(--brand)]">{r.name || "—"}</Link>
           </td>
           <td className="p-3 font-mono text-xs">{r.phone}</td>
           <td className="p-3 tabular-nums">{formatNaira(r.wallet_balance)}</td>

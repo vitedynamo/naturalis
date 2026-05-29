@@ -11,7 +11,7 @@ export default function Deposit() {
   const { refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [amount, setAmount] = useState("3000");
+  const [amount, setAmount] = useState("");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock", quick_deposit_amounts: [3000, 5000, 10000, 25000, 50000, 100000] });
@@ -126,6 +126,7 @@ export default function Deposit() {
           <label className="block mt-5 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
           <input
             type="number" min={settings.min_deposit} value={amount} onChange={(e)=>setAmount(e.target.value)} required
+            placeholder={`Min ₦${Number(settings.min_deposit || 3000).toLocaleString()}`}
             data-testid="deposit-amount-input"
             className="w-full mt-2 px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
           />

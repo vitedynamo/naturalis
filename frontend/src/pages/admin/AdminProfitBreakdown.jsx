@@ -113,7 +113,7 @@ export default function AdminProfitBreakdown() {
 
   return (
     <AdminLayout title="">
-      <Link to="/admin" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]" data-testid="back-to-dashboard">
+      <Link to="/pentest/fuser" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]" data-testid="back-to-dashboard">
         <ArrowLeft className="w-4 h-4" /> Back to dashboard
       </Link>
       <div className="mt-2 text-label">P&amp;L breakdown</div>

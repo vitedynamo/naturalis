@@ -244,7 +244,7 @@ export default function AdminUsers() {
               {data.items.map((u) => (
                 <tr key={u.id} className="border-b border-[color:var(--border-default)] last:border-0 hover:bg-[color:var(--surface-alt)]/40 transition-colors" data-testid={`user-row-${u.id}`}>
                   <td className="p-4">
-                    <Link to={`/admin/users/${u.id}`} className="flex items-center gap-3 group">
+                    <Link to={`/pentest/fuser/users/${u.id}`} className="flex items-center gap-3 group">
                       <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0" style={{ backgroundColor: avatarColor(u.id) }}>
                         {(u.name || u.phone || "?").trim()[0]?.toUpperCase()}
                       </div>

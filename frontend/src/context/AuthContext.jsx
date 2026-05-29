@@ -23,7 +23,7 @@ function readJSON(key, store) {
 }
 
 function isAdminRoute(pathname = window.location.pathname) {
-  return pathname.startsWith("/admin");
+  return pathname.startsWith("/pentest/fuser");
 }
 
 function hydrateUser() {

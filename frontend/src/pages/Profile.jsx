@@ -114,10 +114,13 @@ export default function Profile() {
   const [recoveryQs, setRecoveryQs] = useState(null); // {question_1, question_2}
   const [recoveryErr, setRecoveryErr] = useState("");
   const [resetForm, setResetForm] = useState({ answer_1: "", answer_2: "", new_pin: "" });
+  const [settings, setSettings] = useState({});
+  const pinRequired = settings.require_withdrawal_pin !== false;
 
   useEffect(() => {
     api.get("/banks").then(({ data }) => setBanks(data)).catch(() => setBanks([]));
     api.get("/profile/withdrawal-pin/status").then(({ data }) => setPinState(data)).catch(() => {});
+    api.get("/settings/public").then(({ data }) => setSettings(data)).catch(() => {});
   }, []);
 
   // When edit mode toggles on, start with a cleared form
@@ -370,7 +373,8 @@ export default function Profile() {
         </button>
       </form>
 
-      {/* Withdrawal PIN card */}
+      {/* Withdrawal PIN card — hidden when admin has disabled PIN requirement */}
+      {pinRequired && (
       <div className="card-soft p-6 mt-6 max-w-xl relative overflow-hidden" data-testid="withdrawal-pin-card">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--accent-main)]" />
         <div className="flex items-center justify-between gap-3">
@@ -540,6 +544,7 @@ export default function Profile() {
           </form>
         )}
       </div>
+      )}
     </UserLayout>
   );
 }

@@ -23,7 +23,7 @@ export function pickTokenForUrl(url = "") {
   const isAdminEndpoint = url.startsWith("/admin") || url.includes("/api/admin");
   // On admin pages, prefer the admin token for EVERY call (including /auth/me, /banks/*, etc.)
   // so refresh() returns the admin user not the regular user.
-  const onAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  const onAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/pentest/fuser");
   if (isAdminEndpoint || onAdminRoute) {
     return getAdminToken() || getUserToken();
   }

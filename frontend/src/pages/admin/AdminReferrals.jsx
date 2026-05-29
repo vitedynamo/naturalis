@@ -96,7 +96,7 @@ function TopEarners({ rows }) {
                 {(u.name || "?").trim()[0]?.toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <Link to={`/admin/users/${u.id}`} className="font-semibold text-sm text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate block">
+                <Link to={`/pentest/fuser/users/${u.id}`} className="font-semibold text-sm text-[color:var(--text-primary)] hover:text-[color:var(--brand)] truncate block">
                   {u.name || "—"}
                 </Link>
                 <div className="text-[10px] text-[color:var(--text-tertiary)] font-mono">{u.count} referral{u.count === 1 ? "" : "s"}</div>
@@ -110,7 +110,7 @@ function TopEarners({ rows }) {
           {rest.map((u, idx) => (
             <li key={u.id} className="flex items-center gap-2 text-xs">
               <span className="w-4 text-center text-[10px] font-bold text-[color:var(--text-tertiary)]">{idx + 4}</span>
-              <Link to={`/admin/users/${u.id}`} className="flex-1 truncate font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]">
+              <Link to={`/pentest/fuser/users/${u.id}`} className="flex-1 truncate font-medium text-[color:var(--text-secondary)] hover:text-[color:var(--brand)]">
                 {u.name || "—"}
               </Link>
               <span className="font-mono tabular-nums text-[color:var(--text-tertiary)]">{formatNaira(u.total)}</span>
@@ -404,7 +404,7 @@ export default function AdminReferrals() {
                   <td className="p-4"><LevelBadge level={r.generation} /></td>
                   {/* Referrer */}
                   <td className="p-4 max-w-[200px]">
-                    <Link to={`/admin/users/${r.referrer_id}`} className="flex items-center gap-2.5 group min-w-0">
+                    <Link to={`/pentest/fuser/users/${r.referrer_id}`} className="flex items-center gap-2.5 group min-w-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ backgroundColor: avatarColor(r.referrer_id) }}>
                         {(r.referrer_name || "?").trim()[0]?.toUpperCase()}
                       </div>
@@ -420,7 +420,7 @@ export default function AdminReferrals() {
                   </td>
                   {/* Referred */}
                   <td className="p-4 max-w-[200px]">
-                    <Link to={`/admin/users/${r.referred_id}`} className="flex items-center gap-2.5 group min-w-0">
+                    <Link to={`/pentest/fuser/users/${r.referred_id}`} className="flex items-center gap-2.5 group min-w-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ backgroundColor: avatarColor(r.referred_id) }}>
                         {(r.referred_name || "?").trim()[0]?.toUpperCase()}
                       </div>
