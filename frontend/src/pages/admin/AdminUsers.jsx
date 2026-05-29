@@ -51,6 +51,7 @@ export default function AdminUsers() {
   const [data, setData] = useState({ items: [], total: 0, page: 1, page_size: 20, stats: {} });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | active | blocked | verified | new_today | online
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const QUICK_SIZES = [5, 20, 50, 100, "all"];
@@ -64,14 +65,15 @@ export default function AdminUsers() {
     const effSize = pageSize === "all" ? 10000 : pageSize;
     const params = new URLSearchParams({ page: String(page), page_size: String(effSize) });
     if (q) params.set("q", q);
+    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
     api.get(`/admin/users?${params}`)
       .then(({ data }) => setData(data))
       .finally(() => setLoading(false));
-  }, [page, q, pageSize]);
+  }, [page, q, pageSize, statusFilter]);
   useEffect(() => { load(); }, [load]);
 
-  // Debounce search + reset to page 1 when search or pageSize changes
-  useEffect(() => { setPage(1); }, [pageSize]);
+  // Reset to page 1 when controls change
+  useEffect(() => { setPage(1); }, [pageSize, statusFilter]);
   useEffect(() => { const t = setTimeout(() => { if (page !== 1) setPage(1); else load(); }, 350); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [q]);
 
   const onAdjust = async (e) => {
@@ -161,9 +163,26 @@ export default function AdminUsers() {
         <Stat icon={UserPlus} label="New today" value={data.stats?.new_today ?? 0} sub="Signed up today" color="bg-[color:var(--gold-soft)] text-[color:var(--warning)]" />
       </div>
 
-      {/* Search + export */}
-      <div className="card-soft p-3 md:p-4 mt-5 flex items-center gap-3" data-testid="users-toolbar">
-        <div className="flex-1 relative">
+      {/* Status filter + Search + export */}
+      <div className="card-soft p-3 md:p-4 mt-5 flex items-center gap-3 flex-wrap" data-testid="users-toolbar">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          data-testid="users-status-filter"
+          className="input-base !py-2 !w-[160px] text-sm font-semibold capitalize"
+        >
+          {[
+            { v: "all",        label: `All (${data.stats?.total_users ?? 0})` },
+            { v: "active",     label: `Active (${Math.max(0, (data.stats?.total_users ?? 0) - (data.stats?.blocked ?? 0))})` },
+            { v: "blocked",    label: `Blocked (${data.stats?.blocked ?? 0})` },
+            { v: "verified",   label: `Verified (${data.stats?.verified ?? 0})` },
+            { v: "new_today",  label: `New today (${data.stats?.new_today ?? 0})` },
+            { v: "online",     label: `Online (${data.stats?.online_now ?? 0})` },
+          ].map((o) => (
+            <option key={o.v} value={o.v}>{o.label}</option>
+          ))}
+        </select>
+        <div className="flex-1 min-w-[220px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--text-tertiary)]" />
           <input
             value={q}

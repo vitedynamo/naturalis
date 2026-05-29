@@ -664,20 +664,46 @@ async def admin_stats_inflow(request: Request, frm: Optional[str] = None, to: Op
 async def admin_users(
     request: Request,
     q: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),  # all | active | blocked | verified | new_today | online
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=10000),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
     _admin=Depends(get_current_admin),
 ):
     """List users with search, pagination, and sorting. Returns {items, total, page, page_size, stats}."""
     db = request.app.state.db
-    base_filter = {}
+    base_filter: dict = {}
     if q:
         rx = {"$regex": q.strip(), "$options": "i"}
         base_filter = {"$or": [
             {"name": rx}, {"phone": rx}, {"email": rx}, {"referral_code": rx},
         ]}
+
+    # Status filter — composes with `q` via $and so search still applies.
+    s = (status or "all").lower()
+    now = datetime.now(timezone.utc)
+    today_start_iso = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    five_min_ago_iso = (now - timedelta(minutes=5)).isoformat()
+
+    status_filter: Optional[dict] = None
+    if s == "blocked":
+        status_filter = {"is_blocked": True}
+    elif s == "active":
+        # "Active" = not currently blocked. Covers everyone who can still log in.
+        status_filter = {"$or": [{"is_blocked": {"$ne": True}}, {"is_blocked": {"$exists": False}}]}
+    elif s == "verified":
+        # Has made at least one successful deposit.
+        verified_ids = await db.deposits.distinct("user_id", {"status": "success"})
+        status_filter = {"id": {"$in": verified_ids}}
+    elif s == "new_today":
+        status_filter = {"created_at": {"$gte": today_start_iso}}
+    elif s == "online":
+        status_filter = {"last_seen_at": {"$gte": five_min_ago_iso}}
+
+    if status_filter:
+        base_filter = {"$and": [base_filter, status_filter]} if base_filter else status_filter
+
     direction = -1 if (order or "desc").lower() == "desc" else 1
     sort_field = sort if sort in ("created_at", "wallet_balance", "name", "phone") else "created_at"
     total = await db.users.count_documents(base_filter)
@@ -690,13 +716,13 @@ async def admin_users(
         u["has_withdrawal_pin"] = bool(u.pop("withdrawal_pin_hash", None))
         u["withdrawal_pin_locked"] = bool(u.get("withdrawal_pin_locked_until"))
 
-    # Header stats (always include — independent of pagination/search)
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    five_min_ago = (now - timedelta(minutes=5)).isoformat()
+    # Header stats (always full-DB, independent of pagination/search/status)
+    today_start = today_start_iso
+    five_min_ago = five_min_ago_iso
     total_users = await db.users.count_documents({})
     online_now = await db.users.count_documents({"last_seen_at": {"$gte": five_min_ago}})
     new_today = await db.users.count_documents({"created_at": {"$gte": today_start}})
+    blocked = await db.users.count_documents({"is_blocked": True})
     # "verified" = at least one successful deposit (proxy for KYC-confirmed)
     pipeline = [
         {"$match": {"status": "success"}},
@@ -716,6 +742,7 @@ async def admin_users(
             "online_now": online_now,
             "verified": verified,
             "new_today": new_today,
+            "blocked": blocked,
         },
     }
 
