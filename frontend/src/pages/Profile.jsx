@@ -115,7 +115,10 @@ export default function Profile() {
   const [recoveryErr, setRecoveryErr] = useState("");
   const [resetForm, setResetForm] = useState({ answer_1: "", answer_2: "", new_pin: "" });
   const [settings, setSettings] = useState({});
-  const pinRequired = settings.require_withdrawal_pin !== false;
+  // PIN UI defaults to HIDDEN until /settings/public confirms it's required.
+  // Using `=== true` instead of `!== false` prevents the card from flashing
+  // for a frame while `settings` is still its empty initial value.
+  const pinRequired = settings.require_withdrawal_pin === true;
 
   useEffect(() => {
     api.get("/banks").then(({ data }) => setBanks(data)).catch(() => setBanks([]));

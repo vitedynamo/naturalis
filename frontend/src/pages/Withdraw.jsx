@@ -26,10 +26,14 @@ export default function Withdraw() {
   useEffect(() => { load(); }, []);
 
   const hasPin = !!user?.has_withdrawal_pin;
-
+  // Treat the PIN as required only AFTER /settings/public has returned an
+  // explicit `true`. While `settings` is still its empty initial value the
+  // requirement evaluates to `false`, which keeps the banner hidden during
+  // the load and stops the half-second flash on every page refresh.
+  const pinRequired = settings.require_withdrawal_pin === true;
   const submit = async (e) => {
     e.preventDefault();
-    const requirePin = settings.require_withdrawal_pin !== false;
+    const requirePin = pinRequired;
     if (requirePin && !/^\d{4}$/.test(pin)) { toast.error("Enter your 4-digit PIN"); return; }
     const amt = Number(amount);
     if (settings.max_withdrawal && amt > settings.max_withdrawal) {
@@ -92,7 +96,7 @@ export default function Withdraw() {
         </div>
       )}
 
-      {settings.require_withdrawal_pin !== false && !hasPin && (
+      {pinRequired && !hasPin && (
         <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="no-pin-banner">
           <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Set your withdrawal PIN</div>
           <div className="text-sm text-[color:var(--text-secondary)] mt-1">A 4-digit PIN is required to authorise withdrawals. Set yours once on your profile page.</div>
@@ -121,7 +125,7 @@ export default function Withdraw() {
           className="w-full mt-2 px-3 py-3 input-base"
         />
 
-        {settings.require_withdrawal_pin !== false && (
+        {pinRequired && (
           <>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mt-4 flex items-center gap-1.5">
               <KeyRound className="w-3 h-3" /> Withdrawal PIN
@@ -145,13 +149,13 @@ export default function Withdraw() {
           </div>
         )}
 
-        <button type="submit" disabled={busy || !bankReady || !windowState.open || (settings.require_withdrawal_pin !== false && (!hasPin || pin.length !== 4))}
+        <button type="submit" disabled={busy || !bankReady || !windowState.open || (pinRequired && (!hasPin || pin.length !== 4))}
           data-testid="withdraw-submit-btn"
           title={
             !bankReady ? "Add complete bank details first"
-            : (settings.require_withdrawal_pin !== false && !hasPin) ? "Set your 4-digit withdrawal PIN first"
+            : (pinRequired && !hasPin) ? "Set your 4-digit withdrawal PIN first"
             : !windowState.open ? (windowState.reason || "Withdrawals closed")
-            : (settings.require_withdrawal_pin !== false && pin.length !== 4) ? "Enter your 4-digit PIN"
+            : (pinRequired && pin.length !== 4) ? "Enter your 4-digit PIN"
             : ""
           }
           className="mt-5 w-full flex items-center justify-center gap-2 btn-primary disabled:opacity-60 disabled:cursor-not-allowed">
