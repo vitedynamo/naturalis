@@ -331,6 +331,14 @@ class Settings(BaseModel):
     marasoft_secret_key: str = ""
     marasoft_encryption_key: str = ""
     marasoft_secret_hash: str = ""  # webhook auth — set in Marasoft dashboard + here
+    # BudPay (https://developer.budpay.com/) — accepts cards + bank transfer.
+    budpay_secret_key: str = ""        # sk_live_...
+    budpay_public_key: str = ""        # pk_live_...
+    budpay_webhook_secret: str = ""    # optional; webhook HMAC secret if configured
+    # QorePay (https://app.qorepay.com/docs/reference) — bank-transfer focused.
+    qorepay_secret_key: str = ""       # qp_live_...
+    qorepay_public_key: str = ""
+    qorepay_brand_id: str = ""         # required by /v1/purchases — set in QorePay dashboard under Brands
     # Merchant identity used to create Marasoft reserved (virtual) accounts.
     # Required by Marasoft KYC — every reserved account is opened in the merchant's name.
     marasoft_first_name: str = ""
@@ -345,6 +353,8 @@ class Settings(BaseModel):
     gateway_paystack_enabled: bool = True
     gateway_nomba_enabled: bool = True
     gateway_marasoft_enabled: bool = True
+    gateway_budpay_enabled: bool = False
+    gateway_qorepay_enabled: bool = False
     payment_mode: str = "mock"  # mock | live
     featured_product_id: Optional[str] = None
     home_announcement: str = ""
@@ -411,6 +421,14 @@ class SettingsUpdate(BaseModel):
     marasoft_secret_key: Optional[str] = None
     marasoft_encryption_key: Optional[str] = None
     marasoft_secret_hash: Optional[str] = None
+    budpay_secret_key: Optional[str] = None
+    budpay_public_key: Optional[str] = None
+    budpay_webhook_secret: Optional[str] = None
+    qorepay_secret_key: Optional[str] = None
+    qorepay_public_key: Optional[str] = None
+    qorepay_brand_id: Optional[str] = None
+    gateway_budpay_enabled: Optional[bool] = None
+    gateway_qorepay_enabled: Optional[bool] = None
     marasoft_first_name: Optional[str] = None
     marasoft_last_name: Optional[str] = None
     marasoft_bvn: Optional[str] = None

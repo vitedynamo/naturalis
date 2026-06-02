@@ -1,6 +1,29 @@
 # Evoque-Nova — PRD & Implementation Log
 
-## Recent Changes (Feb 2026 — iteration 57)
+## Recent Changes (Jun 2026 — iteration 62)
+
+### BudPay + QorePay payment gateway integration
+
+**Two new deposit gateways** wired into the existing multi-gateway architecture.
+
+- **BudPay** (`backend/budpay.py`) — fully working live:
+  - `POST /api/v2/transaction/initialize` returns a `https://checkout.budpay.com/...` URL.
+  - `GET /api/v2/transaction/verify/{ref}` maps status `success` → success, `failed/abandoned/reversed/cancelled` → failed, anything else → pending.
+  - Settings keys: `budpay_secret_key`, `budpay_public_key`, `budpay_webhook_secret`.
+  - Smoke-tested live with the user's sk_live_… key — got real checkout URL back, verify correctly returns pending until the user pays.
+
+- **QorePay** (`backend/qorepay.py`):
+  - `POST /v1/purchases` with `channel: "TRANSFER"`, `customer_email`, `customer_name`, and **`brand_id`** (a value the merchant configures under Brands in their QorePay dashboard).
+  - `GET /v1/transactions/{ref}` for verification (maps `success/successful/paid/completed` → success, `failed/declined/cancelled/expired` → failed, else pending).
+  - Settings keys: `qorepay_secret_key`, `qorepay_public_key`, `qorepay_brand_id`.
+
+- **Per-gateway availability** toggles extended with `gateway_budpay_enabled` and `gateway_qorepay_enabled` (default OFF — admin must opt-in). The user-side `Deposit.jsx` gateway picker now shows BudPay (Card · Transfer) and QorePay (Transfer) chips when their respective toggles are on.
+
+- **Admin Settings → Gateways** tab gains two new sections (BudPay credentials and QorePay credentials) modelled after the existing Marasoft section, with public/secret key fields, webhook secret, and Brand ID.
+
+**Verified**: BudPay init returned `mode=live, gateway=budpay, authorization_url=https://checkout.budpay.com/pay/api?reference=...`; BudPay verify on an unpaid reference correctly returned `status=pending`. Both gateways have been turned OFF after testing and `payment_mode` reset to `mock` to avoid live charges in the preview environment.
+
+
 
 ### Admin polish + start of route modularisation
 

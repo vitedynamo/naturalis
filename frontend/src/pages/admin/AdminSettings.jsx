@@ -183,6 +183,14 @@ export default function AdminSettings() {
         marasoft_secret_key: s.marasoft_secret_key || "",
         marasoft_encryption_key: s.marasoft_encryption_key || "",
         marasoft_secret_hash: s.marasoft_secret_hash || "",
+        budpay_secret_key: s.budpay_secret_key || "",
+        budpay_public_key: s.budpay_public_key || "",
+        budpay_webhook_secret: s.budpay_webhook_secret || "",
+        qorepay_secret_key: s.qorepay_secret_key || "",
+        qorepay_public_key: s.qorepay_public_key || "",
+        qorepay_brand_id: s.qorepay_brand_id || "",
+        gateway_budpay_enabled: !!s.gateway_budpay_enabled,
+        gateway_qorepay_enabled: !!s.gateway_qorepay_enabled,
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -361,6 +369,8 @@ export default function AdminSettings() {
                 <Toggle checked={s.gateway_paystack_enabled !== false} onChange={(v) => setS({ ...s, gateway_paystack_enabled: v })} label="Paystack" hint="Card + bank transfer (NGN)" testid="gw-enabled-paystack" />
                 <Toggle checked={s.gateway_nomba_enabled !== false}    onChange={(v) => setS({ ...s, gateway_nomba_enabled: v })}    label="Nomba"    hint="Virtual account · bank pay-in" testid="gw-enabled-nomba" />
                 <Toggle checked={s.gateway_marasoft_enabled !== false} onChange={(v) => setS({ ...s, gateway_marasoft_enabled: v })} label="Marasoft" hint="Dynamic virtual account · 9PSB" testid="gw-enabled-marasoft" />
+                <Toggle checked={!!s.gateway_budpay_enabled}            onChange={(v) => setS({ ...s, gateway_budpay_enabled: v })}    label="BudPay"   hint="Card + bank transfer · sk_live_…" testid="gw-enabled-budpay" />
+                <Toggle checked={!!s.gateway_qorepay_enabled}           onChange={(v) => setS({ ...s, gateway_qorepay_enabled: v })}   label="QorePay"  hint="Bank transfer · qp_live_…" testid="gw-enabled-qorepay" />
               </div>
             </Section>
           </>
@@ -508,6 +518,28 @@ export default function AdminSettings() {
               <div className="mt-4 text-[11px] text-[color:var(--text-tertiary)] bg-[color:var(--surface-alt)] rounded-md p-3">
                 <span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/marasoft</code>
                 <div className="mt-1">Add this URL in your Marasoft dashboard so credit events reach the platform.</div>
+              </div>
+            </Section>
+
+            <Section title="BudPay credentials" hint="Used when deposit gateway is BudPay. Get your sk_live_…/pk_live_… keys at developer.budpay.com under Settings → API Keys & Webhook.">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Public key" value={s.budpay_public_key} text onChange={(v) => setS({ ...s, budpay_public_key: v })} placeholder="pk_live_…" testid="budpay-public-key" />
+                <div className="md:col-span-2">
+                  <SecretField label="Secret key" value={s.budpay_secret_key} onChange={(v) => setS({ ...s, budpay_secret_key: v })} placeholder="sk_live_…" testid="budpay-secret-key" />
+                </div>
+                <div className="md:col-span-2">
+                  <SecretField label="Webhook secret (optional)" value={s.budpay_webhook_secret} onChange={(v) => setS({ ...s, budpay_webhook_secret: v })} sub="Used to HMAC-verify webhook requests. Set the same value in your BudPay dashboard." testid="budpay-webhook-secret" />
+                </div>
+              </div>
+            </Section>
+
+            <Section title="QorePay credentials" hint="Used when deposit gateway is QorePay. Keys come from app.qorepay.com → Settings → API Keys. Brand ID is required by /v1/purchases — get it from Brands.">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Public key" value={s.qorepay_public_key} text onChange={(v) => setS({ ...s, qorepay_public_key: v })} placeholder="(optional)" testid="qorepay-public-key" />
+                <Field label="Brand ID" value={s.qorepay_brand_id} text onChange={(v) => setS({ ...s, qorepay_brand_id: v })} placeholder="brnd_…" testid="qorepay-brand-id" />
+                <div className="md:col-span-2">
+                  <SecretField label="Secret key" value={s.qorepay_secret_key} onChange={(v) => setS({ ...s, qorepay_secret_key: v })} placeholder="qp_live_…" testid="qorepay-secret-key" />
+                </div>
               </div>
             </Section>
           </>

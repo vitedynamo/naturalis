@@ -650,12 +650,14 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
         "paystack": settings.get("gateway_paystack_enabled", True),
         "nomba":    settings.get("gateway_nomba_enabled", True),
         "marasoft": settings.get("gateway_marasoft_enabled", True),
+        "budpay":   settings.get("gateway_budpay_enabled", False),
+        "qorepay":  settings.get("gateway_qorepay_enabled", False),
     }
     # If multi-gateway + user-choose are both enabled, honour the client-provided gateway
     if (
         settings.get("multi_gateway_enabled")
         and settings.get("let_users_choose_gateway")
-        and data.gateway in ("paystack", "nomba", "marasoft")
+        and data.gateway in ("paystack", "nomba", "marasoft", "budpay", "qorepay")
     ):
         gateway = data.gateway
 
@@ -671,8 +673,16 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     # Decide which gateway to use based on settings
     use_marasoft = gateway == "marasoft" and bool(settings.get("marasoft_public_key"))
     use_paystack = gateway == "paystack" and mode == "live" and bool(settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", ""))
+    use_budpay   = gateway == "budpay"   and bool(settings.get("budpay_secret_key"))
+    use_qorepay  = gateway == "qorepay"  and bool(settings.get("qorepay_secret_key"))
 
-    method = "marasoft" if use_marasoft else ("paystack" if use_paystack else "mock")
+    method = (
+        "marasoft" if use_marasoft else
+        "paystack" if use_paystack else
+        "budpay"   if use_budpay   else
+        "qorepay"  if use_qorepay  else
+        "mock"
+    )
 
     deposit_doc = {
         "id": gen_reference("d"),
@@ -759,6 +769,91 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
         except httpx.HTTPError as e:
             raise HTTPException(502, f"Paystack request failed: {e}")
 
+    if use_budpay:
+        from budpay import initialize_transaction as bud_init
+        try:
+            res = await bud_init(
+                secret_key=settings["budpay_secret_key"],
+                email=f"{user['phone']}@evoque-nova.local",
+                amount_naira=float(data.amount),
+                reference=reference,
+                callback_url=callback_url,
+                name=user.get("name") or user.get("phone"),
+            )
+            if not res.get("status"):
+                raise HTTPException(400, res.get("message", "BudPay error"))
+            d = res.get("data", {})
+            return {
+                "mode": "live",
+                "gateway": "budpay",
+                "reference": reference,
+                "authorization_url": d.get("authorization_url"),
+                "access_code": d.get("access_code"),
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {"status": "failed", "admin_note": f"BudPay init failed: {e}", "updated_at": _now_iso()}},
+            )
+            raise HTTPException(502, f"BudPay request failed: {e}")
+
+    if use_qorepay:
+        from qorepay import initialize_transaction as qp_init
+        try:
+            res = await qp_init(
+                secret_key=settings["qorepay_secret_key"],
+                reference=reference,
+                amount_naira=float(data.amount),
+                email=f"{user['phone']}@evoque-nova.local",
+                name=user.get("name") or user.get("phone"),
+                channel="TRANSFER",
+                redirect_url=callback_url,
+                brand_id=settings.get("qorepay_brand_id") or None,
+            )
+            # QorePay returns nested shape — try common fields safely
+            d = res.get("data") if isinstance(res.get("data"), dict) else res
+            checkout_url = d.get("checkout_url") or d.get("authorization_url") or d.get("payment_url")
+            bank = d.get("bank_details") or {}
+            if checkout_url:
+                return {
+                    "mode": "live",
+                    "gateway": "qorepay",
+                    "reference": reference,
+                    "authorization_url": checkout_url,
+                }
+            if bank.get("account_number"):
+                await db.deposits.update_one(
+                    {"reference": reference},
+                    {"$set": {
+                        "account_number": bank["account_number"],
+                        "account_name": bank.get("account_name") or "",
+                        "bank_name": bank.get("bank_name") or "",
+                        "updated_at": _now_iso(),
+                    }},
+                )
+                return {
+                    "mode": "live",
+                    "gateway": "qorepay",
+                    "type": "bank_transfer",
+                    "reference": reference,
+                    "amount": float(data.amount),
+                    "account_number": bank["account_number"],
+                    "account_name": bank.get("account_name", ""),
+                    "bank_name": bank.get("bank_name", ""),
+                    "expires_in_minutes": 60,
+                }
+            raise HTTPException(502, f"QorePay response missing checkout/account details: {res}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {"status": "failed", "admin_note": f"QorePay init failed: {e}", "updated_at": _now_iso()}},
+            )
+            raise HTTPException(502, f"QorePay request failed: {e}")
+
     # Mock mode: front-end will call verify to credit
     return {"mode": "mock", "gateway": "mock", "reference": reference, "amount": data.amount}
 
@@ -833,6 +928,38 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
             else:
                 gateway_status = "pending"
         except httpx.HTTPError:
+            gateway_status = "pending"
+    elif gateway_used == "budpay" and settings.get("budpay_secret_key"):
+        try:
+            from budpay import verify_transaction as bud_verify
+            res = await bud_verify(secret_key=settings["budpay_secret_key"], reference=reference)
+            bd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else {}
+            bs = (bd.get("status") or "").lower()
+            if bs == "success":
+                gateway_status = "success"
+            elif bs in ("failed", "abandoned", "reversed", "cancelled"):
+                gateway_status = "failed"
+            else:
+                gateway_status = "pending"
+            gateway_id = str(bd.get("id") or bd.get("transaction_id") or "") or None
+        except Exception as e:
+            logger.warning(f"BudPay verify failed for {reference}: {e}")
+            gateway_status = "pending"
+    elif gateway_used == "qorepay" and settings.get("qorepay_secret_key"):
+        try:
+            from qorepay import verify_transaction as qp_verify
+            res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=reference)
+            qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
+            qs = (qd.get("status") or "").lower()
+            if qs in ("success", "successful", "paid", "completed"):
+                gateway_status = "success"
+            elif qs in ("failed", "declined", "cancelled", "expired"):
+                gateway_status = "failed"
+            else:
+                gateway_status = "pending"
+            gateway_id = str(qd.get("id") or qd.get("transaction_id") or "") or None
+        except Exception as e:
+            logger.warning(f"QorePay verify failed for {reference}: {e}")
             gateway_status = "pending"
     else:
         # Mock auto-success
@@ -1421,6 +1548,8 @@ async def public_settings(request: Request):
         "gateway_paystack_enabled": s.get("gateway_paystack_enabled", True),
         "gateway_nomba_enabled": s.get("gateway_nomba_enabled", True),
         "gateway_marasoft_enabled": s.get("gateway_marasoft_enabled", True),
+        "gateway_budpay_enabled": s.get("gateway_budpay_enabled", False),
+        "gateway_qorepay_enabled": s.get("gateway_qorepay_enabled", False),
         "referral_commission_mode": s.get("referral_commission_mode", "first_only"),
         "referral_commission_cap_n": s.get("referral_commission_cap_n", 3),
         "brand_logo_url": s.get("brand_logo_url", ""),
