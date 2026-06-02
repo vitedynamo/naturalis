@@ -33,7 +33,9 @@ async def initialize_transaction(
     """
     payload: dict = {
         "reference": reference,
-        "amount": int(round(amount_naira)),
+        # QorePay expects amounts in KOBO (smallest currency unit). NGN minimum is
+        # ₦150 = 15 000 kobo per their API validation.
+        "amount": int(round(amount_naira * 100)),
         "currency": currency,
         "channel": channel,
         "customer_email": email,

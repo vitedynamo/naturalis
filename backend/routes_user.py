@@ -702,10 +702,7 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
         from marasoft import create_dynamic_account as ms_create_account
         # Dynamic accounts only need the encryption key — no merchant KYC required.
         if not settings.get("marasoft_encryption_key"):
-            await db.deposits.update_one(
-                {"reference": reference},
-                {"$set": {"status": "failed", "admin_note": "Marasoft encryption key missing", "updated_at": _now_iso()}},
-            )
+            await db.deposits.delete_one({"reference": reference})
             raise HTTPException(503, "Marasoft is not fully configured. Please contact support.")
         try:
             acct = await ms_create_account(
@@ -735,10 +732,7 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 "expires_in_minutes": 60,
             }
         except Exception as e:
-            await db.deposits.update_one(
-                {"reference": reference},
-                {"$set": {"status": "failed", "admin_note": f"Marasoft init failed: {e}", "updated_at": _now_iso()}},
-            )
+            await db.deposits.delete_one({"reference": reference})
             raise HTTPException(502, f"Marasoft request failed: {e}")
 
     if use_paystack:
@@ -759,6 +753,7 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 )
                 result = resp.json()
             if not result.get("status"):
+                await db.deposits.delete_one({"reference": reference})
                 raise HTTPException(400, result.get("message", "Paystack error"))
             return {
                 "mode": "live",
@@ -766,7 +761,10 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 "reference": reference,
                 "authorization_url": result["data"]["authorization_url"],
             }
+        except HTTPException:
+            raise
         except httpx.HTTPError as e:
+            await db.deposits.delete_one({"reference": reference})
             raise HTTPException(502, f"Paystack request failed: {e}")
 
     if use_budpay:
@@ -791,12 +789,10 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 "access_code": d.get("access_code"),
             }
         except HTTPException:
+            await db.deposits.delete_one({"reference": reference})
             raise
         except Exception as e:
-            await db.deposits.update_one(
-                {"reference": reference},
-                {"$set": {"status": "failed", "admin_note": f"BudPay init failed: {e}", "updated_at": _now_iso()}},
-            )
+            await db.deposits.delete_one({"reference": reference})
             raise HTTPException(502, f"BudPay request failed: {e}")
 
     if use_qorepay:
@@ -814,6 +810,11 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
             )
             # QorePay returns nested shape — try common fields safely
             d = res.get("data") if isinstance(res.get("data"), dict) else res
+            # Surface QorePay's own error message (validation, brand mismatch, etc.)
+            # cleanly so the user sees something actionable instead of "missing fields".
+            if not isinstance(res, dict) or res.get("error") or res.get("message"):
+                qp_err = (res.get("error") if isinstance(res, dict) else None) or (res.get("message") if isinstance(res, dict) else None) or "QorePay rejected the request"
+                raise HTTPException(400, str(qp_err))
             checkout_url = d.get("checkout_url") or d.get("authorization_url") or d.get("payment_url")
             bank = d.get("bank_details") or {}
             if checkout_url:
@@ -846,12 +847,12 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                 }
             raise HTTPException(502, f"QorePay response missing checkout/account details: {res}")
         except HTTPException:
+            # The init request itself failed (validation, auth, missing fields).
+            # Don't leave an orphan pending deposit row in the user's history.
+            await db.deposits.delete_one({"reference": reference})
             raise
         except Exception as e:
-            await db.deposits.update_one(
-                {"reference": reference},
-                {"$set": {"status": "failed", "admin_note": f"QorePay init failed: {e}", "updated_at": _now_iso()}},
-            )
+            await db.deposits.delete_one({"reference": reference})
             raise HTTPException(502, f"QorePay request failed: {e}")
 
     # Mock mode: front-end will call verify to credit
