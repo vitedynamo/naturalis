@@ -812,11 +812,13 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
             d = res.get("data") if isinstance(res.get("data"), dict) else res
             # Surface QorePay's own error message (validation, brand mismatch, etc.)
             # cleanly so the user sees something actionable instead of "missing fields".
-            if not isinstance(res, dict) or res.get("error") or res.get("message"):
-                qp_err = (res.get("error") if isinstance(res, dict) else None) or (res.get("message") if isinstance(res, dict) else None) or "QorePay rejected the request"
+            if isinstance(res, dict) and (res.get("error") or (res.get("message") and not d.get("account_number") and not d.get("checkout_url"))):
+                qp_err = res.get("error") or res.get("message") or "QorePay rejected the request"
                 raise HTTPException(400, str(qp_err))
             checkout_url = d.get("checkout_url") or d.get("authorization_url") or d.get("payment_url")
-            bank = d.get("bank_details") or {}
+            # QorePay returns transfer account fields directly on `data` (not nested under
+            # `bank_details`). Fall back to either layout for forwards-compat.
+            bank = d.get("bank_details") if isinstance(d.get("bank_details"), dict) else d
             if checkout_url:
                 return {
                     "mode": "live",
