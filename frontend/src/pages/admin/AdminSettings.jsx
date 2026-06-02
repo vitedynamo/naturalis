@@ -318,10 +318,12 @@ export default function AdminSettings() {
         {tab === "deposits" && (
           <>
             <Section title="Active deposit gateway" hint="Pick which provider funds users' deposits. Users on /deposit will see the virtual account from this gateway only. Make sure the gateway is also enabled below.">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <GatewayCard active={s.deposit_gateway === "paystack"}  label="Card / Bank" name="Paystack" sub="NGN card + bank transfer" onClick={() => setS({ ...s, deposit_gateway: "paystack" })}  testid="dep-gw-paystack" />
                 <GatewayCard active={s.deposit_gateway === "nomba"}     label="Wallet"      name="Nomba"    sub="Virtual account · bank pay-in" onClick={() => setS({ ...s, deposit_gateway: "nomba" })}     testid="dep-gw-nomba" />
                 <GatewayCard active={s.deposit_gateway === "marasoft"}  label="9PSB / VAS"  name="Marasoft" sub="Dynamic virtual account" onClick={() => setS({ ...s, deposit_gateway: "marasoft" })} testid="dep-gw-marasoft" />
+                <GatewayCard active={s.deposit_gateway === "budpay"}    label="Card · Transfer" name="BudPay"  sub="Hosted checkout · NGN" onClick={() => setS({ ...s, deposit_gateway: "budpay" })}   testid="dep-gw-budpay" />
+                <GatewayCard active={s.deposit_gateway === "qorepay"}   label="Transfer"        name="QorePay" sub="Bank transfer · NGN"  onClick={() => setS({ ...s, deposit_gateway: "qorepay" })}  testid="dep-gw-qorepay" />
               </div>
             </Section>
 
