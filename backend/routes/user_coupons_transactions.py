@@ -26,6 +26,19 @@ async def redeem_coupon(
     user=Depends(get_current_user),
 ):
     db = request.app.state.db
+    # Same gate as withdrawals — only users with at least one active investment
+    # can redeem coupons. Stops referral-only / coupon-farming behaviour where a
+    # user signs up, redeems a bonus, and walks away.
+    invest_count = await db.investments.count_documents({
+        "user_id": user["id"],
+        "status": "active",
+    })
+    if invest_count == 0:
+        raise HTTPException(
+            403,
+            "Coupon redemption requires at least one active investment. Buy a package on the Invest tab to unlock coupon rewards.",
+        )
+
     code = data.code.strip().upper()
     coupon = await db.coupons.find_one({"code": code, "is_active": True}, {"_id": 0})
     if not coupon:
