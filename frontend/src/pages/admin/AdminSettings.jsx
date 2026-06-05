@@ -390,7 +390,7 @@ export default function AdminSettings() {
             <Section title="Limits & PIN" hint="Hard floor / ceiling on user withdrawals plus security PIN requirement.">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <Field label="Min withdrawal (₦)" value={s.min_withdrawal} onChange={(v) => setS({ ...s, min_withdrawal: v })} testid="min-withdrawal-w" />
-                <Field label="Max withdrawal (₦)" value={s.max_withdrawal} onChange={(v) => setS({ ...s, max_withdrawal: v })} testid="max-withdrawal" sub="Hard cap per request" />
+                <Field label="Max withdrawal (₦)" value={s.max_withdrawal} onChange={(v) => setS({ ...s, max_withdrawal: v })} testid="max-withdrawal" sub="The largest single payout a user can request in one transaction. Requests above this are rejected outright with an error — they don't queue for admin approval. Use this to cap exposure on any one transfer. Set to 0 to remove the ceiling." />
                 <Field label="Auto-payout limit (₦)" value={s.auto_payout_max_amount} onChange={(v) => setS({ ...s, auto_payout_max_amount: v })} testid="auto-payout-max" sub="Above this, requires admin approval. 0 = no cap." />
               </div>
               <Toggle checked={!!s.require_withdrawal_pin} onChange={(v) => setS({ ...s, require_withdrawal_pin: v })} label="Require 4-digit withdrawal PIN" hint="Users will be prompted for their PIN before each withdrawal. Off = PIN bypassed." testid="require-pin-toggle" />
