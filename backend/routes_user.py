@@ -1385,6 +1385,18 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
     # Master kill-switch
     if not settings.get("withdrawals_open", True):
         raise HTTPException(400, "Withdrawals are temporarily closed. Please try again later.")
+
+    # Require at least one investment before any withdrawal is allowed. This stops
+    # withdrawal-only behaviour where users deposit, claim a referral/coupon bonus,
+    # then exit without ever buying a package. We count any non-cancelled
+    # investment — active, paused, completed, refunded — so the user can withdraw
+    # again later even after their plan has run out.
+    invest_count = await db.investments.count_documents({
+        "user_id": user["id"],
+        "status": {"$in": ["active", "paused", "completed"]},
+    })
+    if invest_count == 0:
+        raise HTTPException(403, "Withdrawals are only available after you buy at least one investment package. Head to the Invest tab and pick a plan to unlock withdrawals.")
     # Daily window
     start = settings.get("withdrawal_start_time") or "00:00"
     end = settings.get("withdrawal_end_time") or "23:59"
