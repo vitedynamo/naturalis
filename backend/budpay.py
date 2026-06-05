@@ -63,8 +63,8 @@ async def initialize_bank_transfer(
 ):
     """Create a one-time virtual account for bank-transfer-only deposits.
 
-    Endpoint: POST /api/v2/payment/bank-transfer
-    Returns: { status, data: { account_number, account_name, bank_name, ... } }
+    Endpoint: POST /api/s2s/banktransfer/initialize  (BudPay S2S — server-to-server)
+    Returns: { status, message, data: { account_number, account_name, bank_name } }
     """
     payload = {
         "email": email,
@@ -80,7 +80,7 @@ async def initialize_bank_transfer(
     }
     async with _bud_client() as client:
         resp = await client.post(
-            f"{BUDPAY_API_BASE}/api/v2/payment/bank-transfer",
+            f"{BUDPAY_API_BASE}/api/s2s/banktransfer/initialize",
             json=payload, headers=headers,
         )
     try:
