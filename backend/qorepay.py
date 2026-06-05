@@ -65,14 +65,21 @@ async def initialize_transaction(
 
 
 async def verify_transaction(*, secret_key: str, reference: str):
-    """GET /v1/transactions/{reference} — returns transaction status payload."""
+    """GET /v1/purchases/{reference} — returns the purchase-intent payload
+    including status (PROCESSING / SUCCESS / EXPIRED / FAILED) and any settled
+    transaction details once payment lands.
+
+    `reference` here is QorePay's own reference (looks like `QP-XXXXXXXX`), NOT
+    our merchant reference. Callers must pass the value returned from
+    `initialize_transaction()`'s `data.reference` field.
+    """
     headers = {
         "Authorization": f"Bearer {secret_key}",
         "Accept": "application/json",
     }
     async with _qp_client() as client:
         resp = await client.get(
-            f"{QOREPAY_API_BASE}/v1/transactions/{reference}",
+            f"{QOREPAY_API_BASE}/v1/purchases/{reference}",
             headers=headers,
         )
     try:

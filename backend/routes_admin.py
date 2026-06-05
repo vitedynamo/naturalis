@@ -1910,15 +1910,16 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
     elif gateway == "qorepay" and s.get("qorepay_secret_key"):
         try:
             from qorepay import verify_transaction as qp_verify
-            res = await qp_verify(secret_key=s["qorepay_secret_key"], reference=reference)
+            qp_ref = d.get("gateway_id") or reference
+            res = await qp_verify(secret_key=s["qorepay_secret_key"], reference=qp_ref)
             qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
-            new_gateway_id = str(qd.get("id") or qd.get("transaction_id") or "") or None
+            new_gateway_id = qp_ref
             qs = (qd.get("status") or "").lower()
-            if qs in ("success", "successful", "paid", "completed"):
+            if qs in ("success", "successful", "paid", "completed", "approved", "settled"):
                 new_status = "success"
                 action = "credited"
                 note_extra = "Confirmed via QorePay verify"
-            elif qs in ("failed", "declined", "cancelled", "expired"):
+            elif qs in ("failed", "declined", "cancelled", "canceled", "expired"):
                 new_status = "failed"
                 action = "marked_failed"
                 note_extra = f"QorePay reports {qs}"
@@ -1975,15 +1976,23 @@ async def admin_refresh_deposit(deposit_id: str, request: Request, _admin=Depend
 
 
 @router.post("/admin/deposits/poll-pending")
-async def admin_poll_pending_deposits(request: Request, _admin=Depends(get_current_admin)):
+async def admin_poll_pending_deposits(
+    request: Request,
+    gateway: Optional[str] = Query(None, description="If set, only re-verify deposits routed through this gateway (paystack/nomba/marasoft/budpay/qorepay)."),
+    _admin=Depends(get_current_admin),
+):
     """Admin trigger: re-verify every non-final deposit (pending OR failed) with its
     gateway. Failed-but-actually-paid deposits get credited automatically if the
-    gateway now confirms them.
+    gateway now confirms them. Pass `?gateway=qorepay` etc. to scope the sweep
+    to a single provider — handy when one gateway is misbehaving.
     """
     db = request.app.state.db
     expired = await _expire_stale_pending_deposits(db)
-    items = await db.deposits.find({"status": {"$in": ["pending", "failed"]}}, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0, "scanned": len(items), "auto_expired": expired}
+    q: dict = {"status": {"$in": ["pending", "failed"]}}
+    if gateway:
+        q["method"] = gateway
+    items = await db.deposits.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    results = {"refreshed": 0, "credited": 0, "marked_failed": 0, "still_pending": 0, "no_provider": 0, "errors": 0, "scanned": len(items), "auto_expired": expired, "gateway": gateway or "all"}
     for d in items:
         try:
             r = await _refresh_pending_deposit(db, d)

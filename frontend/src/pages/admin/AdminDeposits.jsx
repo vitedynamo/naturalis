@@ -85,12 +85,14 @@ export default function AdminDeposits() {
     finally { setRefreshingId(null); }
   };
 
-  const pollAll = async () => {
+  const pollAll = async (gateway = null) => {
     setPolling(true);
     try {
-      const { data } = await api.post("/admin/deposits/poll-pending");
+      const url = gateway ? `/admin/deposits/poll-pending?gateway=${gateway}` : "/admin/deposits/poll-pending";
+      const { data } = await api.post(url);
+      const scope = gateway ? gateway.charAt(0).toUpperCase() + gateway.slice(1) : "All";
       const scanned = data.scanned ?? data.refreshed;
-      toast.success(`Rechecked ${scanned} · credited ${data.credited} · still pending ${data.still_pending} · failed ${data.marked_failed}`);
+      toast.success(`${scope}: rechecked ${scanned} · credited ${data.credited} · pending ${data.still_pending} · failed ${data.marked_failed}`);
       load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Recheck failed"); }
     finally { setPolling(false); }
@@ -198,12 +200,27 @@ export default function AdminDeposits() {
             className="w-full pl-10 input-base"
           />
         </div>
-        <button onClick={pollAll} disabled={polling}
+        <button onClick={() => pollAll(null)} disabled={polling}
           data-testid="deposits-poll-all"
           title="Re-verify every pending and failed deposit with its payment gateway. Credits any that the gateway now confirms."
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${polling ? "animate-spin" : ""}`} /> {polling ? "Rechecking…" : "Bulk recheck"}
         </button>
+        <select
+          onChange={(e) => { const g = e.target.value; if (g) { pollAll(g); e.target.value = ""; } }}
+          disabled={polling}
+          defaultValue=""
+          data-testid="deposits-poll-per-gateway"
+          title="Re-verify only the deposits routed through one provider."
+          className="shrink-0 input-base !py-2 !w-[170px] text-sm font-semibold"
+        >
+          <option value="" disabled>Recheck by gateway…</option>
+          <option value="paystack">Paystack only</option>
+          <option value="nomba">Nomba only</option>
+          <option value="marasoft">Marasoft only</option>
+          <option value="budpay">BudPay only</option>
+          <option value="qorepay">QorePay only</option>
+        </select>
         <button onClick={backfillGatewayIds} disabled={backfilling}
           data-testid="deposits-backfill-gateway-ids"
           title="Scan every funded deposit that is missing its gateway-side ID and refetch it from Marasoft/Paystack. Does not change status or credit anything."

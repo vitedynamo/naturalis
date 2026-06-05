@@ -768,25 +768,40 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
             raise HTTPException(502, f"Paystack request failed: {e}")
 
     if use_budpay:
-        from budpay import initialize_transaction as bud_init
+        from budpay import initialize_bank_transfer as bud_bank_init
         try:
-            res = await bud_init(
+            res = await bud_bank_init(
                 secret_key=settings["budpay_secret_key"],
                 email=f"{user['phone']}@evoque-nova.local",
                 amount_naira=float(data.amount),
                 reference=reference,
-                callback_url=callback_url,
                 name=user.get("name") or user.get("phone"),
             )
             if not res.get("status"):
                 raise HTTPException(400, res.get("message", "BudPay error"))
-            d = res.get("data", {})
+            d = res.get("data", {}) or {}
+            acct = d.get("account_number") or d.get("accountNumber")
+            if not acct:
+                raise HTTPException(502, f"BudPay bank-transfer response missing account: {res}")
+            await db.deposits.update_one(
+                {"reference": reference},
+                {"$set": {
+                    "account_number": acct,
+                    "account_name": d.get("account_name") or d.get("accountName") or "",
+                    "bank_name": d.get("bank_name") or d.get("bankName") or "",
+                    "updated_at": _now_iso(),
+                }},
+            )
             return {
                 "mode": "live",
                 "gateway": "budpay",
+                "type": "bank_transfer",
                 "reference": reference,
-                "authorization_url": d.get("authorization_url"),
-                "access_code": d.get("access_code"),
+                "amount": float(data.amount),
+                "account_number": acct,
+                "account_name": d.get("account_name") or d.get("accountName") or "",
+                "bank_name": d.get("bank_name") or d.get("bankName") or "",
+                "expires_in_minutes": 60,
             }
         except HTTPException:
             await db.deposits.delete_one({"reference": reference})
@@ -827,12 +842,18 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
                     "authorization_url": checkout_url,
                 }
             if bank.get("account_number"):
+                # Persist the QorePay-side reference (QP-XXXX). All subsequent
+                # verify / recheck calls must use THIS reference, not our local
+                # dep_ reference — QorePay's `/v1/purchases/{ref}` lookup only
+                # accepts the QP-XXXX value.
+                qp_ref = d.get("reference") or reference
                 await db.deposits.update_one(
                     {"reference": reference},
                     {"$set": {
                         "account_number": bank["account_number"],
                         "account_name": bank.get("account_name") or "",
                         "bank_name": bank.get("bank_name") or "",
+                        "gateway_id": qp_ref,
                         "updated_at": _now_iso(),
                     }},
                 )
@@ -951,16 +972,20 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
     elif gateway_used == "qorepay" and settings.get("qorepay_secret_key"):
         try:
             from qorepay import verify_transaction as qp_verify
-            res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=reference)
+            # QorePay's purchase lookup uses THEIR reference (QP-XXXX), which we
+            # stored as gateway_id at init time. Fall back to our reference only
+            # so older rows don't 500 — they'll just always come back pending.
+            qp_ref = deposit.get("gateway_id") or reference
+            res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=qp_ref)
             qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
             qs = (qd.get("status") or "").lower()
-            if qs in ("success", "successful", "paid", "completed"):
+            if qs in ("success", "successful", "paid", "completed", "approved", "settled"):
                 gateway_status = "success"
-            elif qs in ("failed", "declined", "cancelled", "expired"):
+            elif qs in ("failed", "declined", "cancelled", "canceled", "expired"):
                 gateway_status = "failed"
             else:
                 gateway_status = "pending"
-            gateway_id = str(qd.get("id") or qd.get("transaction_id") or "") or None
+            gateway_id = qp_ref
         except Exception as e:
             logger.warning(f"QorePay verify failed for {reference}: {e}")
             gateway_status = "pending"
@@ -1188,12 +1213,13 @@ async def qorepay_webhook(request: Request):
         raise HTTPException(503, "QorePay not configured")
     try:
         from qorepay import verify_transaction as qp_verify
-        res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=reference)
+        qp_ref = deposit.get("gateway_id") or reference
+        res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=qp_ref)
     except Exception as e:
         raise HTTPException(502, f"QorePay re-verify failed: {e}")
     qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
     qs = (qd.get("status") or "").lower()
-    if qs not in ("success", "successful", "paid", "completed"):
+    if qs not in ("success", "successful", "paid", "completed", "approved", "settled"):
         return {"status": "ignored", "reason": f"gateway_status_{qs or 'unknown'}"}
 
     await db.deposits.update_one(

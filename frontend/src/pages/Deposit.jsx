@@ -160,8 +160,8 @@ export default function Deposit() {
                   { v: "paystack", label: "Card", sub: "Paystack", enabled: settings.gateway_paystack_enabled !== false },
                   { v: "nomba",    label: "Wallet", sub: "Nomba", enabled: settings.gateway_nomba_enabled !== false },
                   { v: "marasoft", label: "Transfer", sub: "Marasoft", enabled: settings.gateway_marasoft_enabled !== false },
-                  { v: "budpay",   label: "BudPay", sub: "Card · Transfer", enabled: !!settings.gateway_budpay_enabled },
-                  { v: "qorepay",  label: "QorePay", sub: "Transfer", enabled: !!settings.gateway_qorepay_enabled },
+                  { v: "budpay",   label: "Transfer", sub: "BudPay", enabled: !!settings.gateway_budpay_enabled },
+                  { v: "qorepay",  label: "Transfer", sub: "QorePay", enabled: !!settings.gateway_qorepay_enabled },
                 ].filter((g) => g.enabled).map((g) => {
                   const sel = chosenGateway === g.v || (!chosenGateway && settings.deposit_gateway === g.v);
                   return (
