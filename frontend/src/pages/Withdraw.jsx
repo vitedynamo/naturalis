@@ -28,7 +28,7 @@ export default function Withdraw() {
     ]);
     setHistory(h);
     setSettings(s);
-    setInvestmentsCount(Array.isArray(inv) ? inv.filter(i => ["active","paused","completed"].includes(i.status)).length : 0);
+    setInvestmentsCount(Array.isArray(inv) ? inv.filter(i => i.status === "active").length : 0);
     setSettingsLoaded(true);
   };
   useEffect(() => { load(); }, []);
@@ -125,12 +125,12 @@ export default function Withdraw() {
         </div>
       )}
 
-      {/* Investment gate — block users who haven't bought any package yet */}
+      {/* Investment gate — block users with no currently-active investment */}
       {investmentsCount === 0 && (
         <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="no-investment-banner">
-          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals unlock after your first investment</div>
+          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals require an active investment</div>
           <div className="text-sm text-[color:var(--text-secondary)] mt-1">
-            You need to buy at least one investment package before you can request a withdrawal. Head to the Invest tab, pick a plan, and your wallet will be ready to pay out from after purchase.
+            You need at least one running investment to request a withdrawal. Completed or paused plans don't count — head to the Invest tab and pick a new plan to re-enable withdrawals.
           </div>
           <Link to="/invest" data-testid="go-invest-link" className="mt-4 inline-block btn-primary text-sm">
             Browse plans
