@@ -1886,6 +1886,48 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
         except Exception as e:
             action = "error"
             note_extra = f"Poll error: {e}"
+    elif gateway == "budpay" and s.get("budpay_secret_key"):
+        try:
+            from budpay import verify_transaction as bud_verify
+            res = await bud_verify(secret_key=s["budpay_secret_key"], reference=reference)
+            bd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else {}
+            new_gateway_id = str(bd.get("id") or bd.get("transaction_id") or "") or None
+            bs = (bd.get("status") or "").lower()
+            if bs == "success":
+                new_status = "success"
+                action = "credited"
+                note_extra = "Confirmed via BudPay verify"
+            elif bs in ("failed", "abandoned", "reversed", "cancelled"):
+                new_status = "failed"
+                action = "marked_failed"
+                note_extra = f"BudPay reports {bs}"
+            else:
+                action = "still_pending"
+                note_extra = f"BudPay status: {bs or 'unknown'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Poll error: {e}"
+    elif gateway == "qorepay" and s.get("qorepay_secret_key"):
+        try:
+            from qorepay import verify_transaction as qp_verify
+            res = await qp_verify(secret_key=s["qorepay_secret_key"], reference=reference)
+            qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
+            new_gateway_id = str(qd.get("id") or qd.get("transaction_id") or "") or None
+            qs = (qd.get("status") or "").lower()
+            if qs in ("success", "successful", "paid", "completed"):
+                new_status = "success"
+                action = "credited"
+                note_extra = "Confirmed via QorePay verify"
+            elif qs in ("failed", "declined", "cancelled", "expired"):
+                new_status = "failed"
+                action = "marked_failed"
+                note_extra = f"QorePay reports {qs}"
+            else:
+                action = "still_pending"
+                note_extra = f"QorePay status: {qs or 'unknown'}"
+        except Exception as e:
+            action = "error"
+            note_extra = f"Poll error: {e}"
     else:
         action = "no_provider"
 

@@ -1158,6 +1158,123 @@ async def marasoft_webhook(request: Request):
     return {"status": "ok"}
 
 
+@router.post("/deposit/webhook/qorepay")
+async def qorepay_webhook(request: Request):
+    """Inbound webhook from QorePay. We re-verify against QorePay's GET
+    /v1/transactions/{ref} before crediting — the webhook IS the trigger, the
+    server-side verify call is the authority on whether to credit."""
+    db = request.app.state.db
+    try:
+        event = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    data = event.get("data") if isinstance(event, dict) else None
+    if not data:
+        data = event
+    reference = (
+        (data or {}).get("reference")
+        or (data or {}).get("merchant_reference")
+        or (data or {}).get("transaction_reference")
+    )
+    if not reference:
+        raise HTTPException(400, "reference missing")
+    deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
+    if not deposit:
+        return {"status": "ignored", "reason": "unknown_reference"}
+    if deposit["status"] == "success":
+        return {"status": "ok", "already": True}
+    settings = await _settings(db)
+    if not settings.get("qorepay_secret_key"):
+        raise HTTPException(503, "QorePay not configured")
+    try:
+        from qorepay import verify_transaction as qp_verify
+        res = await qp_verify(secret_key=settings["qorepay_secret_key"], reference=reference)
+    except Exception as e:
+        raise HTTPException(502, f"QorePay re-verify failed: {e}")
+    qd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else res
+    qs = (qd.get("status") or "").lower()
+    if qs not in ("success", "successful", "paid", "completed"):
+        return {"status": "ignored", "reason": f"gateway_status_{qs or 'unknown'}"}
+
+    await db.deposits.update_one(
+        {"reference": reference},
+        {"$set": {"status": "success", "updated_at": _now_iso(),
+                  "gateway_id": str(qd.get("id") or qd.get("transaction_id") or "") or None}},
+    )
+    new_user = await db.users.find_one_and_update(
+        {"id": deposit["user_id"]},
+        {"$inc": {"wallet_balance": deposit["amount"]}},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    await db.transactions.insert_one({
+        "id": gen_reference("tx"),
+        "user_id": deposit["user_id"],
+        "type": "deposit",
+        "amount": deposit["amount"],
+        "description": "Deposit",
+        "balance_after": new_user["wallet_balance"],
+        "meta": {"reference": reference, "gateway": "qorepay"},
+        "created_at": _now_iso(),
+    })
+    return {"status": "ok"}
+
+
+@router.post("/deposit/webhook/budpay")
+async def budpay_webhook(request: Request):
+    """Inbound webhook from BudPay (HMAC-signed). Re-verifies before crediting."""
+    db = request.app.state.db
+    try:
+        event = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    data = event.get("data") if isinstance(event, dict) else None
+    if not data:
+        data = event
+    reference = (data or {}).get("reference") or (data or {}).get("merchant_reference")
+    if not reference:
+        raise HTTPException(400, "reference missing")
+    deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
+    if not deposit:
+        return {"status": "ignored", "reason": "unknown_reference"}
+    if deposit["status"] == "success":
+        return {"status": "ok", "already": True}
+    settings = await _settings(db)
+    if not settings.get("budpay_secret_key"):
+        raise HTTPException(503, "BudPay not configured")
+    try:
+        from budpay import verify_transaction as bud_verify
+        res = await bud_verify(secret_key=settings["budpay_secret_key"], reference=reference)
+    except Exception as e:
+        raise HTTPException(502, f"BudPay re-verify failed: {e}")
+    bd = (res.get("data") or {}) if isinstance(res.get("data"), dict) else {}
+    if (bd.get("status") or "").lower() != "success":
+        return {"status": "ignored", "reason": f"gateway_status_{(bd.get('status') or 'unknown').lower()}"}
+
+    await db.deposits.update_one(
+        {"reference": reference},
+        {"$set": {"status": "success", "updated_at": _now_iso(),
+                  "gateway_id": str(bd.get("id") or bd.get("transaction_id") or "") or None}},
+    )
+    new_user = await db.users.find_one_and_update(
+        {"id": deposit["user_id"]},
+        {"$inc": {"wallet_balance": deposit["amount"]}},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    await db.transactions.insert_one({
+        "id": gen_reference("tx"),
+        "user_id": deposit["user_id"],
+        "type": "deposit",
+        "amount": deposit["amount"],
+        "description": "Deposit",
+        "balance_after": new_user["wallet_balance"],
+        "meta": {"reference": reference, "gateway": "budpay"},
+        "created_at": _now_iso(),
+    })
+    return {"status": "ok"}
+
+
 
 @router.get("/deposits")
 async def my_deposits(request: Request, user=Depends(get_current_user)):

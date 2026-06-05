@@ -14,7 +14,11 @@ export default function Deposit() {
   const [amount, setAmount] = useState("");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [settings, setSettings] = useState({ min_deposit: 3000, payment_mode: "mock", quick_deposit_amounts: [3000, 5000, 10000, 25000, 50000, 100000] });
+  const [settings, setSettings] = useState({});
+  // Tracks whether /settings/public has returned yet. Until it does, we hide
+  // settings-dependent UI (mode badge, placeholder, quick amounts) so the page
+  // doesn't flash with mock-mode + ₦3,000 placeholder on first paint.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [chosenGateway, setChosenGateway] = useState("");
   const [highlightRef, setHighlightRef] = useState(null);
   const [rechecking, setRechecking] = useState({}); // { [reference]: true }
@@ -27,6 +31,7 @@ export default function Deposit() {
     ]);
     setHistory(h);
     setSettings(s);
+    setSettingsLoaded(true);
   };
 
   useEffect(() => { load(); }, []);
@@ -105,7 +110,7 @@ export default function Deposit() {
     <UserLayout>
       <div className="text-label">Funds</div>
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Deposit</h1>
-      <p className="text-sm text-[color:var(--text-secondary)] mt-1">Top up your wallet. Minimum: <span className="font-semibold">{formatNaira(settings.min_deposit)}</span></p>
+      <p className="text-sm text-[color:var(--text-secondary)] mt-1">Top up your wallet.{settingsLoaded ? <> Minimum: <span className="font-semibold">{formatNaira(settings.min_deposit)}</span></> : null}</p>
 
       {pendingBankTransfer && (
         <button onClick={() => navigate(`/deposit/transfer/${pendingBankTransfer.reference}`)}
@@ -120,16 +125,19 @@ export default function Deposit() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <form onSubmit={submit} className="card-soft p-6 lg:col-span-2" data-testid="deposit-form">
-          <div className="flex items-center gap-2 pill pill-neutral w-fit">
-            <ShieldCheck className="w-3.5 h-3.5" /> {settings.payment_mode === "live" ? "Secure checkout" : "Test / Mock mode"}
-          </div>
+          {settingsLoaded && (
+            <div className="flex items-center gap-2 pill pill-neutral w-fit">
+              <ShieldCheck className="w-3.5 h-3.5" /> {settings.payment_mode === "live" ? "Secure checkout" : "Test / Mock mode"}
+            </div>
+          )}
           <label className="block mt-5 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
           <input
             type="number" min={settings.min_deposit} value={amount} onChange={(e)=>setAmount(e.target.value)} required
-            placeholder={`Min ₦${Number(settings.min_deposit || 3000).toLocaleString()}`}
+            placeholder={settingsLoaded ? `Min ₦${Number(settings.min_deposit || 0).toLocaleString()}` : ""}
             data-testid="deposit-amount-input"
             className="w-full mt-2 px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
           />
+          {settingsLoaded && (
           <div className="flex gap-2 mt-3 flex-wrap">
             {(settings.quick_deposit_amounts && settings.quick_deposit_amounts.length > 0
               ? settings.quick_deposit_amounts
@@ -142,8 +150,9 @@ export default function Deposit() {
               </button>
             ))}
           </div>
+          )}
 
-          {settings.multi_gateway_enabled && settings.let_users_choose_gateway && (
+          {settingsLoaded && settings.multi_gateway_enabled && settings.let_users_choose_gateway && (
             <div className="mt-5" data-testid="deposit-gateway-picker">
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">Payment method</label>
               <div className="grid grid-cols-3 gap-2">
@@ -178,7 +187,7 @@ export default function Deposit() {
             className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-lg font-semibold disabled:opacity-60">
             <ArrowDownToLine className="w-4 h-4" /> {busy ? "Processing…" : "Proceed to pay"}
           </button>
-          {settings.payment_mode !== "live" && (
+          {settingsLoaded && settings.payment_mode !== "live" && (
             <p className="mt-3 text-xs text-[color:var(--text-tertiary)]">Mock mode: deposits are credited instantly for testing.</p>
           )}
         </form>
