@@ -12,7 +12,11 @@ export default function Withdraw() {
   const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const [history, setHistory] = useState([]);
-  const [settings, setSettings] = useState({ min_withdrawal: 1000 });
+  const [settings, setSettings] = useState({});
+  // Mirrors Deposit.jsx — keep settings-dependent UI hidden until /settings/public
+  // returns, otherwise the page flashes with a hardcoded ₦1,000 limit before the
+  // admin's actual value loads.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -22,6 +26,7 @@ export default function Withdraw() {
     ]);
     setHistory(h);
     setSettings(s);
+    setSettingsLoaded(true);
   };
   useEffect(() => { load(); }, []);
 
@@ -79,11 +84,15 @@ export default function Withdraw() {
       <div className="text-label">Funds</div>
       <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">Withdraw</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">
-        Limits: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.min_withdrawal)}</span>
-        {settings.max_withdrawal ? <> – <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.max_withdrawal)}</span></> : null}
-        {settings.auto_payout_max_amount > 0 && (
-          <> · auto-payout up to <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.auto_payout_max_amount)}</span> (larger requests need admin approval)</>
-        )}
+        {settingsLoaded ? (
+          <>
+            Limits: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.min_withdrawal)}</span>
+            {settings.max_withdrawal ? <> – <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.max_withdrawal)}</span></> : null}
+            {settings.auto_payout_max_amount > 0 && (
+              <> · auto-payout up to <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(settings.auto_payout_max_amount)}</span> (larger requests need admin approval)</>
+            )}
+          </>
+        ) : <>&nbsp;</>}
       </p>
 
       {!bankReady && (
@@ -120,7 +129,7 @@ export default function Withdraw() {
           min={settings.min_withdrawal}
           max={Math.min(user?.wallet_balance ?? Infinity, settings.max_withdrawal || Infinity)}
           value={amount} onChange={(e)=>setAmount(e.target.value)} required
-          placeholder={`Min ₦${Number(settings.min_withdrawal || 1000).toLocaleString()}`}
+          placeholder={settingsLoaded ? `Min ₦${Number(settings.min_withdrawal || 0).toLocaleString()}` : ""}
           data-testid="withdraw-amount-input"
           className="w-full mt-2 px-3 py-3 input-base"
         />
