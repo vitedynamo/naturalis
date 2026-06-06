@@ -1,5 +1,17 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Feb 2026 — iteration 63)
+
+### Withdrawal fee — UI surface complete
+
+The `withdrawal_fee_percent` setting was wired end-to-end on the backend (wallet debited gross, bank receives net) but the UI never exposed fee/net to users or admins. Three surfaces added:
+
+1. **`Withdraw.jsx` — live fee preview**: when `settings.withdrawal_fee_percent > 0` and the user types a valid amount, a small card under the amount input shows `Withdrawal fee (X%) − ₦Y` and `You'll receive ₦Z` in success-green. Hidden when fee is 0 to keep the form clean.
+2. **`Withdraw.jsx` — history rows**: mobile cards now show a `Fee ₦X · Net ₦Y` sub-line under the gross amount; the desktop table gained a new "Fee · Net" column. Only renders when `fee_amount > 0` on that row.
+3. **`AdminWithdrawals.jsx`** — the Amount column in the main table now shows `−₦fee · net ₦Y` under the gross figure when applicable. The Toolkit modal header was also bug-fixed: the "Net" line previously hardcoded `formatNaira(w.amount)` (i.e. same as gross), now correctly renders `formatNaira(w.net_amount)` plus an extra "Platform fee (X%) − ₦Y" row when the row carries a non-zero fee.
+
+All edits are purely conditional UI rendering against API fields already exposed by `GET /api/withdrawals`, `GET /api/admin/withdrawals`, and `GET /api/settings/public`. Backend code untouched.
+
 ## Recent Changes (Jun 2026 — iteration 62)
 
 ### BudPay + QorePay payment gateway integration

@@ -150,6 +150,36 @@ export default function Withdraw() {
           className="w-full mt-2 px-3 py-3 input-base"
         />
 
+        {/* Live fee preview — only renders when admin has set a non-zero fee% and the
+            user typed a valid amount. Mirrors the math in routes_user.py: wallet is
+            debited the FULL gross amount; the bank receives `amount × (1 - fee%)`. */}
+        {(() => {
+          const feePct = Number(settings.withdrawal_fee_percent) || 0;
+          const amt = Number(amount);
+          if (!settingsLoaded || feePct <= 0 || !Number.isFinite(amt) || amt <= 0) return null;
+          const fee = Math.round(amt * feePct) / 100;
+          const net = Math.round((amt - fee) * 100) / 100;
+          return (
+            <div
+              className="mt-3 rounded-md bg-[color:var(--surface-alt)] p-3 text-xs border border-[color:var(--border-light)]"
+              data-testid="withdraw-fee-preview"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--text-secondary)]">Withdrawal fee ({feePct}%)</span>
+                <span className="font-semibold text-[color:var(--text-primary)] tabular-nums" data-testid="withdraw-fee-amount">
+                  − {formatNaira(fee)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-[color:var(--border-light)]">
+                <span className="font-semibold text-[color:var(--text-primary)]">You'll receive</span>
+                <span className="font-display font-bold text-base text-[color:var(--success)] tabular-nums" data-testid="withdraw-net-amount">
+                  {formatNaira(net)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         {pinRequired && (
           <>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mt-4 flex items-center gap-1.5">
@@ -197,6 +227,11 @@ export default function Withdraw() {
             <div key={w.id} className="card-soft p-3 flex items-center justify-between" data-testid={`w-${w.id}`}>
               <div className="min-w-0">
                 <div className="font-semibold text-[color:var(--text-primary)]">{formatNaira(w.amount)}</div>
+                {Number(w.fee_amount) > 0 && (
+                  <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5" data-testid={`w-fee-net-${w.id}`}>
+                    Fee {formatNaira(w.fee_amount)} · Net <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(w.net_amount ?? (w.amount - w.fee_amount))}</span>
+                  </div>
+                )}
                 <div className="text-xs text-[color:var(--text-secondary)] truncate">{w.bank_name} · {w.account_number}</div>
                 <div className="text-[10px] text-[color:var(--text-tertiary)] mt-1">{formatDate(w.created_at)}</div>
               </div>
@@ -220,6 +255,7 @@ export default function Withdraw() {
             <thead className="bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]">
               <tr>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">Amount</th>
+                <th className="text-left p-3 text-xs uppercase tracking-wider">Fee · Net</th>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">Bank</th>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">Status</th>
                 <th className="text-left p-3 text-xs uppercase tracking-wider">Date</th>
@@ -229,6 +265,17 @@ export default function Withdraw() {
               {history.map((w) => (
                 <tr key={w.id} className="border-t border-[color:var(--border-default)]">
                   <td className="p-3 font-semibold text-[color:var(--text-primary)]">{formatNaira(w.amount)}</td>
+                  <td className="p-3 text-xs text-[color:var(--text-secondary)] whitespace-nowrap" data-testid={`w-row-fee-${w.id}`}>
+                    {Number(w.fee_amount) > 0 ? (
+                      <>
+                        <span className="text-[color:var(--text-tertiary)]">−{formatNaira(w.fee_amount)}</span>
+                        <span className="mx-1.5 text-[color:var(--text-tertiary)]">·</span>
+                        <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(w.net_amount ?? (w.amount - w.fee_amount))}</span>
+                      </>
+                    ) : (
+                      <span className="text-[color:var(--text-tertiary)]">—</span>
+                    )}
+                  </td>
                   <td className="p-3 text-[color:var(--text-secondary)]">{w.bank_name} · {w.account_number}</td>
                   <td className="p-3">
                     <span className={`pill ${w.status === "paid" || w.status === "approved" ? "pill-success" : w.status === "rejected" ? "pill-error" : "pill-warn"}`}>{w.status}</span>
@@ -237,7 +284,7 @@ export default function Withdraw() {
                 </tr>
               ))}
               {history.length === 0 && (
-                <tr><td colSpan={4} className="p-6 text-center text-[color:var(--text-tertiary)]">No withdrawals yet.</td></tr>
+                <tr><td colSpan={5} className="p-6 text-center text-[color:var(--text-tertiary)]">No withdrawals yet.</td></tr>
               )}
             </tbody>
           </table>

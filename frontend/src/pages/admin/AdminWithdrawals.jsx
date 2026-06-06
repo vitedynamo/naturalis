@@ -659,6 +659,11 @@ export default function AdminWithdrawals() {
                     </td>
                     <td className="p-4 text-right whitespace-nowrap">
                       <div className="font-display font-bold tabular-nums leading-tight">{formatNaira(w.amount)}</div>
+                      {Number(w.fee_amount) > 0 && (
+                        <div className="text-[10px] text-[color:var(--text-tertiary)] tabular-nums mt-0.5" data-testid={`row-fee-net-${w.id}`}>
+                          −{formatNaira(w.fee_amount)} · net <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira(w.net_amount ?? (w.amount - w.fee_amount))}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 hidden md:table-cell max-w-[200px]">
                       {gw && (
@@ -856,9 +861,16 @@ function ToolkitModal({ w, onClose, onRefresh, refreshingId, onPay, onApprove, o
               <div className="font-display font-extrabold text-3xl md:text-4xl tabular-nums leading-none mt-1">
                 {formatNaira(w.amount)}
               </div>
-              <div className="text-white/85 text-xs mt-2">
-                Net <span className="font-bold tabular-nums">{formatNaira(w.amount)}</span>
-              </div>
+              {Number(w.fee_amount) > 0 ? (
+                <div className="text-white/85 text-xs mt-2 space-y-0.5" data-testid="toolkit-fee-breakdown">
+                  <div>Platform fee ({Number(w.fee_percent || 0)}%) <span className="font-bold tabular-nums">− {formatNaira(w.fee_amount)}</span></div>
+                  <div>Net to bank <span className="font-bold tabular-nums">{formatNaira(w.net_amount ?? (w.amount - w.fee_amount))}</span></div>
+                </div>
+              ) : (
+                <div className="text-white/85 text-xs mt-2">
+                  Net <span className="font-bold tabular-nums">{formatNaira(w.amount)}</span>
+                </div>
+              )}
               <div className="mt-3">
                 <span className={`inline-flex px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusBadge}`}>
                   {w.status === "paid" ? "completed" : w.status}
