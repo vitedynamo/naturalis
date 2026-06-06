@@ -11,6 +11,7 @@ from auth import hash_password, gen_referral_code
 from routes_user import router as user_router
 from routes_admin import router as admin_router
 from storage import init_storage, get_object
+import fixie_counter
 
 
 ROOT_DIR = Path(__file__).parent
@@ -22,6 +23,10 @@ db = client[os.environ['DB_NAME']]
 
 app = FastAPI(title="Evoque-Nova API")
 app.state.db = db
+
+# Wire the in-process Fixie request counter so httpx event hooks can $inc the
+# `fixie_usage_count` setting whenever a Nomba call goes through the proxy.
+fixie_counter.set_db(db)
 
 api_router = APIRouter(prefix="/api")
 

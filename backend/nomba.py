@@ -4,20 +4,34 @@ import time
 import logging
 import httpx
 
+from fixie_counter import bump_async as _fixie_bump
+
 logger = logging.getLogger(__name__)
 
 NOMBA_BASE_PROD = "https://api.nomba.com"
 NOMBA_BASE_SANDBOX = "https://sandbox.nomba.com"
 
 
+async def _on_request_through_fixie(request):  # noqa: ARG001
+    """httpx request event hook. Bumps the Fixie counter once per outbound
+    request. Only attached when NOMBA_PROXY_URL is configured, so a missing
+    proxy never triggers it."""
+    _fixie_bump(1)
+
+
 def _nomba_client(timeout: int = 20) -> httpx.AsyncClient:
     """Build an httpx client. If NOMBA_PROXY_URL is configured, route Nomba calls
     through it so Nomba sees a stable, whitelisted outbound IP instead of the
-    app server's real (rotating) IP.
+    app server's real (rotating) IP. Each outbound request through the proxy
+    bumps the Fixie usage counter on the admin dashboard.
     """
     proxy = os.environ.get("NOMBA_PROXY_URL") or None
     if proxy:
-        return httpx.AsyncClient(timeout=timeout, proxy=proxy)
+        return httpx.AsyncClient(
+            timeout=timeout,
+            proxy=proxy,
+            event_hooks={"request": [_on_request_through_fixie]},
+        )
     return httpx.AsyncClient(timeout=timeout)
 
 
