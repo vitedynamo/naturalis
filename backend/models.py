@@ -407,6 +407,12 @@ class Settings(BaseModel):
     # Home: customizable section under the featured plan
     home_below_featured_mode: str = "cards"  # cards | image
     home_below_featured_image_url: str = ""
+    # Fixie static-IP proxy usage tracker. Fixie doesn't expose a usage API, so admins
+    # manually paste the live count from their Fixie dashboard. `fixie_usage_synced_at`
+    # is auto-stamped on every sync/reset.
+    fixie_usage_count: int = 0
+    fixie_usage_limit: int = 250000
+    fixie_usage_synced_at: str = ""
 
 
 class SettingsUpdate(BaseModel):

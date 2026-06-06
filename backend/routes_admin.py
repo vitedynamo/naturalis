@@ -2647,6 +2647,86 @@ async def update_settings(data: SettingsUpdate, request: Request, _admin=Depends
 
 
 
+# ===== Fixie proxy usage tracker =====
+# Admins paste the live count from their Fixie dashboard. There's no auto-poll
+# (Fixie has no public usage API), so this is a manually-synced counter.
+
+class FixieSyncRequest(BaseModel):
+    count: int
+
+
+class FixieLimitRequest(BaseModel):
+    limit: int
+
+
+@router.get("/admin/fixie/usage")
+async def get_fixie_usage(request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    return {
+        "count": int(s.get("fixie_usage_count") or 0),
+        "limit": int(s.get("fixie_usage_limit") or 250000),
+        "synced_at": s.get("fixie_usage_synced_at") or "",
+    }
+
+
+@router.post("/admin/fixie/sync")
+async def sync_fixie_usage(data: FixieSyncRequest, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    if data.count < 0:
+        raise HTTPException(400, "count must be 0 or greater")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"fixie_usage_count": int(data.count), "fixie_usage_synced_at": now}},
+        upsert=True,
+    )
+    await _log_admin_activity(
+        db, _admin, "fixie.synced",
+        target_type="settings", target_id="global",
+        description=f"Synced Fixie usage to {data.count:,}",
+        meta={"count": int(data.count)},
+    )
+    return {"count": int(data.count), "synced_at": now}
+
+
+@router.post("/admin/fixie/reset")
+async def reset_fixie_usage(request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    now = datetime.now(timezone.utc).isoformat()
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"fixie_usage_count": 0, "fixie_usage_synced_at": now}},
+        upsert=True,
+    )
+    await _log_admin_activity(
+        db, _admin, "fixie.reset",
+        target_type="settings", target_id="global",
+        description="Reset Fixie usage counter to 0",
+    )
+    return {"count": 0, "synced_at": now}
+
+
+@router.post("/admin/fixie/limit")
+async def update_fixie_limit(data: FixieLimitRequest, request: Request, _admin=Depends(get_current_admin)):
+    db = request.app.state.db
+    if data.limit <= 0:
+        raise HTTPException(400, "limit must be greater than 0")
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {"fixie_usage_limit": int(data.limit)}},
+        upsert=True,
+    )
+    await _log_admin_activity(
+        db, _admin, "fixie.limit_changed",
+        target_type="settings", target_id="global",
+        description=f"Changed Fixie monthly limit to {data.limit:,}",
+        meta={"limit": int(data.limit)},
+    )
+    return {"limit": int(data.limit)}
+
+
+
 @router.get("/admin/stats/profit-breakdown")
 async def admin_profit_breakdown(
     request: Request,

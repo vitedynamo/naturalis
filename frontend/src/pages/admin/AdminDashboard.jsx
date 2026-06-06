@@ -2,13 +2,208 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/AdminLayout";
 import { api } from "@/lib/api";
-import { formatNaira, formatDate } from "@/lib/format";
+import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import {
   Users, TrendingUp, ArrowDownToLine, ArrowUpFromLine, Clock, DollarSign,
   CircleCheck, CircleAlert, ShieldAlert, ScanSearch, Banknote, ChevronRight,
-  CalendarRange, ArrowUpRight, X, Search,
+  CalendarRange, ArrowUpRight, X, Search, Radio, RefreshCw,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+
+function FixieUsageCard() {
+  const [d, setD] = useState(null);     // { count, limit, synced_at }
+  const [busy, setBusy] = useState("");  // "sync" | "reset" | "limit" | ""
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/admin/fixie/usage")
+      .then(({ data }) => { if (!cancelled) setD(data); })
+      .catch(() => { if (!cancelled) setD({ count: 0, limit: 250000, synced_at: "" }); });
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
+
+  if (!d) {
+    return (
+      <div className="card-soft p-6 mt-5 animate-pulse" data-testid="fixie-usage-loading">
+        <div className="h-4 w-48 bg-[color:var(--surface-alt)] rounded" />
+        <div className="h-8 w-32 bg-[color:var(--surface-alt)] rounded mt-4" />
+        <div className="h-2 w-full bg-[color:var(--surface-alt)] rounded-full mt-4" />
+      </div>
+    );
+  }
+
+  const limit = Math.max(1, Number(d.limit) || 250000);
+  const count = Math.max(0, Number(d.count) || 0);
+  const pct = Math.min(100, (count / limit) * 100);
+  const left = Math.max(0, limit - count);
+
+  // Health: green < 70%, amber 70-90%, red > 90%
+  let health, healthClass, barClass;
+  if (pct >= 90) {
+    health = "CRITICAL";
+    healthClass = "bg-[color:var(--error-soft)] text-[color:var(--error)]";
+    barClass = "bg-[color:var(--error)]";
+  } else if (pct >= 70) {
+    health = "WARNING";
+    healthClass = "bg-[color:var(--gold-soft)] text-[color:var(--warning)]";
+    barClass = "bg-[color:var(--warning)]";
+  } else {
+    health = "HEALTHY";
+    healthClass = "bg-[color:var(--success-soft)] text-[color:var(--success)]";
+    barClass = "bg-[color:var(--success)]";
+  }
+
+  const onSync = async () => {
+    const raw = window.prompt(
+      `Paste the live request count from your Fixie dashboard.\n\nCurrent: ${count.toLocaleString()}\nLimit: ${limit.toLocaleString()}`,
+      String(count),
+    );
+    if (raw === null) return;
+    const n = Number(String(raw).replace(/[,\s]/g, ""));
+    if (!Number.isFinite(n) || n < 0) { toast.error("Enter a valid number"); return; }
+    setBusy("sync");
+    try {
+      await api.post("/admin/fixie/sync", { count: Math.floor(n) });
+      toast.success(`Synced to ${Math.floor(n).toLocaleString()}`);
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Sync failed");
+    } finally { setBusy(""); }
+  };
+
+  const onReset = async () => {
+    if (!window.confirm("Reset the Fixie usage counter to 0?\n\nUse this at the start of a new billing cycle.")) return;
+    setBusy("reset");
+    try {
+      await api.post("/admin/fixie/reset");
+      toast.success("Counter reset to 0");
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Reset failed");
+    } finally { setBusy(""); }
+  };
+
+  const onChangeLimit = async () => {
+    const raw = window.prompt(
+      `Update the Fixie monthly request limit. The % bar will track the new cap.\n\nCurrent: ${limit.toLocaleString()} / month`,
+      String(limit),
+    );
+    if (raw === null) return;
+    const n = Number(String(raw).replace(/[,\s]/g, ""));
+    if (!Number.isFinite(n) || n <= 0) { toast.error("Enter a positive number"); return; }
+    setBusy("limit");
+    try {
+      await api.post("/admin/fixie/limit", { limit: Math.floor(n) });
+      toast.success(`Limit set to ${Math.floor(n).toLocaleString()}/month`);
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not update limit");
+    } finally { setBusy(""); }
+  };
+
+  return (
+    <div className="card-soft p-6 mt-5" data-testid="fixie-usage-card">
+      {/* Header */}
+      <div className="flex items-start gap-3 flex-wrap">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-[color:var(--brand-soft)] text-[color:var(--brand)] shrink-0">
+          <Radio className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-display font-bold text-base text-[color:var(--text-primary)]">
+              Fixie proxy usage · Nomba payouts
+            </div>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${healthClass}`}
+              data-testid="fixie-health-badge"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-current" /> {health}
+            </span>
+          </div>
+
+          <div className="flex items-baseline gap-2 mt-3 flex-wrap">
+            <div className="font-display font-extrabold text-3xl text-[color:var(--text-primary)] tabular-nums leading-none" data-testid="fixie-count">
+              {count.toLocaleString()}
+            </div>
+            <div className="text-xs text-[color:var(--text-secondary)]">
+              / <span className="font-semibold text-[color:var(--text-primary)] tabular-nums">{limit.toLocaleString()}</span> requests
+              <span className="mx-1.5 text-[color:var(--text-tertiary)]">·</span>
+              <span className="font-semibold text-[color:var(--text-primary)] tabular-nums">{left.toLocaleString()}</span> left
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mt-4">
+        <div className="h-2 rounded-full bg-[color:var(--surface-alt)] overflow-hidden" data-testid="fixie-progress">
+          <div className={`h-full ${barClass} transition-all duration-500`} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="text-[11px] text-[color:var(--text-tertiary)] mt-2 tabular-nums" data-testid="fixie-pct">
+          {pct.toFixed(2)}% used
+        </div>
+      </div>
+
+      {/* Sync row */}
+      <div className="mt-5 pt-5 border-t border-[color:var(--border-default)] flex items-start gap-3 flex-wrap">
+        <div className="flex-1 min-w-[220px]">
+          <div className="text-xs text-[color:var(--text-secondary)]">
+            Synced <span className="font-semibold text-[color:var(--text-primary)]">{d.synced_at ? relativeTime(d.synced_at) : "never"}</span>
+          </div>
+          <div className="text-[11px] text-[color:var(--text-tertiary)] mt-1 max-w-xl">
+            Read the live count from your Fixie dashboard and paste it here so this meter matches reality.
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={onSync}
+            disabled={!!busy}
+            data-testid="fixie-sync-btn"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${busy === "sync" ? "animate-spin" : ""}`} />
+            Sync with Fixie
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={!!busy}
+            data-testid="fixie-reset-btn"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border border-[color:var(--border-default)] bg-[color:var(--surface)] hover:bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] disabled:opacity-50 transition-colors"
+          >
+            Reset to 0
+          </button>
+        </div>
+      </div>
+
+      {/* Limit row */}
+      <div className="mt-4 pt-4 border-t border-[color:var(--border-default)] flex items-start gap-3 flex-wrap">
+        <div className="flex-1 min-w-[220px]">
+          <div className="text-xs text-[color:var(--text-secondary)]">
+            Plan limit: <span className="font-semibold text-[color:var(--text-primary)] tabular-nums">{limit.toLocaleString()}</span> requests / month
+          </div>
+          <div className="text-[11px] text-[color:var(--text-tertiary)] mt-1 max-w-xl">
+            Upgraded your Fixie plan? Update the limit here so the % bar tracks the new cap.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onChangeLimit}
+          disabled={!!busy}
+          data-testid="fixie-change-limit-btn"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border border-[color:var(--border-default)] bg-[color:var(--surface)] hover:bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] disabled:opacity-50 transition-colors"
+        >
+          Change limit
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function StatCard({ icon: Icon, label, value, sub, tone = "brand", testid }) {
   const tones = {
@@ -175,6 +370,9 @@ export default function AdminDashboard() {
           </div>
         </Link>
       </div>
+
+      {/* Fixie proxy usage — manually-synced counter for the Nomba payout proxy */}
+      <FixieUsageCard />
 
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
