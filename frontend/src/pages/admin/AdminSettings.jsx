@@ -217,6 +217,7 @@ export default function AdminSettings() {
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
         require_withdrawal_pin: !!s.require_withdrawal_pin,
         max_withdrawal: Number(s.max_withdrawal) || 0,
+        withdrawal_fee_percent: Number(s.withdrawal_fee_percent) || 0,
         auto_payout_max_amount: Number(s.auto_payout_max_amount) || 0,
         daily_claim_enabled: !!s.daily_claim_enabled,
         daily_claim_amount: Number(s.daily_claim_amount) || 0,
@@ -391,6 +392,7 @@ export default function AdminSettings() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <Field label="Min withdrawal (₦)" value={s.min_withdrawal} onChange={(v) => setS({ ...s, min_withdrawal: v })} testid="min-withdrawal-w" />
                 <Field label="Max withdrawal (₦)" value={s.max_withdrawal} onChange={(v) => setS({ ...s, max_withdrawal: v })} testid="max-withdrawal" sub="The largest single payout a user can request in one transaction. Requests above this are rejected outright with an error — they don't queue for admin approval. Use this to cap exposure on any one transfer. Set to 0 to remove the ceiling." />
+                <Field label="Withdrawal fee (%)" value={s.withdrawal_fee_percent} step="0.1" onChange={(v) => setS({ ...s, withdrawal_fee_percent: v })} testid="withdrawal-fee-percent" sub="Percentage deducted from each withdrawal as platform revenue. User requests ₦10,000 with fee=5 → wallet debited ₦10,000, bank receives ₦9,500, platform keeps ₦500. Set to 0 to disable." />
                 <Field label="Auto-payout limit (₦)" value={s.auto_payout_max_amount} onChange={(v) => setS({ ...s, auto_payout_max_amount: v })} testid="auto-payout-max" sub="Above this, requires admin approval. 0 = no cap." />
               </div>
               <Toggle checked={!!s.require_withdrawal_pin} onChange={(v) => setS({ ...s, require_withdrawal_pin: v })} label="Require 4-digit withdrawal PIN" hint="Users will be prompted for their PIN before each withdrawal. Off = PIN bypassed." testid="require-pin-toggle" />

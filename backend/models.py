@@ -378,6 +378,10 @@ class Settings(BaseModel):
     quick_deposit_amounts: list = Field(default_factory=lambda: [3000, 5000, 10000, 25000, 50000, 100000])
     # Withdrawals
     require_withdrawal_pin: bool = True
+    # Percentage deducted from the requested withdrawal amount. e.g. user requests
+    # ₦10,000 with fee=5 → wallet is debited ₦10,000 but the bank receives ₦9,500.
+    # The ₦500 difference is platform revenue. Set to 0 to disable.
+    withdrawal_fee_percent: float = 0.0
     max_withdrawal: float = 1000000.0
     auto_payout_max_amount: float = 0.0  # 0 = no cap; above this, manual approval required
     # Daily claim
@@ -456,6 +460,7 @@ class SettingsUpdate(BaseModel):
     let_users_choose_gateway: Optional[bool] = None
     quick_deposit_amounts: Optional[list] = None
     require_withdrawal_pin: Optional[bool] = None
+    withdrawal_fee_percent: Optional[float] = None
     max_withdrawal: Optional[float] = None
     auto_payout_max_amount: Optional[float] = None
     daily_claim_enabled: Optional[bool] = None

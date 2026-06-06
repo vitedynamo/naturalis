@@ -1420,10 +1420,19 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
     )
     wid = gen_reference("w")
     method = data.method if data.method in ("manual", "auto") else "manual"
+    # Compute the platform fee. Wallet is debited the FULL `data.amount`; the bank
+    # only receives `net_amount` = amount × (1 - fee%). The difference stays in
+    # the platform's pocket as revenue.
+    fee_pct = float(settings.get("withdrawal_fee_percent") or 0)
+    fee_amount = round(float(data.amount) * fee_pct / 100, 2) if fee_pct > 0 else 0.0
+    net_amount = round(float(data.amount) - fee_amount, 2)
     doc = {
         "id": wid,
         "user_id": user["id"],
-        "amount": float(data.amount),
+        "amount": float(data.amount),          # gross — what the user requested / what the wallet was debited
+        "fee_amount": fee_amount,
+        "fee_percent": fee_pct,
+        "net_amount": net_amount,              # what the bank actually receives
         "bank_name": user["bank_name"],
         "bank_code": user.get("bank_code", ""),
         "account_number": user["account_number"],
@@ -1470,7 +1479,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                 except Exception as be:
                     logger.warning(f"Nomba balance check failed: {be}")
                     available = None
-                if available is not None and available < float(data.amount):
+                if available is not None and available < net_amount:
                     # Insufficient float — keep as pending. Admin gets a clear flag
                     # (red INSUFFICIENT FLOAT pill), users just see "pending".
                     await db.withdrawals.update_one(
@@ -1479,7 +1488,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                             "status": "pending",
                             "insufficient_float": True,
                             "float_balance_at_request": available,
-                            "admin_note": f"Auto-payout deferred (Nomba float ₦{available:,.2f} < requested ₦{float(data.amount):,.2f}). Top up Nomba and retry, or pay manually.",
+                            "admin_note": f"Auto-payout deferred (Nomba float ₦{available:,.2f} < requested ₦{net_amount:,.2f}). Top up Nomba and retry, or pay manually.",
                             "updated_at": _now_iso(),
                         }},
                     )
@@ -1490,7 +1499,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                 transfer_resp = await nomba_transfer(
                     client_id=settings["nomba_client_id"], client_secret=settings["nomba_client_secret"],
                     account_id=settings.get("nomba_account_id", ""),
-                    amount_naira=float(data.amount), account_number=user["account_number"],
+                    amount_naira=net_amount, account_number=user["account_number"],
                     account_name=user["account_name"], bank_code=user["bank_code"],
                     merchant_tx_ref=ref, narration=f"Auto payout {wid}",
                     environment=settings.get("nomba_environment"),
@@ -1549,7 +1558,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     r2 = await client.post(
                         "https://api.paystack.co/transfer",
                         headers={"Authorization": f"Bearer {settings['paystack_secret_key']}", "Content-Type": "application/json"},
-                        json={"source": "balance", "amount": int(float(data.amount) * 100), "recipient": recipient_code, "reason": f"Auto payout {wid}", "reference": ref},
+                        json={"source": "balance", "amount": int(net_amount * 100), "recipient": recipient_code, "reason": f"Auto payout {wid}", "reference": ref},
                     )
                     tr = r2.json()
                     if not tr.get("status"):
@@ -1693,6 +1702,7 @@ async def public_settings(request: Request):
         "let_users_choose_gateway": s.get("let_users_choose_gateway", False),
         "quick_deposit_amounts": s.get("quick_deposit_amounts") or [3000, 5000, 10000, 25000, 50000, 100000],
         "require_withdrawal_pin": s.get("require_withdrawal_pin", True),
+        "withdrawal_fee_percent": float(s.get("withdrawal_fee_percent") or 0),
         "max_withdrawal": s.get("max_withdrawal", 1000000.0),
         "daily_claim_enabled": s.get("daily_claim_enabled", False),
         "daily_claim_amount": s.get("daily_claim_amount", 100.0),
