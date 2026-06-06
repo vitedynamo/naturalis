@@ -270,13 +270,14 @@ export default function AdminWithdrawals() {
   /* ----- derived stats ----- */
   const stats = useMemo(() => {
     const lagosStart = startOfLagosDayISO();
-    let pendingCount = 0, paidToday = 0, paidAll = 0;
+    let pendingCount = 0, paidToday = 0, paidAll = 0, feesAll = 0;
     let nombaLast = null, paystackLast = null;
     let nombaPending = 0, nombaDone = 0, paystackPending = 0, paystackDone = 0;
     for (const w of items) {
       if (w.status === "pending" || w.status === "processing") pendingCount += 1;
       if (w.status === "paid") {
         paidAll += Number(w.amount || 0);
+        feesAll += Number(w.fee_amount || 0);
         if ((w.updated_at || w.created_at) >= lagosStart) paidToday += Number(w.amount || 0);
         if (w.nomba_transfer_ref) {
           nombaDone += 1;
@@ -292,7 +293,7 @@ export default function AdminWithdrawals() {
       }
     }
     return {
-      pendingCount, paidToday, paidAll, total: items.length,
+      pendingCount, paidToday, paidAll, feesAll, total: items.length,
       nombaLast, paystackLast,
       nombaPending, nombaDone,
       paystackPending, paystackDone,
@@ -519,10 +520,11 @@ export default function AdminWithdrawals() {
       </div>
 
       {/* ====== Stats ====== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-5">
         <StatCard tone="warn" icon={Hourglass} label="Pending" value={stats.pendingCount} sub="Awaiting approval" testid="stat-pending" />
         <StatCard tone="success" icon={CheckCircle2} label="Paid today" value={formatNaira(stats.paidToday)} sub={`Since 00:00 Lagos`} testid="stat-paid-today" />
         <StatCard tone="accent" icon={Wallet} label="Paid · all time" value={formatNaira(stats.paidAll)} sub="Settled withdrawals" testid="stat-paid-all" />
+        <StatCard tone="success" icon={Banknote} label="Fees collected" value={formatNaira(stats.feesAll)} sub="Platform revenue · all time" testid="stat-fees-all" />
         <StatCard tone="brand" icon={ArrowUpFromLine} label="All withdrawals" value={stats.total} sub="All statuses combined" testid="stat-total" />
       </div>
 
