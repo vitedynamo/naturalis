@@ -411,7 +411,7 @@ class Settings(BaseModel):
     # manually paste the live count from their Fixie dashboard. `fixie_usage_synced_at`
     # is auto-stamped on every sync/reset.
     fixie_usage_count: int = 0
-    fixie_usage_limit: int = 250000
+    fixie_usage_limit: int = 25000
     fixie_usage_synced_at: str = ""
 
 

@@ -2665,7 +2665,7 @@ async def get_fixie_usage(request: Request, _admin=Depends(get_current_admin)):
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
     return {
         "count": int(s.get("fixie_usage_count") or 0),
-        "limit": int(s.get("fixie_usage_limit") or 250000),
+        "limit": int(s.get("fixie_usage_limit") or 25000),
         "synced_at": s.get("fixie_usage_synced_at") or "",
     }
 

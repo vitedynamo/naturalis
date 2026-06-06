@@ -20,7 +20,7 @@ function FixieUsageCard() {
     let cancelled = false;
     api.get("/admin/fixie/usage")
       .then(({ data }) => { if (!cancelled) setD(data); })
-      .catch(() => { if (!cancelled) setD({ count: 0, limit: 250000, synced_at: "" }); });
+      .catch(() => { if (!cancelled) setD({ count: 0, limit: 25000, synced_at: "" }); });
     return () => { cancelled = true; };
   }, [reloadKey]);
 
@@ -36,7 +36,7 @@ function FixieUsageCard() {
     );
   }
 
-  const limit = Math.max(1, Number(d.limit) || 250000);
+  const limit = Math.max(1, Number(d.limit) || 25000);
   const count = Math.max(0, Number(d.count) || 0);
   const pct = Math.min(100, (count / limit) * 100);
   const left = Math.max(0, limit - count);
