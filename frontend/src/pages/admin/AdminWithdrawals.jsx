@@ -481,6 +481,24 @@ export default function AdminWithdrawals() {
     }, 200);
   };
 
+  const [bulkRetrying, setBulkRetrying] = useState(false);
+  const bulkRetryNomba = async () => {
+    if (!window.confirm("Retry every PENDING withdrawal that doesn't have a Nomba transaction id yet?\n\nThis re-submits each one to Nomba using their resolved account name. Float will be debited as each succeeds.")) return;
+    setBulkRetrying(true);
+    try {
+      const { data } = await api.post("/admin/withdrawals/retry-pending-nomba");
+      toast.success(
+        `Retried ${data.scanned} · paid ${data.paid} · processing ${data.processing} · failed ${data.failed} · skipped ${data.skipped}`,
+        { duration: 8000 },
+      );
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Bulk retry failed");
+    } finally {
+      setBulkRetrying(false);
+    }
+  };
+
   const bulkBackfillStuck = async () => {
     if (!window.confirm("Scan Nomba's transaction history and link any matching pending withdrawals? This may take a minute.")) return;
     setBulkBackfilling(true);
@@ -553,6 +571,12 @@ export default function AdminWithdrawals() {
           title="Scan Nomba transaction history and link any pending withdrawals paid off-system"
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--accent-main)] text-white hover:bg-[color:var(--accent-hover)] disabled:opacity-50">
           <Wallet className={`w-4 h-4 ${bulkBackfilling ? "animate-pulse" : ""}`} /> {bulkBackfilling ? "Scanning…" : "Backfill from Nomba"}
+        </button>
+        <button onClick={bulkRetryNomba} disabled={bulkRetrying}
+          data-testid="bulk-retry-nomba-btn"
+          title="Re-submit every PENDING withdrawal that never got a Nomba transaction id (e.g. rejected by old name-check)"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-[color:var(--success)] text-white hover:opacity-90 disabled:opacity-50">
+          <ArrowUpFromLine className={`w-4 h-4 ${bulkRetrying ? "animate-bounce" : ""}`} /> {bulkRetrying ? "Retrying…" : "Retry all pending"}
         </button>
       </div>
 

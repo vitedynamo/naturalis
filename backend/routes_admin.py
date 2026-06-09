@@ -426,6 +426,155 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
     return {"status": "ok", "reference": transfer_ref, "mode": "mock"}
 
 
+@router.post("/admin/withdrawals/retry-pending-nomba")
+async def retry_pending_nomba(request: Request, _admin=Depends(get_current_admin)):
+    """Bulk-retry every pending withdrawal that has no Nomba transaction id yet.
+
+    Goes through the same flow as `/admin/withdrawals/{wid}/pay-nomba`:
+      - Skip rows missing `bank_code` (legacy or manual entries — admin must pay them individually).
+      - Resolve account via Nomba (non-blocking), use the resolved name when available.
+      - Submit the transfer; on rejection, stamp the row with the failure reason.
+      - On success, mark `paid` or `processing` exactly as the single-row endpoint does.
+
+    Returns per-row outcomes so the admin sees which ones cleared and which ones still need attention.
+    """
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    mode = s.get("payment_mode", "mock")
+    client_id = s.get("nomba_client_id") or ""
+    client_secret = s.get("nomba_client_secret") or ""
+    account_id = s.get("nomba_account_id") or ""
+
+    if mode != "live" or not (client_id and client_secret and account_id):
+        raise HTTPException(400, "Nomba live credentials not configured.")
+
+    candidates = await db.withdrawals.find(
+        {
+            "status": "pending",
+            "$or": [
+                {"nomba_transaction_id": {"$in": [None, ""]}},
+                {"nomba_transaction_id": {"$exists": False}},
+            ],
+        },
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(500)
+
+    # Pre-check float once — if Nomba doesn't have enough to cover even the smallest
+    # pending withdrawal, bail early.
+    try:
+        available = await nomba_balance(
+            client_id=client_id, client_secret=client_secret, account_id=account_id,
+            environment=s.get("nomba_environment"),
+        )
+    except Exception:
+        available = None
+
+    results = {
+        "scanned": len(candidates),
+        "paid": 0,
+        "processing": 0,
+        "skipped": 0,
+        "failed": 0,
+        "details": [],
+    }
+
+    for w in candidates:
+        wid = w["id"]
+        amt = float(w.get("amount") or 0)
+        bank_code = (w.get("bank_code") or "").strip()
+
+        if not bank_code:
+            results["skipped"] += 1
+            results["details"].append({"id": wid, "outcome": "skipped_no_bank_code"})
+            continue
+
+        if available is not None and amt > available:
+            await db.withdrawals.update_one(
+                {"id": wid},
+                {"$set": {
+                    "needs_attention": True, "insufficient_float": True,
+                    "float_balance_at_request": available,
+                    "admin_note": f"Insufficient Nomba float during bulk retry · ₦{available:,.2f} available, ₦{amt:,.2f} needed.",
+                    "updated_at": _now_iso(),
+                }},
+            )
+            results["skipped"] += 1
+            results["details"].append({"id": wid, "outcome": "insufficient_float"})
+            continue
+
+        transfer_ref = gen_reference("ntr")
+        resolved_name = ""
+        try:
+            resolved = await nomba_resolve_account(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+                account_number=w["account_number"], bank_code=bank_code,
+                environment=s.get("nomba_environment"),
+            )
+            resolved_name = (resolved.get("account_name") or "").strip()
+        except Exception:
+            resolved_name = ""
+
+        try:
+            transfer_resp = await nomba_transfer(
+                client_id=client_id, client_secret=client_secret, account_id=account_id,
+                amount_naira=amt,
+                account_number=w["account_number"],
+                account_name=resolved_name or w.get("account_name") or "",
+                bank_code=bank_code, merchant_tx_ref=transfer_ref,
+                narration=f"Withdrawal {wid}",
+                environment=s.get("nomba_environment"),
+            )
+        except Exception as e:
+            await db.withdrawals.update_one(
+                {"id": wid},
+                {"$set": {
+                    "needs_attention": True,
+                    "admin_note": str(e),
+                    "last_gateway_error": getattr(e, "nomba_raw", str(e))[:500],
+                    "last_gateway_status": getattr(e, "nomba_status", None),
+                    "updated_at": _now_iso(),
+                }},
+            )
+            results["failed"] += 1
+            results["details"].append({"id": wid, "outcome": "failed", "error": str(e)[:200]})
+            continue
+
+        # Bookkeep available float as we go so subsequent rows in the batch
+        # know whether they can be attempted.
+        if available is not None:
+            available -= amt
+
+        nomba_txn_id = transfer_resp.get("_nomba_transaction_id")
+        nomba_initial_status = transfer_resp.get("_nomba_status", "PENDING")
+        new_status = "paid" if nomba_initial_status == "SUCCESS" else "processing"
+
+        await db.withdrawals.update_one(
+            {"id": wid},
+            {"$set": {
+                "status": new_status,
+                "method": "auto",
+                "admin_note": f"Nomba transfer · ref {transfer_ref}"
+                              + (f" · txn {nomba_txn_id}" if nomba_txn_id else "")
+                              + (" · SUCCESS at create" if new_status == "paid" else " · awaiting status confirmation"),
+                "nomba_transfer_ref": transfer_ref,
+                "nomba_transaction_id": nomba_txn_id,
+                "needs_attention": False,
+                "insufficient_float": False,
+                "updated_at": _now_iso(),
+            }},
+        )
+        results["paid" if new_status == "paid" else "processing"] += 1
+        results["details"].append({"id": wid, "outcome": new_status, "nomba_id": nomba_txn_id})
+
+    await _log_admin_activity(
+        db, _admin, "withdrawal.bulk_retry_nomba",
+        target_type="withdrawal", target_id="bulk",
+        description=f"Bulk-retried {results['scanned']} pending · {results['paid']} paid, {results['processing']} processing, {results['failed']} failed, {results['skipped']} skipped",
+        meta={k: v for k, v in results.items() if k != "details"},
+    )
+    return results
+
+
 # ===== Image upload =====
 @router.post("/admin/upload-image")
 async def upload_image(request: Request, file: UploadFile = File(...), _admin=Depends(get_current_admin)):

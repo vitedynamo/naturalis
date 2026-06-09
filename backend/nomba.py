@@ -238,9 +238,9 @@ async def transfer_to_bank(
 
     if not success:
         # Nomba is notoriously terse on errors — `description` is often just "BAD_REQUEST"
-        # with the real reason buried in `data.data.errors[]`, `data.data.message`, or even
-        # the top-level `errors` field. Walk the response and collect every useful string so
-        # the admin sees an actionable message instead of "BAD_REQUEST".
+        # with the real reason in a sibling `message` field, or buried in
+        # `data.data.errors[]` / `data.data.message`. Walk the whole response and
+        # collect every useful string so the admin sees an actionable message.
         def _collect_errors(blob, depth=0):
             if depth > 4 or blob is None:
                 return []
@@ -266,10 +266,11 @@ async def transfer_to_bank(
                 return out
             return []
 
-        # The base message Nomba sent, plus everything else we can dig out.
+        # The base message Nomba sent, plus every other useful string in the response
+        # (including top-level `message` siblings to a bare `description: BAD_REQUEST`).
         base = data.get("description") or data.get("message") or f"HTTP {status}"
-        extra = _collect_errors(inner) + _collect_errors(data.get("errors"))
-        # Deduplicate while preserving order, drop the base if it's in there
+        extra = _collect_errors(data)  # walk the FULL response, not just `inner`
+        # Deduplicate while preserving order; drop the base if it shows up again
         seen, parts = set(), []
         for s in extra:
             sl = s.lower()
