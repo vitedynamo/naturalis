@@ -317,9 +317,10 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
             )
             raise HTTPException(402, f"Insufficient Nomba float (₦{available:,.2f} available). Top up your Nomba wallet then retry.")
 
-        # PRE-FLIGHT account resolve — Nomba's #1 reason for BAD_REQUEST is an
-        # unresolvable / non-existent recipient. Resolve once before submitting
-        # the transfer so we can surface a precise error (and persist it).
+        # OPTIONAL pre-flight: try Nomba's account-name lookup so we can submit the
+        # resolved name (improves acceptance). NEVER block the transfer on this —
+        # a flaky lookup or a name mismatch is not a reason to deny a payout.
+        resolved_name = ""
         try:
             resolved = await nomba_resolve_account(
                 client_id=client_id, client_secret=client_secret, account_id=account_id,
@@ -327,40 +328,15 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
                 environment=s.get("nomba_environment"),
             )
             resolved_name = (resolved.get("account_name") or "").strip()
-        except Exception as resolve_err:
-            note = (
-                f"Nomba account lookup failed for {w.get('account_number')} @ bank "
-                f"{payload.bank_code}: {resolve_err}. The account number may be invalid "
-                f"or the bank code may be wrong for this user's bank."
-            )
-            await db.withdrawals.update_one(
-                {"id": wid},
-                {"$set": {
-                    "needs_attention": True,
-                    "admin_note": note,
-                    "last_gateway_error": str(resolve_err)[:500],
-                    "updated_at": _now_iso(),
-                }},
-            )
-            raise HTTPException(422, note)
-
-        # Warn (but allow) if Nomba's resolved name diverges sharply from what the user
-        # entered — could indicate a typo or mismatched account, but not always a hard
-        # error since Nigerian banks sometimes return abbreviated names.
-        user_name_norm = (w.get("account_name") or "").strip().upper()
-        resolved_norm = resolved_name.upper()
-        name_mismatch = (
-            user_name_norm and resolved_norm
-            and not any(p in resolved_norm for p in user_name_norm.split() if len(p) >= 3)
-            and not any(p in user_name_norm for p in resolved_norm.split() if len(p) >= 3)
-        )
+        except Exception:
+            # Swallow — proceed with the user-entered name.
+            resolved_name = ""
 
         try:
             transfer_resp = await nomba_transfer(
                 client_id=client_id, client_secret=client_secret, account_id=account_id,
                 amount_naira=float(w["amount"]),
                 account_number=w["account_number"],
-                # Use Nomba's resolved name to maximise the chance of acceptance.
                 account_name=resolved_name or w["account_name"],
                 bank_code=payload.bank_code, merchant_tx_ref=transfer_ref,
                 narration=payload.reason or f"Withdrawal {wid}",
@@ -369,17 +345,11 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
         except Exception as e:
             # Persist the rejection so the admin sees *why* on the withdrawal row
             # next time they open the toolkit — not just a flash toast.
-            note_parts = [str(e)]
-            if name_mismatch:
-                note_parts.append(
-                    f"Note: Nomba resolved this account as '{resolved_name}' but the "
-                    f"user entered '{w.get('account_name')}'."
-                )
             await db.withdrawals.update_one(
                 {"id": wid},
                 {"$set": {
                     "needs_attention": True,
-                    "admin_note": " · ".join(note_parts),
+                    "admin_note": str(e),
                     "last_gateway_error": getattr(e, "nomba_raw", str(e))[:500],
                     "last_gateway_status": getattr(e, "nomba_status", None),
                     "updated_at": _now_iso(),
