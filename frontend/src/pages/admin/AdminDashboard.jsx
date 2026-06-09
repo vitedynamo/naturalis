@@ -6,7 +6,7 @@ import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import {
   Users, TrendingUp, ArrowDownToLine, ArrowUpFromLine, Clock, DollarSign,
   CircleCheck, CircleAlert, ShieldAlert, ScanSearch, Banknote, ChevronRight,
-  CalendarRange, ArrowUpRight, X, Search, Radio, RefreshCw,
+  CalendarRange, ArrowUpRight, X, Search, Radio, RefreshCw, Activity, CheckCircle2, XCircle, MinusCircle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -205,6 +205,153 @@ function FixieUsageCard() {
   );
 }
 
+const GATEWAY_META = [
+  { key: "paystack", label: "Paystack", sub: "Card · transfer · checkout" },
+  { key: "nomba",    label: "Nomba",    sub: "Payouts via Fixie proxy" },
+  { key: "marasoft", label: "Marasoft", sub: "Dynamic bank accounts" },
+  { key: "qorepay",  label: "QorePay",  sub: "Card · checkout" },
+  { key: "budpay",   label: "BudPay",   sub: "Bank transfer" },
+];
+
+function GatewayHealthCard() {
+  // Map keyed by gateway → last test result; null = never tested
+  const [results, setResults] = useState({});
+  const [testing, setTesting] = useState(""); // gateway currently being tested, or "all"
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/admin/gateways/test")
+      .then(({ data }) => { if (!cancelled) setResults(data || {}); })
+      .catch(() => { if (!cancelled) setResults({}); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const runOne = async (gw) => {
+    setTesting(gw);
+    try {
+      const { data } = await api.post(`/admin/gateways/test/${gw}`);
+      setResults((prev) => ({ ...prev, [gw]: data }));
+      if (data.ok) toast.success(`${gw}: ${data.message}`, { duration: 4000 });
+      else toast.error(`${gw}: ${data.message}`, { duration: 6000 });
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || `Failed to test ${gw}`);
+    } finally {
+      setTesting("");
+    }
+  };
+
+  const runAll = async () => {
+    setTesting("all");
+    // Sequential — most gateways share the Fixie proxy, so parallel runs would
+    // skew latency numbers and risk rate-limits.
+    for (const g of GATEWAY_META) {
+      try {
+        const { data } = await api.post(`/admin/gateways/test/${g.key}`);
+        setResults((prev) => ({ ...prev, [g.key]: data }));
+      } catch (e) {
+        setResults((prev) => ({ ...prev, [g.key]: { ok: false, message: "Request error", tested_at: new Date().toISOString() } }));
+      }
+    }
+    setTesting("");
+    toast.success("All gateways tested");
+  };
+
+  return (
+    <div className="card-soft p-6 mt-5" data-testid="gateway-health-card">
+      <div className="flex items-start gap-3 flex-wrap mb-4">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-[color:var(--brand-soft)] text-[color:var(--brand)] shrink-0">
+          <Activity className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-display font-bold text-base text-[color:var(--text-primary)]">
+            Gateway connection health
+          </div>
+          <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5 max-w-xl">
+            Ping each payment gateway with a lightweight, non-destructive call to confirm live credentials and network path are working.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={runAll}
+          disabled={!!testing}
+          data-testid="test-all-gateways-btn"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${testing === "all" ? "animate-spin" : ""}`} />
+          Test all
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {GATEWAY_META.map((g) => {
+          const r = results[g.key];
+          const isTesting = testing === g.key || testing === "all";
+          let icon, pillCls, pillText;
+          if (isTesting) {
+            icon = <RefreshCw className="w-4 h-4 animate-spin text-[color:var(--text-secondary)]" />;
+            pillCls = "bg-[color:var(--surface-alt)] text-[color:var(--text-secondary)]";
+            pillText = "Testing…";
+          } else if (!r) {
+            icon = <MinusCircle className="w-4 h-4 text-[color:var(--text-tertiary)]" />;
+            pillCls = "bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)]";
+            pillText = "Untested";
+          } else if (r.ok) {
+            icon = <CheckCircle2 className="w-4 h-4 text-[color:var(--success)]" />;
+            pillCls = "bg-[color:var(--success-soft)] text-[color:var(--success)]";
+            pillText = "Healthy";
+          } else {
+            icon = <XCircle className="w-4 h-4 text-[color:var(--error)]" />;
+            pillCls = "bg-[color:var(--error-soft)] text-[color:var(--error)]";
+            pillText = "Failed";
+          }
+
+          return (
+            <div
+              key={g.key}
+              className="flex items-start gap-3 p-3 rounded-lg border border-[color:var(--border-default)] bg-[color:var(--surface-alt)]"
+              data-testid={`gateway-row-${g.key}`}
+            >
+              <div className="mt-0.5 shrink-0">{icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm text-[color:var(--text-primary)]">{g.label}</span>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${pillCls}`} data-testid={`gateway-pill-${g.key}`}>
+                    {pillText}
+                  </span>
+                  {r?.latency_ms != null && (
+                    <span className="text-[10px] text-[color:var(--text-tertiary)] tabular-nums">
+                      {r.latency_ms} ms
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5 break-words" data-testid={`gateway-msg-${g.key}`}>
+                  {r?.message || g.sub}
+                </div>
+                {r?.tested_at && (
+                  <div className="text-[10px] text-[color:var(--text-tertiary)] mt-0.5">
+                    Last tested {relativeTime(r.tested_at)}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => runOne(g.key)}
+                disabled={!!testing}
+                data-testid={`test-${g.key}-btn`}
+                className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold border border-[color:var(--border-default)] bg-[color:var(--surface)] hover:bg-[color:var(--surface-alt)] text-[color:var(--text-primary)] disabled:opacity-50 transition-colors"
+              >
+                Test
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+
 function StatCard({ icon: Icon, label, value, sub, tone = "brand", testid }) {
   const tones = {
     brand: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
@@ -373,6 +520,9 @@ export default function AdminDashboard() {
 
       {/* Fixie proxy usage — manually-synced counter for the Nomba payout proxy */}
       <FixieUsageCard />
+
+      {/* Gateway health — on-demand ping for each payment provider */}
+      <GatewayHealthCard />
 
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">

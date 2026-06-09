@@ -13,6 +13,9 @@ from models import ProductCreate, CouponCreate, SettingsUpdate, AdminWithdrawalA
 from pydantic import BaseModel, Field
 from storage import put_object, get_object
 from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomba_balance, get_transfer_status as nomba_status, list_transfers as nomba_list_transfers, invalidate_token_cache as nomba_invalidate_token
+import marasoft as ms
+import qorepay as qp
+import budpay as bp
 
 # Shared APIRouter — exported back at module bottom for `server.py`.
 # Domain sub-modules under `/app/backend/routes/` attach endpoints via the same
@@ -2724,6 +2727,196 @@ async def update_fixie_limit(data: FixieLimitRequest, request: Request, _admin=D
         meta={"limit": int(data.limit)},
     )
     return {"limit": int(data.limit)}
+
+
+
+# ===== Gateway connection tests =====
+# Each test fires a single lightweight, **non-destructive** call against the
+# gateway's live API to confirm that credentials work, the network path
+# (incl. Fixie proxy when applicable) is up, and the gateway is reachable.
+#
+# Strategy:
+#   - Paystack: GET /balance (returns merchant float).
+#   - Nomba:    reuse `get_wallet_balance()` (issues token + GET balance via Fixie).
+#   - Marasoft / QorePay / BudPay: call `verify_transaction(fake_ref)`. A
+#     "transaction not found" response with 2xx/404 status means: ✅ creds work
+#     and the API is reachable. Auth failures (401/403) surface as `ok=false`.
+#
+# Returns `{ok, message, latency_ms, live, environment, details?}`.
+
+_FAKE_PING_REF = "evoque-ping-test"
+
+
+async def _test_paystack(s: dict) -> dict:
+    key = s.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY") or ""
+    if not key:
+        return {"ok": False, "message": "Paystack secret key not configured."}
+    t0 = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.paystack.co/balance",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+        latency = int((time.perf_counter() - t0) * 1000)
+        if resp.status_code == 401:
+            return {"ok": False, "message": "Paystack rejected the secret key (401).", "latency_ms": latency}
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+        if resp.status_code >= 400:
+            return {"ok": False, "message": f"Paystack HTTP {resp.status_code}: {data.get('message') or resp.text[:120]}", "latency_ms": latency}
+        bal_items = (data.get("data") or []) if isinstance(data, dict) else []
+        ngn = next((b for b in bal_items if (b.get("currency") or "").upper() == "NGN"), {})
+        bal = (ngn.get("balance") or 0) / 100  # paystack returns kobo
+        return {
+            "ok": True,
+            "message": f"Connected · NGN balance ₦{bal:,.2f}",
+            "latency_ms": latency,
+            "details": {"balance_naira": round(bal, 2), "currency": "NGN"},
+        }
+    except httpx.RequestError as e:
+        return {"ok": False, "message": f"Network error reaching Paystack: {e.__class__.__name__}"}
+
+
+async def _test_nomba(s: dict) -> dict:
+    needed = ("nomba_client_id", "nomba_client_secret", "nomba_account_id")
+    missing = [k for k in needed if not s.get(k)]
+    if missing:
+        return {"ok": False, "message": f"Nomba credentials incomplete · missing {', '.join(missing)}."}
+    t0 = time.perf_counter()
+    try:
+        bal = await nomba_balance(
+            client_id=s["nomba_client_id"], client_secret=s["nomba_client_secret"],
+            account_id=s["nomba_account_id"], environment=s.get("nomba_environment"),
+        )
+        latency = int((time.perf_counter() - t0) * 1000)
+        return {
+            "ok": True,
+            "message": f"Connected via Fixie · NGN balance ₦{float(bal):,.2f}",
+            "latency_ms": latency,
+            "environment": s.get("nomba_environment", "auto"),
+            "details": {"balance_naira": round(float(bal), 2)},
+        }
+    except Exception as e:
+        return {"ok": False, "message": f"Nomba ping failed: {e.__class__.__name__}: {str(e)[:120]}"}
+
+
+async def _test_marasoft(s: dict) -> dict:
+    pub = s.get("marasoft_public_key") or ""
+    sec = s.get("marasoft_secret_key") or ""
+    if not (pub and sec):
+        return {"ok": False, "message": "Marasoft public_key / secret_key not configured."}
+    t0 = time.perf_counter()
+    try:
+        result = await ms.verify_transaction(public_key=pub, secret_key=sec, merchant_tx_ref=_FAKE_PING_REF)
+        latency = int((time.perf_counter() - t0) * 1000)
+        raw = result.get("raw") or {}
+        raw_str = str(raw).lower()
+        # If creds were wrong Marasoft typically responds with an auth message.
+        if "invalid" in raw_str and ("key" in raw_str or "auth" in raw_str):
+            return {"ok": False, "message": f"Marasoft auth rejected: {str(raw)[:140]}", "latency_ms": latency}
+        return {
+            "ok": True,
+            "message": "Connected · Marasoft API reachable (creds valid, fake ref returned 'pending' as expected).",
+            "latency_ms": latency,
+            "details": {"raw_status": result.get("raw_status")},
+        }
+    except httpx.RequestError as e:
+        return {"ok": False, "message": f"Network error reaching Marasoft: {e.__class__.__name__}"}
+    except Exception as e:
+        return {"ok": False, "message": f"Marasoft ping failed: {e.__class__.__name__}: {str(e)[:120]}"}
+
+
+async def _test_qorepay(s: dict) -> dict:
+    key = s.get("qorepay_secret_key") or ""
+    if not key:
+        return {"ok": False, "message": "QorePay secret key not configured."}
+    t0 = time.perf_counter()
+    try:
+        data = await qp.verify_transaction(secret_key=key, reference=_FAKE_PING_REF)
+        latency = int((time.perf_counter() - t0) * 1000)
+        # QorePay returns 404 with a JSON body when reference doesn't exist; 401 when key is bad.
+        msg = str(data.get("message") or "").lower()
+        if "unauthor" in msg or "invalid" in msg and "key" in msg:
+            return {"ok": False, "message": f"QorePay auth rejected: {data.get('message')}", "latency_ms": latency}
+        return {
+            "ok": True,
+            "message": "Connected · QorePay API reachable (fake ref returned 'not found' as expected).",
+            "latency_ms": latency,
+        }
+    except httpx.RequestError as e:
+        return {"ok": False, "message": f"Network error reaching QorePay: {e.__class__.__name__}"}
+    except Exception as e:
+        return {"ok": False, "message": f"QorePay ping failed: {e.__class__.__name__}: {str(e)[:120]}"}
+
+
+async def _test_budpay(s: dict) -> dict:
+    key = s.get("budpay_secret_key") or ""
+    if not key:
+        return {"ok": False, "message": "BudPay secret key not configured."}
+    t0 = time.perf_counter()
+    try:
+        data = await bp.verify_transaction(secret_key=key, reference=_FAKE_PING_REF)
+        latency = int((time.perf_counter() - t0) * 1000)
+        msg = str(data.get("message") or "").lower()
+        if "unauthor" in msg or "invalid api key" in msg or "invalid key" in msg:
+            return {"ok": False, "message": f"BudPay auth rejected: {data.get('message')}", "latency_ms": latency}
+        return {
+            "ok": True,
+            "message": "Connected · BudPay API reachable (fake ref returned 'not found' as expected).",
+            "latency_ms": latency,
+        }
+    except httpx.RequestError as e:
+        return {"ok": False, "message": f"Network error reaching BudPay: {e.__class__.__name__}"}
+    except Exception as e:
+        return {"ok": False, "message": f"BudPay ping failed: {e.__class__.__name__}: {str(e)[:120]}"}
+
+
+_GATEWAY_TESTERS = {
+    "paystack": _test_paystack,
+    "nomba": _test_nomba,
+    "marasoft": _test_marasoft,
+    "qorepay": _test_qorepay,
+    "budpay": _test_budpay,
+}
+
+
+@router.post("/admin/gateways/test/{gateway}")
+async def test_gateway_connection(gateway: str, request: Request, _admin=Depends(get_current_admin)):
+    gw = (gateway or "").lower()
+    tester = _GATEWAY_TESTERS.get(gw)
+    if not tester:
+        raise HTTPException(404, f"Unknown gateway '{gateway}'. Must be one of: {', '.join(_GATEWAY_TESTERS.keys())}")
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    result = await tester(s)
+    result["gateway"] = gw
+    result["tested_at"] = datetime.now(timezone.utc).isoformat()
+    result.setdefault("live", s.get("payment_mode") == "live")
+
+    # Persist the last test result per gateway so the UI can show the previous
+    # state without re-running the test on every page load.
+    await db.settings.update_one(
+        {"id": "global"},
+        {"$set": {f"gateway_test_{gw}": result}},
+        upsert=True,
+    )
+    await _log_admin_activity(
+        db, _admin, "gateway.tested",
+        target_type="gateway", target_id=gw,
+        description=f"Tested {gw} gateway → {'OK' if result.get('ok') else 'FAILED'}",
+        meta={"ok": result.get("ok"), "latency_ms": result.get("latency_ms")},
+    )
+    return result
+
+
+@router.get("/admin/gateways/test")
+async def get_gateway_test_results(request: Request, _admin=Depends(get_current_admin)):
+    """Return the last-known test result for every gateway. Cached on the
+    settings doc so admins can land on the dashboard and see prior state
+    immediately, without re-pinging every gateway."""
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    return {gw: s.get(f"gateway_test_{gw}") for gw in _GATEWAY_TESTERS}
 
 
 
