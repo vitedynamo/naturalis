@@ -237,8 +237,58 @@ async def transfer_to_bank(
     success = http_ok and (code_indicates_success or desc_indicates_success or inner_indicates_non_failure)
 
     if not success:
-        msg = data.get("description") or data.get("message") or f"HTTP {status}"
-        raise RuntimeError(f"Nomba transfer rejected: {msg}")
+        # Nomba is notoriously terse on errors — `description` is often just "BAD_REQUEST"
+        # with the real reason buried in `data.data.errors[]`, `data.data.message`, or even
+        # the top-level `errors` field. Walk the response and collect every useful string so
+        # the admin sees an actionable message instead of "BAD_REQUEST".
+        def _collect_errors(blob, depth=0):
+            if depth > 4 or blob is None:
+                return []
+            if isinstance(blob, str):
+                s = blob.strip()
+                # Skip obviously-useless strings
+                if s and s.upper() not in ("BAD_REQUEST", "ERROR", "FAILED", "FAILURE"):
+                    return [s]
+                return []
+            if isinstance(blob, dict):
+                out = []
+                # Prefer specific human-readable keys first
+                for key in ("message", "description", "error", "errorMessage",
+                            "reason", "detail", "details", "errors", "errorDescription"):
+                    v = blob.get(key)
+                    if v is not None:
+                        out.extend(_collect_errors(v, depth + 1))
+                return out
+            if isinstance(blob, list):
+                out = []
+                for v in blob:
+                    out.extend(_collect_errors(v, depth + 1))
+                return out
+            return []
+
+        # The base message Nomba sent, plus everything else we can dig out.
+        base = data.get("description") or data.get("message") or f"HTTP {status}"
+        extra = _collect_errors(inner) + _collect_errors(data.get("errors"))
+        # Deduplicate while preserving order, drop the base if it's in there
+        seen, parts = set(), []
+        for s in extra:
+            sl = s.lower()
+            if sl == base.lower() or sl in seen:
+                continue
+            seen.add(sl)
+            parts.append(s)
+        full = f"{base} · {' · '.join(parts)}" if parts else base
+        # Attach the raw response (truncated) to the exception so callers can persist it.
+        try:
+            import json as _json
+            raw_truncated = _json.dumps(data)[:600]
+        except Exception:
+            raw_truncated = str(data)[:600]
+        err = RuntimeError(f"Nomba transfer rejected: {full}")
+        err.nomba_status = status  # type: ignore[attr-defined]
+        err.nomba_raw = raw_truncated  # type: ignore[attr-defined]
+        err.nomba_message = full  # type: ignore[attr-defined]
+        raise err
 
     # Extract Nomba's transactionId — the canonical key for requery.
     # Try every common shape Nomba has used across docs/versions.
