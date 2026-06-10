@@ -1987,15 +1987,43 @@ async def delete_coupon(cid: str, request: Request, _admin=Depends(get_current_a
 
 
 # ===== Transactions =====
+async def _attach_user_names(db, items: list) -> list:
+    """Batch-load user name/phone for a list of transactions in a single query
+    (avoids the N+1 per-row lookup that made these endpoints hang)."""
+    user_ids = list({it.get("user_id") for it in items if it.get("user_id")})
+    users = {}
+    if user_ids:
+        cursor = db.users.find(
+            {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1}
+        )
+        async for u in cursor:
+            users[u["id"]] = u
+    for it in items:
+        u = users.get(it.get("user_id"))
+        it["user_name"] = u["name"] if u else "—"
+        it["user_phone"] = u["phone"] if u else "—"
+    return items
+
+
 @router.get("/admin/transactions")
 async def list_all_tx(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     items = await db.transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)
-    for it in items:
-        u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
-        it["user_name"] = u["name"] if u else "—"
-        it["user_phone"] = u["phone"] if u else "—"
-    return items
+    return await _attach_user_names(db, items)
+
+
+@router.get("/admin/manual-adjustments")
+async def list_manual_adjustments(request: Request, _admin=Depends(get_current_admin)):
+    """Only admin-made wallet edits (meta.by_admin == true).
+
+    Filters server-side and batch-loads users so the Manual Adjustments page
+    loads fast instead of pulling all transactions and looking up each user one
+    by one."""
+    db = request.app.state.db
+    items = await db.transactions.find(
+        {"meta.by_admin": True}, {"_id": 0}
+    ).sort("created_at", -1).to_list(2000)
+    return await _attach_user_names(db, items)
 
 
 # ===== Password resets =====

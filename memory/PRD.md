@@ -1,5 +1,20 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 64)
+
+### Fix: Manual Adjustments admin page lag (P0)
+
+**Root cause:** `AdminManualAdjustments.jsx` called `GET /api/admin/transactions` (returns up to 2000 rows) and filtered client-side for `meta.by_admin`. The backend endpoint also ran a **separate `users.find_one` lookup per transaction** (N+1 over MongoDB Atlas), so the page pulled ~344KB and hung on thousands of round-trips.
+
+**Fix:**
+- Added `GET /api/admin/manual-adjustments` (in `routes_admin.py`) that filters `{"meta.by_admin": True}` **server-side** and batch-loads users via a single `$in` query (new `_attach_user_names` helper, also reused by `/admin/transactions` to kill its N+1).
+- Pointed `AdminManualAdjustments.jsx` (`useEffect` + `reload`) at the new endpoint; removed the client-side filter.
+- Added startup indexes in `server.py`: `transactions(created_at)`, `transactions(meta.by_admin, created_at)`, `transactions(user_id, created_at)`, `users(id)`.
+
+**Verified:** new endpoint returns in ~0.49s (16 rows, correct keys) vs the old 1.5s/344KB fetch; admin page renders all adjustments correctly (screenshot + curl).
+
+
+
 ## Recent Changes (Feb 2026 — iteration 63)
 
 ### Withdrawal fee — UI surface complete

@@ -59,15 +59,14 @@ export default function AdminManualAdjustments() {
   const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
-    api.get("/admin/transactions").then(({ data }) => {
-      const adj = (data || []).filter((t) => (t?.meta || {}).by_admin === true);
-      setItems(adj);
+    api.get("/admin/manual-adjustments").then(({ data }) => {
+      setItems(data || []);
       setLoading(false);
     });
   }, []);
 
-  const reload = () => api.get("/admin/transactions").then(({ data }) => {
-    setItems((data || []).filter((t) => (t?.meta || {}).by_admin === true));
+  const reload = () => api.get("/admin/manual-adjustments").then(({ data }) => {
+    setItems(data || []);
   });
 
   const [reverseTx, setReverseTx] = useState(null);

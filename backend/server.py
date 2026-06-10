@@ -80,6 +80,14 @@ async def on_startup():
         init_storage()
     except Exception as e:
         logger.warning(f"Object storage init failed at startup: {e}")
+    # Indexes that keep admin list/lookups fast (non-fatal if they fail)
+    try:
+        await db.transactions.create_index([("created_at", -1)])
+        await db.transactions.create_index([("meta.by_admin", 1), ("created_at", -1)])
+        await db.transactions.create_index([("user_id", 1), ("created_at", -1)])
+        await db.users.create_index([("id", 1)])
+    except Exception as e:
+        logger.warning(f"Index creation failed at startup: {e}")
     # Seed global settings
     existing = await db.settings.find_one({"id": "global"})
     if not existing:
