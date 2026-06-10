@@ -1,131 +1,116 @@
 {
-  "theme": "light",
-  "archetype": "1_organic_earthy",
-  "design_philosophy": {
-    "identity": "Nigerian Investment App with premium, trustworthy, organic fintech aesthetic. High contrast for readability, avoiding default Vercel-look.",
-    "emotion": "Prosperity, Trust, Security, Calm",
-    "core_principles": [
-      "Generous spacing to let financial data breathe",
-      "Optical alignment over strict mathematical alignment",
-      "Dense, bento-grid data presentation on dashboard",
-      "No full-screen gradients; focus on texture and solid typography",
-      "High contrast text for accessibility"
-    ]
+  "theme_and_archetype": {
+    "primary_archetype": "Archetype 5 (Luxury) + Archetype 4 (Swiss & High-Contrast)",
+    "mood": "Exclusive, premium, high-speed, authoritative.",
+    "core_concept": "A wealth club interface. Using deep absolute blacks, hyper-crisp 1px electric blue borders, and warm gold accents to create tension between cold technology and warm wealth."
   },
   "typography": {
-    "fonts": {
-      "heading": "'Outfit', sans-serif",
-      "body": "'Manrope', sans-serif",
-      "mono": "'JetBrains Mono', monospace"
-    },
-    "scales": {
-      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none font-bold",
-      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
-      "h3": "text-xl sm:text-2xl tracking-tight font-medium",
-      "h4": "text-lg sm:text-xl font-medium",
-      "body": "text-base leading-relaxed",
-      "label": "text-xs tracking-[0.2em] uppercase font-bold",
-      "metric": "text-3xl sm:text-4xl font-black tracking-tighter text-primary-dark"
-    },
-    "instructions": "Use font-light or font-black for tension. Avoid regular weight for headings. Never use Inter for headings. Import fonts from Google Fonts."
-  },
-  "colors": {
-    "background": {
-      "page": "#F9FAF8",
-      "surface": "#FFFFFF",
-      "surface_alt": "#F3F5F1",
-      "overlay": "rgba(10, 28, 22, 0.4)"
-    },
-    "brand": {
-      "primary": "#0F4C3A",
-      "primary_hover": "#0A3629",
-      "accent": "#00D084",
-      "accent_hover": "#00B372",
-      "terracotta": "#D97736",
-      "gold": "#D4AF37"
-    },
-    "text": {
-      "primary": "#0A1C16",
-      "secondary": "#4A5D54",
-      "tertiary": "#8A9C93",
-      "on_primary": "#FFFFFF",
-      "on_accent": "#0A1C16"
-    },
-    "border": {
-      "default": "#E2E8F0",
-      "light": "#F1F5F9",
-      "focus": "#0F4C3A"
-    },
-    "status": {
-      "success": "#00D084",
-      "warning": "#D97736",
-      "error": "#E11D48",
-      "info": "#3B82F6"
+    "heading_font": "Clash Display",
+    "body_font": "IBM Plex Sans",
+    "mono_font": "JetBrains Mono",
+    "rules": {
+      "headings": "font-heading tracking-tight text-text-primary",
+      "body": "font-sans leading-relaxed text-text-secondary",
+      "numbers_and_metrics": "font-heading tracking-tighter tabular-nums text-text-primary",
+      "labels": "font-mono uppercase tracking-[0.2em] text-[10px] sm:text-xs text-text-tertiary"
     }
   },
-  "surfaces_and_borders": {
-    "cards": "bg-white border border-[#E5E9E4] rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6",
-    "inputs": "bg-white border border-[#E5E9E4] rounded-lg focus:ring-2 focus:ring-[#0F4C3A] focus:border-[#0F4C3A]",
-    "buttons": {
-      "primary": "bg-[#0F4C3A] text-white hover:bg-[#0A3629] rounded-lg font-medium transition-colors",
-      "secondary": "bg-[#F3F5F1] text-[#0A1C16] hover:bg-[#E5E9E4] rounded-lg font-medium transition-colors",
-      "outline": "bg-transparent border border-[#0F4C3A] text-[#0F4C3A] hover:bg-[#0F4C3A] hover:text-white rounded-lg font-medium transition-colors"
+  "colors": {
+    "dark_theme": {
+      "--app-bg": "#050505",
+      "--surface": "#0F0F0F",
+      "--surface-alt": "#171717",
+      "--surface-2": "#262626",
+      "--brand": "#1E50FF",
+      "--brand-hover": "#3B6CFF",
+      "--brand-soft": "rgba(30, 80, 255, 0.12)",
+      "--accent-main": "#F5D061",
+      "--accent-hover": "#FCD970",
+      "--accent-soft": "rgba(245, 208, 97, 0.12)",
+      "--gold": "#F5D061",
+      "--gold-soft": "rgba(245, 208, 97, 0.15)",
+      "--success": "#22C55E",
+      "--warning": "#F59E0B",
+      "--error": "#EF4444",
+      "--text-primary": "#FFFFFF",
+      "--text-secondary": "#A3A3A3",
+      "--text-tertiary": "#737373",
+      "--border": "rgba(255, 255, 255, 0.08)"
     },
-    "radius": "0.75rem",
-    "spacing_scale": "Tailwind standard (p-4, p-6, p-8, p-12)",
-    "table": "w-full text-left border-collapse",
-    "table_header": "bg-[#F3F5F1] text-[#4A5D54] text-xs uppercase tracking-wider font-semibold p-4",
-    "table_cell": "p-4 border-b border-[#E5E9E4] text-sm text-[#0A1C16]"
+    "light_theme": {
+      "--app-bg": "#FAFAFA",
+      "--surface": "#FFFFFF",
+      "--surface-alt": "#F5F5F5",
+      "--surface-2": "#E5E5E5",
+      "--brand": "#0038FF",
+      "--brand-hover": "#002ECC",
+      "--brand-soft": "#E6EBFF",
+      "--accent-main": "#D4AF37",
+      "--accent-hover": "#B5952F",
+      "--accent-soft": "#FDF8E8",
+      "--gold": "#D4AF37",
+      "--gold-soft": "#FDF8E8",
+      "--success": "#16A34A",
+      "--warning": "#D97706",
+      "--error": "#DC2626",
+      "--text-primary": "#0A0A0A",
+      "--text-secondary": "#525252",
+      "--text-tertiary": "#A3A3A3",
+      "--border": "rgba(0, 0, 0, 0.08)"
+    }
   },
-  "layout_and_grids": {
-    "dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
-    "bento_spans": {
-      "summary": "col-span-1",
-      "main_chart_or_table": "col-span-1 md:col-span-2 lg:col-span-3",
-      "sidebar_feed": "col-span-1 row-span-2"
+  "styling_recipes": {
+    "hero_gradient": {
+      "light": "bg-[radial-gradient(ellipse_at_top_right,_var(--brand-soft)_0%,_transparent_70%),_radial-gradient(ellipse_at_bottom_left,_var(--gold-soft)_0%,_transparent_50%)]",
+      "dark": "bg-[radial-gradient(ellipse_at_top_right,_rgba(30,80,255,0.15)_0%,_transparent_60%),_radial-gradient(ellipse_at_bottom_left,_rgba(245,208,97,0.08)_0%,_transparent_50%)]"
     },
-    "admin_panel": "flex h-screen bg-[#F9FAF8]",
-    "admin_sidebar": "w-64 bg-[#0A1C16] text-white flex-shrink-0 hidden md:flex flex-col",
-    "admin_main": "flex-1 overflow-y-auto p-8"
+    "surface_treatment": {
+      "cards": "bg-surface border border-border/40 shadow-sm rounded-lg",
+      "glass": "backdrop-blur-xl bg-surface/70 border border-border/50 shadow-[0_8px_32px_rgba(0,0,0,0.04)]",
+      "tracing_beam_active": "relative overflow-hidden before:absolute before:inset-0 before:-z-10 before:p-[1px] before:bg-gradient-to-br before:from-brand before:to-transparent before:rounded-lg"
+    },
+    "grain_overlay": "after:content-[''] after:pointer-events-none after:absolute after:inset-0 after:bg-[url('/noise.png')] after:opacity-[0.03] after:mix-blend-overlay z-0"
   },
-  "motion_and_interactions": {
-    "hover": "Subtle lifts (-translate-y-1) and shadow increases on cards. Color darkening on buttons.",
-    "page_transition": "animate-in fade-in slide-in-from-bottom-4 duration-500",
-    "lists": "Staggered fade-in for table rows and list items."
+  "layout_blueprint": {
+    "wallet_balance_hero": {
+      "structure": "Bento Grid - Main span. Generous padding (p-8)",
+      "styling": "Card with `hero-gradient` applied. Top section: subtle 'Wallet Balance' mono label. Middle: Huge balance text `text-5xl sm:text-6xl font-heading tracking-tighter tabular-nums`. Bottom: Flex row for Deposit/Withdraw buttons.",
+      "buttons": "Deposit: Solid brand background with text-white (no gold text on blue to maintain contrast). Withdraw: Outline/Ghost button with 1px border-border and text-text-primary hover:bg-surface-alt.",
+      "testid_requirements": "data-testid='wallet-balance-amount', data-testid='btn-deposit', data-testid='btn-withdraw'"
+    },
+    "daily_claim_reward_card": {
+      "structure": "Compact card, highly prominent (Gold accent focus).",
+      "styling": "Dark mode: 1px solid gold border (`border-[#F5D061]/30`) with a very soft gold inner glow (`shadow-[inset_0_0_20px_var(--gold-soft)]`).",
+      "content": "Flex-col. Timer in mono font `tabular-nums tracking-widest text-gold`. Large 'Claim' button with solid gold background, black text. If claimed, disabled state with grayscale.",
+      "testid_requirements": "data-testid='daily-claim-timer', data-testid='btn-claim-reward'"
+    },
+    "featured_investment_plan": {
+      "structure": "Tall card (row-span-2) in bento grid.",
+      "styling": "Image on top (max-h-40 object-cover rounded-t-lg), text below. Use high contrast. 1px solid border. Hover effect: slight lift (`-translate-y-1`) and border changes to `--brand`.",
+      "metrics": "Display metrics (Daily %, Days) in a 2-column grid with mono labels above large numeric values. Avoid standard bullet points.",
+      "testid_requirements": "data-testid='featured-plan-card', data-testid='btn-invest-now'"
+    },
+    "quick_action_cards": {
+      "structure": "Grid of 2 to 3 small square cards.",
+      "styling": "Flat background (`bg-surface`), `rounded-lg`, 1px border. Minimalist icons (Phosphor/Lucide) colored in `--brand`. Text should be heavily left-aligned.",
+      "testid_requirements": "data-testid='quick-action-[name]'"
+    },
+    "admin_announcement_banner": {
+      "structure": "Full width thin strip above or below hero.",
+      "styling": "Solid brand color (Royal Blue) background with white text, or pure black with gold text. Marquee or static centering. Close 'x' button on right.",
+      "testid_requirements": "data-testid='announcement-banner'"
+    },
+    "navigation": {
+      "mobile_bottom_nav": "Glassmorphism background (`backdrop-blur-xl bg-surface/80`). Icons active state: Gold or Electric Blue. No labels if icons are extremely clear, or tiny text-xs.",
+      "desktop_sidebar": "Solid `bg-app-bg`, right border `border-border/40`. Clean list of links. Active state: 1px left border in `--brand`, background `--brand-soft`.",
+      "testid_requirements": "data-testid='nav-[page-name]'"
+    }
   },
-  "assets": {
-    "icons": "lucide-react",
-    "image_urls": [
-      {
-        "category": "dashboard_welcome_banner",
-        "url": "https://static.prod-images.emergentagent.com/jobs/e38e69f9-5b98-4414-80dd-511cf8b129a7/images/2aa38017b0e4d0f7ef14a7bc0e3229dc9e52cf76fb08e5062bf25d734c958d17.png",
-        "description": "Abstract deep green and gold waves for the main dashboard welcome widget background"
-      },
-      {
-        "category": "product_agriculture",
-        "url": "https://images.unsplash.com/photo-1673200692829-fcdb7e267fc1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHxhZ3JpY3VsdHVyZSUyMGZhcm0lMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzc5MzEwMjc0fDA&ixlib=rb-4.1.0&q=85",
-        "description": "Agriculture investment product thumbnail"
-      },
-      {
-        "category": "product_real_estate",
-        "url": "https://images.pexels.com/photos/27307400/pexels-photo-27307400.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Real Estate investment product thumbnail"
-      },
-      {
-        "category": "product_gold",
-        "url": "https://images.pexels.com/photos/33539242/pexels-photo-33539242.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Gold backed investment product thumbnail"
-      }
-    ]
-  },
-  "specific_instructions_for_main_agent": {
-    "architecture": "Build a hybrid fullstack app using React, React Router, Tailwind, Shadcn UI primitives.",
-    "routing": "Include /login, /register, /dashboard, /dashboard/invest, /dashboard/deposit, /dashboard/withdraw, /dashboard/referrals, /dashboard/profile, /dashboard/history, and /admin/* routes.",
-    "components": "Heavily use Shadcn UI (customize to match colors and border radius). Do not build raw HTML selects/dialogs. Use Recharts for any data visualization if needed. Use lucide-react for icons.",
-    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='login-button', data-testid='invest-submit', data-testid='admin-approve-withdrawal-btn').",
-    "nigerian_context": "Format currency in Naira (₦). Use standard Nigerian phone number validation where applicable. Ensure Paystack flow is simulated or visually integrated for deposits.",
-    "referral_system": "Implement 3-tier tree visual (Level 1, Level 2, Level 3) in the referral view. Provide a clear 'copy link' interaction.",
-    "investment_logic": "Show active investments with a visual progress bar or countdown timer (24h) until next payout. Users can invest multiple times in multiple products.",
-    "admin_features": "Admin must have a separate layout (dark sidebar, light content area). Must have views to manage users, approve/reject withdrawals, and edit products (image, name, price, daily profit %, duration). Create global settings for generation bonuses and welcome bonuses."
+  "implementation_notes": {
+    "css_variables": "Update `src/index.css` to replace the old indigo/pink/amber with the new exact hex codes provided in this JSON.",
+    "fonts": "Import Clash Display and IBM Plex Sans. In tailwind.config.js, map theme.fontFamily.heading to Clash Display and sans to IBM Plex Sans.",
+    "spacing": "Maintain generous spacing. Do not cram elements on mobile. Use `gap-4` to `gap-6` standard.",
+    "component_borders": "All cards should have `rounded-lg` (8px). Shadows should be minimal ambient or entirely replaced by crisp 1px borders to align with the 'Premium/Swiss' high-contrast aesthetic.",
+    "anti_ai_rules_applied": "No generic purple gradients. Center-aligned layouts are avoided in favor of strong left-alignment on data. Generous padding applied. Specific emotion (Luxury Fintech) targeted."
   }
 }
