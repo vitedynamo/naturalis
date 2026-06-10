@@ -1,55 +1,58 @@
 <analysis>**original_problem_statement**: 
-Build a Nigerian investment web app with features such as deposits, withdrawals, referrals, profile, bonuses, and transaction history. Users invest in products and get returns. Requires phone number (11 digits) authentication. Admin panel needed to customize products/packages (with image uploads), profit percentages, gateway toggles, and view all system activity. Minimum deposit 3,000, minimum withdrawal 1000.
+Build a Nigerian investment web app with features such as deposits, withdrawals, referrals, profile, bonuses, and transaction history. Rebranded as Evoque-Nova. Users invest in products and get returns. Requires phone number (11 digits) authentication. Admin panel needed to customize products/packages, profit percentages, gateway toggles, UI components, and view all system activity. Minimum deposit 3,000, minimum withdrawal 1000. 
 PRODUCT REQUIREMENTS: 
-- Integrations: Paystack, Nomba, and Marasoft for deposits/withdrawals. Emergent Object Storage for product and announcement images. 
+- Integrations: Paystack, Nomba, Marasoft, QorePay, and BudPay for deposits/withdrawals. Emergent Object Storage for product/announcement images. 
 - UI: Mobile-first approach, dark/light mode toggle, modern color scheme, persistent mobile bottom navigation bar.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A fully functional, mobile-first full-stack investment application. The backend (FastAPI + MongoDB) supports JWT auth, robust integrations with Paystack, Nomba, and Marasoft (via Fixie static IP proxy). The frontend features responsive dark/light modes, user impersonation, and highly polished Admin dashboards. In this session, a custom in-app checkout flow for Marasoft using Dynamic Accounts was built, complete with a dedicated countdown timer page, UI highlights, and a bulk-recheck mechanism for admins to sync pending/failed transactions. 
+A fully functional, mobile-first full-stack investment application (React + FastAPI + MongoDB Atlas). It features robust payment gateway integrations (Paystack, Nomba, Marasoft, QorePay, BudPay) with auto-verify polling and webhooks. In this session, the admin UI was significantly upgraded with a Fees Collected stat card, a live Fixie Proxy auto-tracking widget, and a Gateway Health Connection checker. Additionally, Nomba error handling was refactored to extract deep nested errors (revealing Nomba transfer limits) and a bulk-retry mechanism was added for pending payouts.
 
 **Last working item**: 
-    - Last item agent was working: Investigating a production deployment failure reported by the system. The build was successful, but the platform orchestration (DEPLOY, HEALTH_CHECK) emitted zero logs. 
-    - Status: BLOCKED (Awaiting user to retry deployment or contact Emergent Support, as this is an infrastructure issue, not a code issue).
-    - Agent Testing Done: N/A
-    - Which testing method agent to use? NA (Testing already done for codebase; deployment issue relies on Emergent platform).
+    - Last item agent was working: Debugging a user report stating: manual adjustment page on the admin is taking forever to load. The agent attempted to locate the component using a wildcard search () but didn't find anything before the session ended.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? Frontend testing agent / curl
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:  
-  Issue 1: Production Deployment Failure (P0)
-     - Attempted fixes: Analyzed build logs using deployment agent and bash tools. Confirmed app builds successfully (Frontend compiled, R2 upload OK) and preview environment is fully healthy ( returns 200). 
-     - Next debug checklist: This is an Emergent platform orchestration error (zero logs in deploy stage). Instruct user to retry the deployment from the platform UI. If it fails again, user must contact . No code changes are required.
-     - Why fix this issue and what will be achieved with the fix?: Unblocks the user from pushing the latest Marasoft dynamic account features to production.
-     - Status: BLOCKED
+  Issue 1: Manual adjustment page on admin is taking forever to load (P0)
+     - Attempted fixes: Globbed for , found nothing. 
+     - Next debug checklist: The page might not have adjust in its filename. It is likely a modal within  (e.g., clicking on a user to adjust their wallet balance) or a dedicated transaction/adjustment history route. Check the frontend routes in  to find the exact component. Once found, inspect the corresponding backend API endpoint (e.g., fetching a user's transaction list) for missing pagination or missing DB indexes causing a slow collection scan.
+     - Why fix this issue and what will be achieved with the fix?: Unblocks admin from crediting/debiting user accounts.
+     - Status: IN PROGRESS
      - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: NA
-     - Blocked on other issue: Platform infrastructure.
+     - Should Test frontend/backend/both after fix?: Both
+     - Blocked on other issue: None
 
 **In progress Task List**: 
-None. All coding tasks requested by the user in the session were completed.
+  Task 1: Implement CSV export for Activity Logs (P1)
+     - Where to resume: The agent started this earlier by viewing the  and  functions in , but was interrupted by the user's Nomba bug report. You need to create an export endpoint and link it to the frontend Admin Activity page.
+     - What will be achieved with this?: Admins can download logs for external auditing.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix?: Both
+     - Blocked on something: Finish Issue 1 (manual adjustment load time) first.
 
 **Upcoming and Future Tasks**
-  Task 1: Implement CSV export for Activity Logs (P1)
-  Task 2: Email/SMS confirmations on deposit/withdrawal success (P2)
-  Task 3: Migrate payouts to APScheduler-driven logic (P2)
-  Task 4: Refactor  (P3)
-  Task 5: Apply table column trim/no-overflow treatment to Admin Withdrawals and Admin Investments tables (P3 - Suggested to match Admin Deposits table update).
+  Task 1: Complete modularisation of  and  into  domain files (P2)
+  Task 2: Apply table column trim/no-overflow treatment to Admin Withdrawals and Admin Investments tables (P3)
+  Task 3: Email/SMS confirmations on deposit/withdrawal success (P2)
+  Task 4: Migrate payouts to APScheduler-driven logic (P2)
 
 **Completed work in this session**
-- Fixed broken  module syntax error hidden by hot-reload cache (DONE)
-- Migrated Marasoft integration to Dynamic Accounts endpoint to remove merchant KYC/BVN requirement (DONE)
-- Created dedicated  page with 60-minute countdown timer for bank transfers (DONE)
-- Implemented Marasoft Webhook validation using  (DONE)
-- Fixed Marasoft verify endpoint bug where 401s (unpaid) were mapped to false failed statuses; now mapped to pending (DONE)
-- Added auto-redirect to  after user clicks I have paid, with visual ring highlight and scale-up on the newly created deposit card (DONE)
-- Added checking... spinner pill for pending deposits and Recheck button for failed deposits in User UI (DONE)
-- Built Bulk recheck button in Admin Deposits to scan both pending and failed deposits (DONE)
-- Redesigned Admin Deposits View Modal to match reference image (DONE)
-- Fixed Admin Deposits table horizontal overflow by trimming columns from 10 to 6 (DONE)
+- Verified the 7 new product packages exist in DB (total 10) (DONE)
+- Added live Withdrawal Fee preview on User Withdraw form & Admin Withdrawals table (DONE)
+- Added Fees collected stat card on Admin Withdrawals (DONE)
+- Added Fixie proxy usage widget and auto-increment middleware logic in  (DONE)
+- Updated Fixie proxy limit to actual 25,000 per month in DB and Code (DONE)
+- Added Gateway connection health ping test panel on Admin Dashboard () (DONE)
+- Fixed Nomba rejection extraction to expose inner nested  (transfer limits) in admin notes (DONE)
+- Removed strict name-mismatch checking for Nomba payouts (falls back safely) (DONE)
+- Added Retry all pending payouts bulk action for stuck Nomba transfers (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-None.
+None explicitly outside of the currently active manual adjustment page issue.
 
 **Known issue recurrence from previous fork**
   - Issue recurrence in previous fork: None
@@ -60,82 +63,79 @@ None.
 
 
 **Key Technical Concepts**
-React, FastAPI, MongoDB, Tailwind CSS, Shadcn UI, Marasoft (Dynamic Accounts & Secret Hash webhooks), Fixie Static Proxy ( proxy routing),  vs .
+React, FastAPI, MongoDB Atlas, Tailwind CSS, Fixie Static Proxy ( proxy routing), Multi-Gateway Architecture.
 
 **key DB schema**
-  - Users: 
-  - Deposits: 
   - Settings: 
+  - Admin Activity: 
+  - Withdrawals: 
 
 **changes in tech stack**
-- Transitioned Marasoft integration entirely to Dynamic Virtual Accounts. 
+- None. Note that the DB uses MongoDB Atlas, meaning Preview and Production share the same live data.
 
 **All files of reference** 
-- 
-- 
-- 
-- 
--  
+-  (Updated to auto-increment Fixie usage & extract better nested errors)
 -  (Created)
+-  (Updated with Fixie endpoints, Gateway ping endpoints, and Nomba retry endpoints)
+-  (Updated with new component cards)
 - 
 - 
 
 **Areas that need refactoring**: 
-- : Getting large, needs breakdown.
-- Admin Withdrawals and Admin Investments tables: Need column reduction to prevent horizontal scrolling (similar to what was just done for Admin Deposits).
+-  and : Modularization started in previous forks but not finished. Files are still very large (~3000 lines).
 
 **key api endpoints**
+-  (and  for , , )
 - 
--  (Updated to distinguish pending vs failed)
--  (Updated with secret hash validation)
--  (Updated to poll both pending and failed)
+- 
+- FRONTEND ADMIN:  (Previously )
 
 **Critical Info for New Agent**
-- **PREVIEW vs PRODUCTION DBs**: The user has a live production environment. The MongoDB databases for Preview and Production are entirely separate. If a user complains about missing settings or mock payments in production, remind them they must log into the *Production* Admin panel and input API keys/settings there.
-- **Marasoft Integration**: Marasoft's  API returns a 401 error until the user actually makes the transfer. The backend code intercepts this 401 and converts it to a pending status to prevent the UI from prematurely telling the user the transaction failed.
-- **Webhooks**: Marasoft webhooks rely on  (configured in Settings). The payload is trusted directly if this hash matches.
+- **PREVIEW vs PRODUCTION DBs**: The DB points to a live MongoDB Atlas cluster. Modifying limits or triggering live endpoints in Preview *directly impacts the production database*. 
+- **Admin URL**: The frontend admin dashboard is at .  and all navigations use this.
+- **Stuck Withdrawals (Nomba limits)**: The recent issue with pending withdrawals wasn't code-related—it was because Nomba hit transfer caps (₦80,000 single transfer limit, and daily volume limits). The agent updated the code to pull these deep errors into the  so the user can actually see *why* Nomba rejected it.
 
 **documents and test reports created in this job** 
   -  (Updated)
-  -  (Full deposit flow e2e tests passed)
 
 **Last 10 User Messages and any pending HUMAN messages** 
- 1. **User**: What is the marasoft webhook verification hash? (COMPLETED - Agent explained Secret Hash).
- 2. **User**: Yes, I was able to log into the production admin. When I make a deposit, it returns Marasoft reported this transaction failed. (COMPLETED - Agent fixed verify endpoint returning false failures).
- 3. **User**: Acknowledged fix.
- 4. **User**: After user clicks I have paid, it should redirect to the deposit page highlighting the most recent deposit. (COMPLETED).
- 5. **User**: Add a checking... spinner pill while status is pending. Previous deposits are showing failed. (COMPLETED).
- 6. **User**: Add Bulk recheck all failed/pending action on Admin Deposits page. Contents in Admin deposit card should not overflow. Redesign modal based on image. (COMPLETED).
- 7. **User**: The deposit list in the admin is overflowing, fix it. (COMPLETED - Trimmed columns).
- 8. **System**: Deployment to production FAILED.
- 9. **User**: Use deployment agent to debug build logs. (COMPLETED - Agent analyzed and determined it's a platform issue, not a code issue, requested user to retry or contact support).
- 10. **User**: a (Acknowledged). -> *PENDING: Wait for user to retry deployment.*
+ 1. **User**: Add fixie proxy usage, as seen in the image. (COMPLETED)
+ 2. **User**: add an auto-increment on every Nomba call (use a small middleware that bumps fixie_usage_count...) (COMPLETED)
+ 3. **User**: use my actual fixie data... I subscribed for the 25,000 monthly requests... (COMPLETED)
+ 4. **User**: Add a feauture or toggle that enables me test each gateway and get a confirmation that they are working in production... (COMPLETED)
+ 5. **User**: some withdrawal requests are not having the nomba transaction id attached... (COMPLETED - Extracted nested errors).
+ 6. **User**: It does not matter if the name they registered with and the bank name does not match. Process the withdrawal (COMPLETED)
+ 7. **User**: Remove the name check and process withdrawal with nomba bank name resolve. (COMPLETED)
+ 8. **User**: There are still pending withdrawals as a result of the name mismatch (COMPLETED - Diagnosed as Nomba limits, added bulk retry button).
+ 9. **User**: okay, continue (ACKNOWLEDGED)
+ 10. **User**: manual adjustment page on the admin is taking forever to load. -> *PENDING: Agent was actively debugging this when context ended.*
 
 **Project Health Check:**
-- Broken: Deployment Orchestration (Platform side).
-- Mocked: None
+- Broken: Admin manual adjustment page is lagging/hanging.
+- Mocked: None.
 
 **3rd Party Integrations** 
  - Paystack (Payments) — requires User API Key
  - Nomba (Payments) — requires User API Key + Fixie Proxy
  - Marasoft (Payments) — requires User API Key + Fixie Proxy
- - Fixie (Static IP Proxy) — credentials passed via 
+ - QorePay (Payments) — requires User API Key + Brand ID
+ - BudPay (Payments) — requires User API Key
  - Emergent Object Storage (Image Uploads) — Emergent managed
 
 **Testing status**
-  - Testing agent used after significant changes: YES ( generated )
+  - Testing agent used after significant changes: NO (Extensive curl + manual screenshot testing utilized instead).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: 
-  - Known regressions: None in codebase.
+  - Test files created: None this session.
+  - Known regressions: None.
 
 **Credentials to test flow:**
-Check 
+Check  (Admin is seeded in DB, routes are at ).
 
 **What agent forgot to execute**
-Nothing. The agent successfully addressed all feature requests. The only block is an external platform deployment error. 
+The agent was asked to proceed with the P1 task (CSV export for Admin Activity logs) but was interrupted by the urgent Nomba payout bug. That P1 task is still pending after the P0 manual adjustment lag issue is fixed.
 
 **Debugging checklist for current issue**
-    Issue: Production Deployment Orchestration Failure
-    - Check frontend build: Succeeded, warnings only.
-    - Check backend health:  returns 200 on preview.
-    - Action: No code changes required. The  and  steps in the logs are completely empty, indicating Emergent's Kubernetes orchestrator failed to spin up the container post-build. Instruct user to click Deploy again. If it fails, escalate to .</analysis>
+    Issue: manual adjustment page on the admin is taking forever to load.
+    Frontend files to check:  to locate the exact route, or  if adjustments are handled via a modal. (Agent tried globbing  and failed; look for , , or something similar).
+    Backend files to check:  or domain files under .
+    Database to check: Check if a query retrieving manual adjustments/wallet modifications is missing an index, causing a full collection scan that times out.</analysis>
