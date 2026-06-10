@@ -1,5 +1,20 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 65)
+
+### User-side UI/UX redesign — Royal Blue + Gold + Black (home/dashboard first)
+
+User asked to change the user-side primary colors and restyle, starting with the home page. Design blueprint generated at `/app/design_guidelines.json` (Royal/Electric Blue + Gold + Black, "wealth club" premium aesthetic; Clash Display headings + IBM Plex Sans body).
+
+**Implementation (scoped to NOT touch the admin console):**
+- `index.css`: added a `.user-theme` (light) + `.dark .user-theme` (dark) block that overrides ALL app + shadcn HSL color tokens with the new blue/gold/black palette, `--radius: 0.5rem`, scoped fonts (Clash Display via Fontshare, IBM Plex Sans via Google), and a new blue→gold `hero-gradient`. Admin keeps its original pink/indigo identity untouched.
+- `UserLayout.jsx`: root div now carries `user-theme` → every user page (Dashboard, Deposit, Withdraw, Invest, Profile, etc.) inherits the new palette automatically (other user pages use only CSS vars — no hardcoded colors, so they recolor cleanly). Sidebar active state = blue left-border + `brand-soft`. Fixed wordmark truncation caused by the wider Clash Display font.
+- `Dashboard.jsx`: full component restyle per blueprint — wallet hero with mono label + gold Deposit CTA on royal-blue gradient; Daily Claim card rebuilt as a gold-bordered card with gold glow + gold Claim button (was a hardcoded pink gradient); welcome modal `DialogContent` tagged `user-theme` so the portaled dialog inherits the palette.
+
+**Verified:** dashboard renders correctly in both light & dark themes (desktop screenshots). All `data-testid`s preserved. Auth pages (Login/Register) intentionally left on the old theme for a later rollout round.
+
+
+
 ## Recent Changes (Jun 2026 — iteration 64)
 
 ### Fix: Manual Adjustments admin page lag (P0)

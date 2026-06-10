@@ -62,19 +62,19 @@ export default function UserLayout({ children }) {
   const isMoreActive = moreItems.some((i) => location.pathname === i.to);
 
   return (
-    <div className="min-h-screen bg-[color:var(--app-bg)] flex">
+    <div className="user-theme min-h-screen bg-[color:var(--app-bg)] flex">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col bg-[color:var(--surface)] border-r border-[color:var(--border-default)] sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-64 flex-col bg-[color:var(--app-bg)] border-r border-[color:var(--border-default)] sticky top-0 h-screen">
         <div className="px-6 py-6 border-b border-[color:var(--border-default)] flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center overflow-hidden shrink-0">
               <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
             </div>
             <div className="min-w-0">
-              <div className="font-display font-extrabold text-xl tracking-tight text-[color:var(--brand)] truncate">
+              <div className="font-display font-bold text-lg tracking-tight text-[color:var(--brand)] whitespace-nowrap">
                 Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
               </div>
-              <div className="text-label mt-0.5">Daily Returns Platform</div>
+              <div className="text-label mt-0.5 leading-tight">Daily Returns</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -95,10 +95,10 @@ export default function UserLayout({ children }) {
               to={it.to}
               data-testid={`nav-${it.to.replace("/", "")}`}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-2 ${
                   isActive
-                    ? "bg-[color:var(--brand)] text-white"
-                    : "text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
+                    ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)] text-[color:var(--brand)]"
+                    : "border-transparent text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
                 }`
               }
             >
@@ -124,7 +124,7 @@ export default function UserLayout({ children }) {
           <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center overflow-hidden shrink-0">
             <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
           </div>
-          <div className="font-display font-extrabold text-base text-[color:var(--brand)] truncate">
+          <div className="font-display font-bold text-base text-[color:var(--brand)] whitespace-nowrap">
             Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
           </div>
         </div>

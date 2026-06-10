@@ -51,21 +51,21 @@ function DailyClaimCard({ onClaimed }) {
   };
   return (
     <div
-      className="mt-6 rounded-3xl p-5 text-white relative overflow-hidden animate-fade-up"
-      style={{ background: "linear-gradient(120deg,#7A0A45 0%,#C81A6E 50%,#E5097F 100%)" }}
+      className="mt-6 rounded-lg p-5 relative overflow-hidden card-soft animate-fade-up border border-[color:var(--gold)]/40"
+      style={{ boxShadow: "inset 0 0 30px var(--gold-soft)" }}
       data-testid="daily-claim-card"
     >
-      <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
+      <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full bg-[color:var(--gold-soft)] blur-2xl pointer-events-none" />
       <div className="relative flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-lg bg-[color:var(--gold-soft)] text-[color:var(--gold)] flex items-center justify-center shrink-0 border border-[color:var(--gold)]/30">
           <Gift className="w-6 h-6" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80">Daily reward</div>
-          <div className="font-display font-extrabold text-xl mt-0.5 leading-none">{formatNaira(status.amount)} every 24h</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] font-medium text-[color:var(--text-tertiary)]">Daily reward</div>
+          <div className="font-display font-bold text-xl mt-1 leading-none text-[color:var(--text-primary)]">{formatNaira(status.amount)} <span className="text-[color:var(--text-tertiary)] text-sm font-normal">every 24h</span></div>
           {!ready && (
-            <div className="mt-1 text-[11px] text-white/80 inline-flex items-center gap-1.5">
-              <Clock className="w-3 h-3" /> next claim in <span className="font-mono font-bold">{fmtCountdown(status.cooldown_remaining_sec)}</span>
+            <div className="mt-1.5 text-[11px] text-[color:var(--text-secondary)] inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" /> next claim in <span className="font-mono font-bold tabular-nums tracking-widest text-[color:var(--gold)]">{fmtCountdown(status.cooldown_remaining_sec)}</span>
             </div>
           )}
         </div>
@@ -73,7 +73,7 @@ function DailyClaimCard({ onClaimed }) {
           onClick={claim}
           disabled={!ready || busy}
           data-testid="daily-claim-btn"
-          className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold ${ready ? "bg-white text-[color:var(--brand)] hover:scale-105" : "bg-white/20 text-white/60 cursor-not-allowed"} transition-all disabled:cursor-not-allowed`}
+          className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${ready ? "bg-[color:var(--gold)] text-black hover:bg-[color:var(--accent-hover)] hover:scale-105" : "bg-[color:var(--surface-alt)] text-[color:var(--text-tertiary)] cursor-not-allowed grayscale"} disabled:cursor-not-allowed`}
         >
           <Sparkles className="w-4 h-4" /> {busy ? "Claiming…" : ready ? "Claim" : "Locked"}
         </button>
@@ -119,18 +119,18 @@ export default function Dashboard() {
   return (
     <UserLayout>
       {/* Wallet hero */}
-      <div className="relative overflow-hidden rounded-2xl hero-gradient grain text-white p-6 md:p-9 animate-fade-up" data-testid="dashboard-hero">
+      <div className="relative overflow-hidden rounded-lg hero-gradient grain text-white p-6 md:p-9 animate-fade-up" data-testid="dashboard-hero">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/75">Good day, {user?.name?.split(" ")[0] || "Investor"}</div>
-            <div className="metric-num text-4xl md:text-5xl mt-2 text-white" data-testid="hero-balance">{formatNaira(user?.wallet_balance)}</div>
-            <div className="text-white/75 text-sm mt-1">Available wallet balance</div>
+            <div className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] font-medium text-white/70">Wallet balance · {user?.name?.split(" ")[0] || "Investor"}</div>
+            <div className="metric-num text-5xl md:text-6xl mt-3 text-white tracking-tighter tabular-nums" data-testid="hero-balance">{formatNaira(user?.wallet_balance)}</div>
+            <div className="text-white/65 text-sm mt-2">Available to invest or withdraw</div>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <Link to="/deposit" data-testid="hero-deposit-btn" className="flex-1 md:flex-none bg-white text-[color:var(--brand)] hover:bg-white/90 font-semibold rounded-xl px-5 py-3.5 inline-flex items-center justify-center gap-2 shadow-lg shadow-black/10">
+            <Link to="/deposit" data-testid="hero-deposit-btn" className="flex-1 md:flex-none bg-[color:var(--gold)] text-black hover:bg-[color:var(--accent-hover)] font-semibold rounded-lg px-5 py-3.5 inline-flex items-center justify-center gap-2 shadow-lg shadow-black/20 transition-colors">
               <ArrowDownToLine className="w-4 h-4" /> Deposit
             </Link>
-            <Link to="/withdraw" data-testid="hero-withdraw-btn" className="flex-1 md:flex-none bg-white/15 hover:bg-white/25 backdrop-blur border border-white/30 text-white font-semibold rounded-xl px-5 py-3.5 inline-flex items-center justify-center gap-2">
+            <Link to="/withdraw" data-testid="hero-withdraw-btn" className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 backdrop-blur border border-white/25 text-white font-semibold rounded-lg px-5 py-3.5 inline-flex items-center justify-center gap-2 transition-colors">
               <ArrowUpFromLine className="w-4 h-4" /> Withdraw
             </Link>
           </div>
@@ -253,7 +253,7 @@ export default function Dashboard() {
       <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
         <DialogContent
           data-testid="welcome-modal"
-          className="duration-500 w-[calc(100vw-2rem)] max-w-md rounded-3xl overflow-hidden p-0 border-0 shadow-2xl"
+          className="user-theme duration-500 w-[calc(100vw-2rem)] max-w-md rounded-lg overflow-hidden p-0 border-0 shadow-2xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <div className="hero-gradient grain text-white px-6 pt-6 pb-8 relative">

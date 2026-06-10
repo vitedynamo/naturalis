@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -113,7 +115,124 @@
     --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 22px 50px rgba(0, 0, 0, 0.65);
   }
+
+  /* =========================================================
+     USER-SIDE THEME — Royal/Electric Blue + Gold + Black
+     Scoped to `.user-theme` so the admin console keeps its
+     own (pink/indigo) identity untouched.
+     ========================================================= */
+  .user-theme {
+    --radius: 0.5rem;
+
+    /* Shadcn HSL tokens (so portaled dialogs/popovers match) */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 227 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 32%;
+    --accent: 46 65% 52%;
+    --accent-foreground: 0 0% 4%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 227 100% 50%;
+
+    /* App tokens — light */
+    --app-bg: #FAFAFA;
+    --surface: #FFFFFF;
+    --surface-alt: #F5F5F5;
+    --surface-2: #E5E5E5;
+    --text-primary: #0A0A0A;
+    --text-secondary: #525252;
+    --text-tertiary: #A3A3A3;
+
+    --brand: #0038FF;
+    --brand-hover: #002ECC;
+    --brand-soft: #E6EBFF;
+    --accent-main: #D4AF37;
+    --accent-hover: #B5952F;
+    --accent-soft: #FDF8E8;
+    --gold: #D4AF37;
+    --gold-soft: #FDF8E8;
+    --success: #16A34A;
+    --success-soft: #DCFCE7;
+    --warning: #D97706;
+    --error: #DC2626;
+    --error-soft: #FEE2E2;
+
+    --border-default: rgba(0, 0, 0, 0.10);
+    --border-light: rgba(0, 0, 0, 0.06);
+
+    --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.05);
+    --shadow-md: 0 4px 16px rgba(10, 10, 10, 0.08);
+    --shadow-lg: 0 18px 44px rgba(10, 10, 10, 0.12);
+  }
+
+  .dark .user-theme {
+    --background: 0 0% 2%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 226 100% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 9%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 45 87% 67%;
+    --accent-foreground: 0 0% 4%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 226 100% 56%;
+
+    --app-bg: #050505;
+    --surface: #0F0F0F;
+    --surface-alt: #171717;
+    --surface-2: #262626;
+    --text-primary: #FFFFFF;
+    --text-secondary: #A3A3A3;
+    --text-tertiary: #737373;
+
+    --brand: #1E50FF;
+    --brand-hover: #3B6CFF;
+    --brand-soft: rgba(30, 80, 255, 0.14);
+    --accent-main: #F5D061;
+    --accent-hover: #FCD970;
+    --accent-soft: rgba(245, 208, 97, 0.14);
+    --gold: #F5D061;
+    --gold-soft: rgba(245, 208, 97, 0.15);
+    --success: #22C55E;
+    --success-soft: rgba(34, 197, 94, 0.15);
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --error-soft: rgba(239, 68, 68, 0.15);
+
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-light: rgba(255, 255, 255, 0.06);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.8);
+  }
+
+  /* User-side typography — Clash Display headings + IBM Plex Sans body */
+  .user-theme {
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .user-theme h1, .user-theme h2, .user-theme h3, .user-theme h4, .user-theme h5,
+  .user-theme .font-display, .user-theme .metric-num {
+    font-family: 'Clash Display', 'Outfit', sans-serif;
+  }
 }
+
 
 @layer base {
   * { @apply border-border; }
@@ -242,6 +361,18 @@
       radial-gradient(120% 100% at 0% 0%, rgba(244, 114, 182, 0.45) 0%, transparent 55%),
       radial-gradient(120% 120% at 100% 0%, rgba(251, 191, 36, 0.35) 0%, transparent 55%),
       linear-gradient(135deg, #312E81 0%, #4338CA 50%, #6D28D9 100%);
+  }
+  /* User-side hero — royal blue base with warm gold glow */
+  .user-theme .hero-gradient {
+    background:
+      radial-gradient(120% 110% at 100% 0%, rgba(212, 175, 55, 0.38) 0%, transparent 52%),
+      linear-gradient(135deg, #0038FF 0%, #1E50FF 48%, #001A7A 100%);
+  }
+  .dark .user-theme .hero-gradient {
+    background:
+      radial-gradient(120% 110% at 100% 0%, rgba(245, 208, 97, 0.20) 0%, transparent 52%),
+      radial-gradient(130% 120% at 0% 0%, rgba(30, 80, 255, 0.40) 0%, transparent 55%),
+      linear-gradient(135deg, #001033 0%, #06143D 50%, #000000 100%);
   }
   .grain::after {
     content: "";
