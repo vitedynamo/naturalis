@@ -1722,6 +1722,7 @@ async def public_settings(request: Request):
         "home_featured_plan_enabled": s.get("home_featured_plan_enabled", True),
         "home_below_featured_mode": s.get("home_below_featured_mode", "cards"),
         "home_below_featured_image_url": s.get("home_below_featured_image_url", ""),
+        "home_secondary_section_enabled": s.get("home_secondary_section_enabled", True),
     }
 
 

@@ -213,6 +213,7 @@ export default function AdminSettings() {
         home_featured_plan_enabled: s.home_featured_plan_enabled !== false,
         home_below_featured_mode: s.home_below_featured_mode || "cards",
         home_below_featured_image_url: s.home_below_featured_image_url || "",
+        home_secondary_section_enabled: s.home_secondary_section_enabled !== false,
         quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
         require_withdrawal_pin: !!s.require_withdrawal_pin,
@@ -597,12 +598,12 @@ export default function AdminSettings() {
               </div>
             </Section>
 
-            <Section title="Featured plan visibility" hint="Show or hide the entire 'Featured Plan' hero section + CTA grid on the user home page. When OFF, the dashboard goes straight from the daily-claim card to the products list.">
+            <Section title="Featured plan visibility" hint="Controls ONLY the 'Featured Plan' poster + Invest CTA on the user home page. This is independent of the section below it.">
               <Toggle
                 checked={s.home_featured_plan_enabled !== false}
                 onChange={(v) => setS({ ...s, home_featured_plan_enabled: v })}
                 label="Show featured plan on home"
-                hint="Turn OFF to hide the entire hero block (image + stats + CTA + cards/image to the right)."
+                hint="Turn OFF to hide just the featured-plan poster. The secondary section (cards/image) is unaffected."
                 testid="featured-plan-toggle"
               />
             </Section>
@@ -618,8 +619,15 @@ export default function AdminSettings() {
               </label>
             </Section>
 
-            <Section title="Section below featured plan" hint="On the user dashboard, the area to the right of the featured plan can show the default action cards (Team / Coupon / Packages) or a custom image (e.g. a poster of your investment packages).">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Section title="Section below featured plan" hint="An independent section on the user dashboard. Toggle it on/off separately from the featured plan, then choose the default action cards (Team / Coupon / Packages) or a custom image (e.g. a poster of your investment packages).">
+              <Toggle
+                checked={s.home_secondary_section_enabled !== false}
+                onChange={(v) => setS({ ...s, home_secondary_section_enabled: v })}
+                label="Show this section on home"
+                hint="Independent of the featured-plan toggle above. Turn OFF to hide the cards / packages image entirely."
+                testid="secondary-section-toggle"
+              />
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 transition-opacity ${s.home_secondary_section_enabled === false ? "opacity-40 pointer-events-none" : ""}`}>
                 {[
                   { v: "cards", label: "Default cards", desc: "Team · Coupon · Packages CTAs" },
                   { v: "image", label: "Custom image",  desc: "Upload a poster, banner, or package collage" },

@@ -1,5 +1,30 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 66)
+
+### User-side FULL redesign #2 — "Verdant Growth" + decoupled home toggles
+
+User felt the prior (blue/gold/black) restyle still looked too similar and asked for an *entirely new* design (fresh palette, redesigned bottom nav kept at bottom). New blueprint at `/app/design_guidelines.json`.
+
+**New identity — "Verdant Growth"** (deep forest green + sage + coral/terracotta accents; Clash Display headings, Satoshi body, JetBrains Mono numbers). Implemented by replacing the `.user-theme` palette in `index.css` (light + dark + shadcn HSL tokens + new green/coral `hero-gradient`), still scoped so the admin console is untouched.
+
+**Dashboard.jsx fully rebuilt** (new structure, not a recolor):
+- Typographic balance hero (no card) — big mono balance, coral **Deposit** pill + outline **Withdraw**.
+- Daily reward → dense structural status banner with a pulsing green dot, mono countdown, "Claim now" pill (animated check on claim).
+- Featured plan → immersive 4:3/16:9 poster with dark gradient overlay, glass stat tiles, full-width green Invest CTA.
+- Secondary section → horizontal-scroll quick-action "pill cards" (or the admin packages image).
+- Welcome modal → glassmorphism with top hero image.
+
+**Bottom nav redesign** (`UserLayout.jsx`): floating glass pill (`bottom-4`, detached) with a raised brand-green circle for the active item; desktop sidebar active state = coral left-border + `surface-alt`.
+
+**Point 2 — decoupled toggles (admin):** added new setting `home_secondary_section_enabled` (models.py `Settings`/`SettingsUpdate`, exposed in `/api/settings/public`, default True). Dashboard now renders the **featured plan** (`home_featured_plan_enabled`) and the **secondary cards/image section** (`home_secondary_section_enabled`) independently. AdminSettings → "Featured plan visibility" now controls ONLY the poster; "Section below featured plan" gained its own independent on/off toggle (`secondary-section-toggle`).
+
+**Verified:** light + dark render correctly (diagnostics: `--app-bg #F4F5F4` light, no `dark` class); `/api/settings/public` returns the new field; toggle decoupling confirmed by code. Live Atlas DB NOT mutated. Bottom nav is mobile-only (not in desktop screenshot).
+
+**Scope:** dashboard + bottom nav done; pending rollout of the new style to Invest/Deposit/Withdraw/Profile/etc. + auth pages.
+
+
+
 ## Recent Changes (Jun 2026 — iteration 65)
 
 ### User-side UI/UX redesign — Royal Blue + Gold + Black (home/dashboard first)

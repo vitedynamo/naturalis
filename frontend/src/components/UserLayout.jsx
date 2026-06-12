@@ -95,9 +95,9 @@ export default function UserLayout({ children }) {
               to={it.to}
               data-testid={`nav-${it.to.replace("/", "")}`}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-2 ${
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
                   isActive
-                    ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)] text-[color:var(--brand)]"
+                    ? "border-[color:var(--accent-main)] bg-[color:var(--surface-alt)] text-[color:var(--brand)]"
                     : "border-transparent text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
                 }`
               }
@@ -140,56 +140,57 @@ export default function UserLayout({ children }) {
       </div>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0 pb-24 lg:pb-0">
+      <main className="flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0 pb-28 lg:pb-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">{children}</div>
       </main>
 
-      {/* MOBILE BOTTOM NAV */}
+      {/* MOBILE BOTTOM NAV — floating glass pill with raised active icon */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[color:var(--surface)]/95 backdrop-blur border-t border-[color:var(--border-default)] px-1 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        className="lg:hidden fixed bottom-4 left-4 right-4 z-40"
         data-testid="mobile-bottom-nav"
         aria-label="Primary"
       >
-        <ul className="grid grid-cols-5 gap-1">
+        <div className="glass-pill rounded-full px-1.5 py-2 flex items-stretch justify-between">
           {primaryItems.map((it) => (
-            <li key={it.to}>
-              <NavLink
-                to={it.to}
-                data-testid={`bottom-nav-${it.label.toLowerCase()}`}
-                className={({ isActive }) =>
-                  `relative flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-colors ${
-                    isActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[color:var(--accent-main)]" />
-                    )}
-                    <it.icon className={`w-5 h-5 ${isActive ? "stroke-[2.4]" : ""}`} />
-                    <span>{it.label}</span>
-                  </>
-                )}
-              </NavLink>
-            </li>
+            <NavLink
+              key={it.to}
+              to={it.to}
+              data-testid={`bottom-nav-${it.label.toLowerCase()}`}
+              className="flex-1 flex flex-col items-center justify-end gap-1 min-w-0"
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`flex items-center justify-center transition-all duration-300 ${
+                      isActive
+                        ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
+                        : "w-9 h-9 text-[color:var(--text-tertiary)]"
+                    }`}
+                  >
+                    <it.icon className="w-5 h-5" />
+                  </span>
+                  <span className={`text-[10px] font-semibold leading-none ${isActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"}`}>{it.label}</span>
+                </>
+              )}
+            </NavLink>
           ))}
-          <li>
-            <button
-              onClick={() => setMoreOpen(true)}
-              data-testid="bottom-nav-more"
-              className={`relative w-full flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-colors ${
-                isMoreActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"
+          <button
+            onClick={() => setMoreOpen(true)}
+            data-testid="bottom-nav-more"
+            className="flex-1 flex flex-col items-center justify-end gap-1"
+          >
+            <span
+              className={`flex items-center justify-center transition-all duration-300 ${
+                isMoreActive
+                  ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
+                  : "w-9 h-9 text-[color:var(--text-tertiary)]"
               }`}
             >
-              {isMoreActive && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[color:var(--accent-main)]" />
-              )}
               <MoreHorizontal className="w-5 h-5" />
-              <span>More</span>
-            </button>
-          </li>
-        </ul>
+            </span>
+            <span className={`text-[10px] font-semibold leading-none ${isMoreActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"}`}>More</span>
+          </button>
+        </div>
       </nav>
 
       {/* MORE SHEET */}

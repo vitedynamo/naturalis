@@ -407,6 +407,9 @@ class Settings(BaseModel):
     # Home: customizable section under the featured plan
     home_below_featured_mode: str = "cards"  # cards | image
     home_below_featured_image_url: str = ""
+    # Home: independent show/hide for the secondary section (cards/image) — decoupled
+    # from the featured-plan toggle so either can be shown without the other.
+    home_secondary_section_enabled: bool = True
     # Fixie static-IP proxy usage tracker. Fixie doesn't expose a usage API, so admins
     # manually paste the live count from their Fixie dashboard. `fixie_usage_synced_at`
     # is auto-stamped on every sync/reset.
@@ -484,6 +487,7 @@ class SettingsUpdate(BaseModel):
     home_featured_plan_enabled: Optional[bool] = None
     home_below_featured_mode: Optional[str] = None  # cards | image
     home_below_featured_image_url: Optional[str] = None
+    home_secondary_section_enabled: Optional[bool] = None
 
 
 class PaystackPayRequest(BaseModel):
