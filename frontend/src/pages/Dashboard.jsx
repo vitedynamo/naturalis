@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
 import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle, Gift, Briefcase, Check } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -94,22 +95,15 @@ function DailyClaimBanner({ onClaimed }) {
 
 export default function Dashboard() {
   const { user, refresh } = useAuth();
+  const { settings } = useSettings();
   const [products, setProducts] = useState([]);
-  const [settings, setSettings] = useState({});
-  const [loaded, setLoaded] = useState(false);
-  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(settings.welcome_modal_active !== false);
 
   useEffect(() => {
     (async () => {
       await refresh();
-      const [{ data: ps }, { data: s }] = await Promise.all([
-        api.get("/products"),
-        api.get("/settings/public"),
-      ]);
+      const { data: ps } = await api.get("/products");
       setProducts(ps);
-      setSettings(s);
-      setLoaded(true);
-      if (s.welcome_modal_active !== false) setWelcomeOpen(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -180,7 +174,7 @@ export default function Dashboard() {
       )}
 
       {/* ===== Featured plan — immersive poster ===== */}
-      {loaded && featured && featuredEnabled && (
+      {featured && featuredEnabled && (
         <div className="mt-6 animate-fade-up">
           <div className="relative overflow-hidden rounded-[var(--radius)] aspect-[4/3] sm:aspect-[16/9] border border-[color:var(--border-default)]" data-testid="featured-plan">
             {featured.image_url ? (
@@ -223,7 +217,7 @@ export default function Dashboard() {
       )}
 
       {/* ===== Secondary section — independent toggle ===== */}
-      {loaded && secondaryEnabled && (
+      {secondaryEnabled && (
         showImage ? (
           <div className="mt-6 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-default)] animate-fade-up" data-testid="home-below-featured-image">
             <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />

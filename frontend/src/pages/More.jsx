@@ -1,35 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
 import UserLayout from "@/components/UserLayout";
 import { moreItems } from "@/components/UserLayout";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
 import { LogOut, ChevronRight, Send, MessageCircle } from "lucide-react";
 
 export default function More() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
-  const [socials, setSocials] = useState({});
-
-  useEffect(() => {
-    axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/settings/public`)
-      .then(({ data }) => setSocials({
-        telegram_url: data?.telegram_url || "",
-        telegram_channel_url: data?.telegram_channel_url || "",
-        telegram_group_url: data?.telegram_group_url || "",
-        whatsapp_channel_url: data?.whatsapp_channel_url || "",
-        whatsapp_group_url: data?.whatsapp_group_url || "",
-      }))
-      .catch(() => {});
-  }, []);
 
   const socialItems = [
-    { key: "telegram_url",         label: "Telegram",         href: socials.telegram_url,         color: "#229ED9", icon: Send },
-    { key: "telegram_channel_url", label: "Telegram channel", href: socials.telegram_channel_url, color: "#229ED9", icon: Send },
-    { key: "telegram_group_url",   label: "Telegram group",   href: socials.telegram_group_url,   color: "#229ED9", icon: Send },
-    { key: "whatsapp_channel_url", label: "WhatsApp channel", href: socials.whatsapp_channel_url, color: "#25D366", icon: MessageCircle },
-    { key: "whatsapp_group_url",   label: "WhatsApp group",   href: socials.whatsapp_group_url,   color: "#25D366", icon: MessageCircle },
+    { key: "telegram_url",         label: "Telegram",         href: settings.telegram_url,         color: "#229ED9", icon: Send },
+    { key: "telegram_channel_url", label: "Telegram channel", href: settings.telegram_channel_url, color: "#229ED9", icon: Send },
+    { key: "telegram_group_url",   label: "Telegram group",   href: settings.telegram_group_url,   color: "#229ED9", icon: Send },
+    { key: "whatsapp_channel_url", label: "WhatsApp channel", href: settings.whatsapp_channel_url, color: "#25D366", icon: MessageCircle },
+    { key: "whatsapp_group_url",   label: "WhatsApp group",   href: settings.whatsapp_group_url,   color: "#25D366", icon: MessageCircle },
   ].filter((s) => s.href);
 
   return (

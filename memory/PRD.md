@@ -1,5 +1,19 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 70)
+
+### Global SettingsContext — load app settings once, before any user page (no flashing)
+
+Previously each page (Dashboard, Deposit, Withdraw, More, Register) fetched `/settings/public` independently, so settings-dependent UI flashed stale defaults (e.g. ₦3,000 deposit min, mock-mode badge, home cards-before-image, security-questions block) before the real values arrived.
+
+- **New `context/SettingsContext.jsx`**: `SettingsProvider` fetches `/api/settings/public` ONCE at app start and exposes `{ settings, loaded, refresh }` via `useSettings()`. Mounted in `App.js` (inside `BrandingProvider`, wrapping all routes).
+- **`UserLayout`** gates its main content on `settings.loaded` — renders a small spinner (`data-testid="settings-loading"`) until settings are ready, so no user page renders settings-dependent UI with stale defaults. (Chrome/sidebar still render immediately.)
+- **Refactored** Dashboard, Deposit, Withdraw, More, Register to read settings from `useSettings()` instead of their own fetch/`settingsLoaded` state. Removed the now-redundant per-page `loaded`/`settingsLoaded` flags and the `axios` settings fetch in `More.jsx`. Register's security-questions block now gates on `settingsLoaded && secEnabled`.
+
+**Verified:** compiles clean; Dashboard + Deposit render correct settings-driven UI immediately on navigation (screenshots) — Deposit shows real ₦3,000 min + quick amounts with no flash. (Note: `BrandingContext` still does its own small `/settings/public` fetch for the logo — left as-is.)
+
+
+
 ## Recent Changes (Jun 2026 — iteration 69)
 
 ### Auth pages restyled + admin toggle for registration security questions

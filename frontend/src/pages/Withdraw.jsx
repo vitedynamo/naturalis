@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatNaira, formatDate } from "@/lib/format";
 import { ArrowUpFromLine, KeyRound, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -9,27 +10,20 @@ import { Link } from "react-router-dom";
 
 export default function Withdraw() {
   const { user, refresh } = useAuth();
+  const { settings, loaded: settingsLoaded } = useSettings();
   const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const [history, setHistory] = useState([]);
-  const [settings, setSettings] = useState({});
-  // Mirrors Deposit.jsx — keep settings-dependent UI hidden until /settings/public
-  // returns, otherwise the page flashes with a hardcoded ₦1,000 limit before the
-  // admin's actual value loads.
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [investmentsCount, setInvestmentsCount] = useState(null); // null = loading
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const [{ data: h }, { data: s }, { data: inv }] = await Promise.all([
+    const [{ data: h }, { data: inv }] = await Promise.all([
       api.get("/withdrawals"),
-      api.get("/settings/public"),
       api.get("/investments"),
     ]);
     setHistory(h);
-    setSettings(s);
     setInvestmentsCount(Array.isArray(inv) ? inv.filter(i => i.status === "active").length : 0);
-    setSettingsLoaded(true);
   };
   useEffect(() => { load(); }, []);
 

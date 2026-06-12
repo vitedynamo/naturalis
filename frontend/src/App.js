@@ -43,6 +43,7 @@ import AdminUserDetail from "@/pages/admin/AdminUserDetail";
 import MyPackages from "@/pages/MyPackages";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BrandingProvider } from "@/context/BrandingContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
         <BrowserRouter>
           <AuthProvider>
             <BrandingProvider>
+            <SettingsProvider>
             <Toaster richColors position="top-right" />
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
@@ -94,6 +96,7 @@ function App() {
 
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+            </SettingsProvider>
             </BrandingProvider>
           </AuthProvider>
         </BrowserRouter>

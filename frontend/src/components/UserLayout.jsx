@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
 import ThemeToggle from "@/components/ThemeToggle";
 import InAppAnnouncementPopup from "@/components/InAppAnnouncementPopup";
@@ -32,6 +33,7 @@ const sidebarItems = [...primaryItems, ...moreItems];
 export default function UserLayout({ children }) {
   const { user, logout } = useAuth();
   const { logoUrl } = useBranding();
+  const { loaded: settingsReady } = useSettings();
   const navigate = useNavigate();
 
   return (
@@ -114,7 +116,13 @@ export default function UserLayout({ children }) {
 
       {/* Main */}
       <main className="flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0 pb-28 lg:pb-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">{children}</div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
+          {settingsReady ? children : (
+            <div className="flex items-center justify-center py-32" data-testid="settings-loading">
+              <div className="w-8 h-8 rounded-full border-2 border-[color:var(--border-default)] border-t-[color:var(--brand)] animate-spin" />
+            </div>
+          )}
+        </div>
       </main>
 
       {/* MOBILE BOTTOM NAV — floating glass pill with raised active icon */}

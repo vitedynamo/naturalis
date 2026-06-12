@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { User, Phone, Lock, Gift, ArrowRight, ShieldQuestion } from "lucide-react";
 import { toast } from "sonner";
 import { SECURITY_QUESTIONS } from "@/lib/securityQuestions";
@@ -13,6 +14,7 @@ export default function Register() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
   const { logoUrl } = useBranding();
+  const { settings, loaded: settingsLoaded } = useSettings();
   const [sp] = useSearchParams();
 
   const [phone, setPhone] = useState("");
@@ -24,16 +26,13 @@ export default function Register() {
   const [q2, setQ2] = useState(SECURITY_QUESTIONS[1]);
   const [a2, setA2] = useState("");
   const [loading, setLoading] = useState(false);
-  const [welcomeBonus, setWelcomeBonus] = useState(750);
-  const [secEnabled, setSecEnabled] = useState(true);
+
+  const welcomeBonus = typeof settings.welcome_bonus === "number" ? settings.welcome_bonus : 750;
+  const secEnabled = settings.require_security_questions !== false;
 
   useEffect(() => {
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref);
-    api.get("/settings/public").then(({ data }) => {
-      if (typeof data?.welcome_bonus === "number") setWelcomeBonus(data.welcome_bonus);
-      if (typeof data?.require_security_questions === "boolean") setSecEnabled(data.require_security_questions);
-    }).catch(() => { /* ignore */ });
   }, [sp]);
 
   const submit = async (e) => {
@@ -143,7 +142,7 @@ export default function Register() {
               className="w-full pl-10 pr-3 py-3 input-base uppercase" />
           </div>
 
-          {secEnabled && (
+          {settingsLoaded && secEnabled && (
           <div className="mt-6 p-4 rounded-xl bg-[color:var(--brand-soft)] border border-[color:var(--border-default)]" data-testid="security-block">
             <div className="flex items-center gap-2 text-[color:var(--brand)] font-semibold text-sm">
               <ShieldQuestion className="w-4 h-4" /> Security questions

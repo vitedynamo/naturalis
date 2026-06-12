@@ -3,35 +3,27 @@ import { useLocation, useNavigate } from "react-router-dom";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { formatNaira, formatDate } from "@/lib/format";
 import { ArrowDownToLine, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Deposit() {
   const { refresh } = useAuth();
+  const { settings, loaded: settingsLoaded } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [amount, setAmount] = useState("");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [settings, setSettings] = useState({});
-  // Tracks whether /settings/public has returned yet. Until it does, we hide
-  // settings-dependent UI (mode badge, placeholder, quick amounts) so the page
-  // doesn't flash with mock-mode + ₦3,000 placeholder on first paint.
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [chosenGateway, setChosenGateway] = useState("");
   const [highlightRef, setHighlightRef] = useState(null);
   const [rechecking, setRechecking] = useState({}); // { [reference]: true }
   const cardRefs = useRef({});
 
   const load = async () => {
-    const [{ data: h }, { data: s }] = await Promise.all([
-      api.get("/deposits"),
-      api.get("/settings/public"),
-    ]);
+    const { data: h } = await api.get("/deposits");
     setHistory(h);
-    setSettings(s);
-    setSettingsLoaded(true);
   };
 
   useEffect(() => { load(); }, []);
