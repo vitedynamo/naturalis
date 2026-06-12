@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only verification of redesigned brutalist 'Editorial Ledger' Dashboard. Login + render + navigation + theme + regression verified on both desktop (1440px) and mobile (430px). No live mutations performed. Core hero sections all render; the quick-actions-list/featured-plan branches were not visible because current admin settings (home_below_featured_mode='image', home_featured_plan_enabled=false) route the secondary section to the image branch — the conditional logic in Dashboard.jsx is correct, so those scenarios were not testable end-to-end in the live environment.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard welcome modal & generic Dialog", "issues": ["Radix a11y console warning: 'DialogContent requires a DialogTitle for the component to be accessible for screen reader users' and 'Missing Description or aria-describedby={undefined}'. The welcome modal uses a plain <h2 data-testid='welcome-modal-title'> rather than the Radix <DialogTitle> primitive. Wrap the heading with <DialogTitle> (use VisuallyHidden if needed) and add <DialogDescription> or aria-describedby to silence warnings and improve a11y."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_14.json"
+  ],
+  "action_items": [
+    "(Optional, a11y) Wrap welcome modal heading with Radix <DialogTitle> + add <DialogDescription> to remove the console warnings emitted on every dashboard load.",
+    "(Verification-only, no code change needed) To exercise the redesigned 'INDEX — QUICK ACTIONS' list (data-testid quick-actions-list with cta-invest/cta-team/cta-packages/cta-coupon/cta-history) and the 'FEATURED PROSPECTUS' magazine section (data-testid featured-plan + featured-cta), an admin must (a) enable home_featured_plan_enabled and select a featured_product_id, and (b) set home_below_featured_mode to 'list' (or unset home_below_featured_image_url). With current live admin settings these branches are hidden by design, so cta-team and cta-packages navigation could NOT be exercised in this run.",
+    "Consider tagging the daily-claim-card section with an admin-toggle data-testid so testers can confirm reward eligibility without firing /daily-claim/claim."
+  ],
+  "critical_code_review_comments": [
+    "Dashboard.jsx (340 lines) is reasonably sized — no split needed yet, but the inline Ticker / DailyReward subcomponents could be moved to /components/home/ for reuse.",
+    "DailyReward.useEffect interval continues counting locally and never refetches /daily-claim/status when reaching 0 — minor UX nit; user has to refresh to flip from 'Locked' to 'Claim'.",
+    "Welcome modal uses raw <h2> instead of Radix DialogTitle — produces a11y console errors on every render.",
+    "Negative-margin edge-to-edge trick (-mx-4 sm:-mx-6 lg:-mx-10) works but is fragile if UserLayout padding ever changes; consider a layout prop like <UserLayout edgeToEdge> instead.",
+    "Date string uses toLocaleDateString('en-GB') which is locale-dependent on the runtime — fine here but worth a constant for Nigerian audience."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100% of testable scenarios; 2 scenarios (quick-actions-list, featured-plan) not exercisable under current admin settings"},
+  "test_credentials": "user phone 08099887766 / password newpwd (wallet ₦1,000.00)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verified data-testid presence at desktop 1440x900 and mobile 430x900: home-announcement-ticker, home-greeting ('FRI, 12 JUN 2026 / Good day, FEE'), wallet-balance-display, hero-balance (₦1,000.00), primary-actions-grid, hero-deposit-btn (orange), hero-withdraw-btn, daily-claim-card, daily-claim-btn, dashboard-hero, welcome-modal (dismissed with Escape). Not visible due to admin settings: quick-actions-list, cta-invest/team/packages/coupon/history, featured-plan, featured-cta — confirmed home-below-featured-image is rendering instead (data-testid='home-below-featured-image'). Verified navigation: hero-deposit-btn → /deposit; hero-withdraw-btn → /withdraw (no form submission). Theme toggle (sun/moon icon in sidebar header) flips <html class='dark'> — light & dark home palettes both rendered, orange accent legible in dark mode. Regression PASSED: /invest and /profile have NO .ledger-home class and retain the green Botanical Bank theme (body bg rgb(250,250,252), green CTAs e.g. 'Invest now'). No horizontal overflow: documentElement scrollWidth==clientWidth on both 1440 and 430. Console: only Radix Dialog a11y warnings (non-blocking). DID NOT click daily-claim-btn, welcome-bonus-cta, or any deposit/withdraw/invest submission as instructed.",
+  "rca of the issue": "Not a bug — the absence of quick-actions-list / featured-plan in the rendered DOM is driven by admin-controlled feature flags (settings.home_below_featured_mode='image' + settings.home_featured_plan_enabled=false). Code path in Dashboard.jsx (lines 254-286 & 216-252) is correct. To validate those branches in the future, toggle the admin flags before retesting."
+}

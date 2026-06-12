@@ -4,13 +4,15 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle, Gift, Briefcase, Check } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-const FEATURED_FALLBACK_BG = "https://images.unsplash.com/photo-1677611998429-1baa4371456b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGZvcmVzdCUyMGdyZWVuJTIwZ2VvbWV0cmljJTIwdGV4dHVyZXxlbnwwfHx8fDE3ODEyNzMwODN8MA&ixlib=rb-4.1.0&q=85";
-const WELCOME_ART = "https://images.unsplash.com/photo-1777576968636-efa4ed929c9a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwbW9uZXklMjB3ZWFsdGglMjBjb25jZXB0JTIwdGVycmFjb3R0YSUyMHNhbmR8ZW58MHx8fHwxNzgxMjczMDgzfDA&ixlib=rb-4.1.0&q=85";
+const FEATURED_FALLBACK_BG =
+  "https://images.unsplash.com/photo-1527576539890-dfa815648363?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwaGlnaCUyMGVuZCUyMGJsYWNrJTIwYW5kJTIwd2hpdGUlMjBhcmNoaXRlY3R1cmV8ZW58MHx8fHwxNzgxMjk1NzczfDA&ixlib=rb-4.1.0&q=85";
+const WELCOME_ART =
+  "https://images.unsplash.com/photo-1658165598588-eac23c4d76ff?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHxtb25vY2hyb21lJTIwcGF0dGVybiUyMHRleHR1cmV8ZW58MHx8fHwxNzgxMjk1NzY3fDA&ixlib=rb-4.1.0&q=85";
 
 function resolveUrl(url) {
   if (!url) return "";
@@ -19,26 +21,55 @@ function resolveUrl(url) {
 }
 
 function fmtCountdown(sec) {
-  if (sec <= 0) return "Ready";
+  if (sec <= 0) return "READY";
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/* Daily reward — dense structural status banner */
-function DailyClaimBanner({ onClaimed }) {
+/* ===== Top announcement marquee ===== */
+function Ticker({ settings }) {
+  const announce =
+    settings.home_announcement_active && settings.home_announcement
+      ? settings.home_announcement.replace(/\s+/g, " ").trim()
+      : null;
+  const base = announce
+    ? [announce]
+    : ["Daily returns, paid every 24h", "Refer & earn across 2 generations", "Withdraw anytime", "Naturalis — grow with confidence"];
+  const items = [...base, ...base, ...base];
+  const line = (
+    <span className="lh-marquee-track lh-mono text-[11px] tracking-[0.18em] uppercase py-2">
+      {items.map((t, i) => (
+        <span key={i} className="inline-flex items-center">
+          <span className="px-5">{t}</span>
+          <span className="text-[color:var(--lh-accent)]">/</span>
+        </span>
+      ))}
+    </span>
+  );
+  return (
+    <div
+      className="lh-marquee-wrap overflow-hidden bg-[color:var(--lh-fg)] text-[color:var(--lh-bg)] border-b border-[color:var(--lh-line)]"
+      data-testid="home-announcement-ticker"
+    >
+      <div className="relative whitespace-nowrap">{line}</div>
+    </div>
+  );
+}
+
+/* ===== Daily reward — terminal row ===== */
+function DailyReward({ onClaimed }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      api.get("/daily-claim/status")
-        .then(({ data }) => { if (!cancelled) setStatus(data); })
-        .catch(() => {});
-    load();
-    const t = setInterval(() => setStatus((s) => s ? { ...s, cooldown_remaining_sec: Math.max(0, s.cooldown_remaining_sec - 1) } : s), 1000);
+    api.get("/daily-claim/status").then(({ data }) => { if (!cancelled) setStatus(data); }).catch(() => {});
+    const t = setInterval(
+      () => setStatus((s) => (s ? { ...s, cooldown_remaining_sec: Math.max(0, s.cooldown_remaining_sec - 1) } : s)),
+      1000,
+    );
     return () => { cancelled = true; clearInterval(t); };
   }, []);
   if (!status || !status.enabled) return null;
@@ -59,35 +90,34 @@ function DailyClaimBanner({ onClaimed }) {
   };
   return (
     <div
-      className="mt-7 rounded-[var(--radius)] p-4 sm:p-5 relative overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--surface-alt)] animate-fade-up flex items-center gap-4"
+      className="flex items-center justify-between gap-4 px-6 lg:px-8 py-6 border-b border-[color:var(--lh-line)]"
       data-testid="daily-claim-card"
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <span className="relative flex w-2.5 h-2.5 shrink-0">
-          {ready && <span className="animate-claim-pulse absolute inline-flex w-full h-full rounded-full bg-[color:var(--success)] opacity-70" />}
-          <span className={`relative inline-flex rounded-full w-2.5 h-2.5 ${ready ? "bg-[color:var(--success)]" : "bg-[color:var(--text-tertiary)]"}`} />
-        </span>
-        <div className="min-w-0">
-          <div className="font-body text-[10px] uppercase tracking-[0.2em] font-bold text-[color:var(--text-tertiary)]">Daily reward</div>
-          <div className="font-display font-medium text-lg leading-tight text-[color:var(--text-primary)] mt-0.5">
-            {formatNaira(status.amount)}
-            {!ready && <span className="font-mono text-xs text-[color:var(--text-secondary)] ml-2">· {fmtCountdown(status.cooldown_remaining_sec)}</span>}
-          </div>
+      <div className="min-w-0">
+        <div className="lh-mono text-[10px] tracking-[0.24em] uppercase text-[color:var(--lh-muted)] flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 ${ready ? "bg-[color:var(--lh-accent)]" : "bg-[color:var(--lh-muted)]"}`} />
+          Daily reward
+        </div>
+        <div className="lh-mono text-2xl sm:text-3xl tracking-tighter mt-2">
+          {formatNaira(status.amount)}
+          {!ready && <span className="text-sm text-[color:var(--lh-muted)] ml-3">{fmtCountdown(status.cooldown_remaining_sec)}</span>}
         </div>
       </div>
       <button
         onClick={claim}
         disabled={!ready || busy}
         data-testid="daily-claim-btn"
-        className={`shrink-0 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
+        className={`shrink-0 lh-mono text-xs uppercase tracking-widest px-6 py-4 transition-colors duration-150 ${
           justClaimed
-            ? "bg-[color:var(--success)] text-white"
+            ? "bg-[color:var(--lh-accent)] text-[color:var(--lh-accent-ink)]"
             : ready
-              ? "bg-[color:var(--brand)] text-[color:var(--brand-ink)] hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5"
-              : "bg-[color:var(--surface-2)] text-[color:var(--text-tertiary)] cursor-not-allowed"
-        } disabled:cursor-not-allowed`}
+              ? "bg-[color:var(--lh-fg)] text-[color:var(--lh-bg)] hover:bg-[color:var(--lh-accent)] hover:text-[color:var(--lh-accent-ink)]"
+              : "bg-transparent border border-[color:var(--lh-line)] text-[color:var(--lh-muted)] cursor-not-allowed"
+        }`}
       >
-        {justClaimed ? <><Check className="w-4 h-4" /> Claimed</> : <><Sparkles className="w-4 h-4" /> {busy ? "Claiming…" : ready ? "Claim now" : "Locked"}</>}
+        {justClaimed ? (
+          <span className="inline-flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> Claimed</span>
+        ) : busy ? "Claiming" : ready ? "Claim" : "Locked"}
       </button>
     </div>
   );
@@ -116,203 +146,192 @@ export default function Dashboard() {
       (a, b) => (b.daily_profit_percent * b.duration_days) - (a.daily_profit_percent * a.duration_days),
     )[0];
 
-  const firstName = user?.name?.split(" ")[0] || "Investor";
-  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const firstName = (user?.name?.split(" ")[0] || "Investor").toUpperCase();
+  const today = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
+    .toUpperCase();
   const featuredEnabled = settings.home_featured_plan_enabled !== false;
   const secondaryEnabled = settings.home_secondary_section_enabled !== false;
   const showImage = settings.home_below_featured_mode === "image" && settings.home_below_featured_image_url;
 
+  const indexLinks = [
+    { to: "/invest", label: "Browse plans", note: "Start a new investment", testid: "cta-invest" },
+    { to: "/team", label: "Invite & earn", note: `Earn ${settings.gen1_percent || 10}% / ${settings.gen2_percent || 5}% · 2 generations`, testid: "cta-team" },
+    { to: "/my-packages", label: "Your packages", note: "Track active investments", testid: "cta-packages" },
+    { to: "/coupons", label: "Redeem a coupon", note: "Promo codes for instant cash", testid: "cta-coupon" },
+    { to: "/history", label: "Transaction history", note: "Every credit & debit", testid: "cta-history" },
+  ];
+
   return (
     <UserLayout>
-      {/* ===== Editorial balance hero ===== */}
-      <section className="pt-1 animate-fade-up" data-testid="dashboard-hero">
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-body text-xs font-bold uppercase tracking-[0.22em] text-[color:var(--text-tertiary)]">Good day, {firstName}</div>
-          <div className="font-mono text-[11px] text-[color:var(--text-tertiary)] tabular-nums">{today}</div>
+      <div
+        className="ledger-home -mx-4 sm:-mx-6 lg:-mx-10 -mt-6 lg:-mt-8 -mb-6 lg:-mb-8 min-h-[80vh] border-x-0 lg:border-x border-[color:var(--lh-line)]"
+        data-testid="dashboard-hero"
+      >
+        {/* ===== Ticker ===== */}
+        <Ticker settings={settings} />
+
+        {/* ===== Editorial greeting ===== */}
+        <div className="px-6 lg:px-8 pt-7 pb-6 border-b border-[color:var(--lh-line)]" data-testid="home-greeting">
+          <div className="lh-mono text-[10px] tracking-[0.24em] text-[color:var(--lh-muted)]">{today}</div>
+          <h1 className="lh-display text-3xl sm:text-4xl mt-2 leading-[0.95]">Good day,<br />{firstName}</h1>
         </div>
-        <div className="mt-6 border-t border-[color:var(--border-default)] pt-6">
-          <div className="font-body text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-tertiary)]">Total balance</div>
-          <div
-            className="font-display font-extrabold text-6xl sm:text-7xl tracking-tighter text-[color:var(--text-primary)] leading-[0.95] mt-3 break-all"
-            data-testid="hero-balance"
-          >
+
+        {/* ===== Ledger vault — balance ===== */}
+        <div className="px-6 lg:px-8 py-12 sm:py-14 border-b border-[color:var(--lh-line)]" data-testid="wallet-balance-display">
+          <div className="lh-mono text-[10px] tracking-[0.26em] text-[color:var(--lh-muted)]">TOTAL LEDGER BALANCE — NGN</div>
+          <div className="lh-mono text-5xl sm:text-7xl tracking-tighter mt-5 break-all leading-none" data-testid="hero-balance">
             {formatNaira(user?.wallet_balance)}
           </div>
         </div>
-        <div className="flex gap-3 mt-7">
+
+        {/* ===== Split brutalist actions ===== */}
+        <div className="grid grid-cols-2 border-b border-[color:var(--lh-line)]" data-testid="primary-actions-grid">
           <Link
             to="/deposit"
             data-testid="hero-deposit-btn"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-[color:var(--accent-main)] text-white font-semibold shadow-md shadow-[color:var(--accent-main)]/25 hover:bg-[color:var(--accent-hover)] hover:-translate-y-0.5 transition-all"
+            className="group relative px-6 py-7 sm:py-8 bg-[color:var(--lh-accent)] text-[color:var(--lh-accent-ink)] flex flex-col items-start justify-between gap-6 min-h-[120px] transition-opacity hover:opacity-90"
           >
-            <ArrowDownToLine className="w-4 h-4" /> Deposit
+            <span className="lh-mono text-[10px] tracking-[0.2em]">01 / FUND</span>
+            <span className="lh-display text-2xl sm:text-3xl inline-flex items-center gap-2">
+              Deposit <ArrowUpRight className="w-6 h-6 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </span>
           </Link>
           <Link
             to="/withdraw"
             data-testid="hero-withdraw-btn"
-            className="glass-pill flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[color:var(--text-primary)] font-semibold hover:-translate-y-0.5 transition-transform"
+            className="group relative px-6 py-7 sm:py-8 bg-[color:var(--lh-bg)] text-[color:var(--lh-fg)] border-l border-[color:var(--lh-line)] flex flex-col items-start justify-between gap-6 min-h-[120px] transition-colors duration-150 hover:bg-[color:var(--lh-fg)] hover:text-[color:var(--lh-bg)]"
           >
-            <ArrowUpFromLine className="w-4 h-4" /> Withdraw
+            <span className="lh-mono text-[10px] tracking-[0.2em] text-[color:var(--lh-muted)] group-hover:text-[color:var(--lh-bg)]">02 / CASH OUT</span>
+            <span className="lh-display text-2xl sm:text-3xl inline-flex items-center gap-2">
+              Withdraw <ArrowUpRight className="w-6 h-6 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </span>
           </Link>
         </div>
-      </section>
 
-      {/* ===== Daily reward ===== */}
-      <DailyClaimBanner onClaimed={refresh} />
+        {/* ===== Daily reward ===== */}
+        <DailyReward onClaimed={refresh} />
 
-      {/* ===== Announcement (editorial) ===== */}
-      {settings.home_announcement_active && (settings.home_announcement || settings.home_announcement_image_url) && (
-        <div className="mt-5 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-light)] bg-[color:var(--brand-soft)] animate-fade-up" data-testid="home-announcement">
-          {settings.home_announcement_image_url && (
-            <img src={resolveUrl(settings.home_announcement_image_url)} alt="Announcement"
-                 className="w-full max-h-56 object-cover" data-testid="home-announcement-image" />
-          )}
-          {settings.home_announcement && (
-            <div className="p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[color:var(--surface)] text-[color:var(--brand)] flex items-center justify-center shrink-0">
-                <Megaphone className="w-4 h-4" />
-              </div>
-              <div className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{settings.home_announcement}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== Featured plan — asymmetric bento ===== */}
-      {featured && featuredEnabled && (
-        <div className="mt-7 animate-fade-up">
-          <div className="card-soft grid grid-cols-1 md:grid-cols-12 overflow-hidden" data-testid="featured-plan">
-            <div className="md:col-span-7 relative min-h-[180px] md:min-h-[320px]">
-              <img
-                src={featured.image_url ? resolveUrl(featured.image_url) : FEATURED_FALLBACK_BG}
-                alt={featured.name}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
-              <span className="absolute top-4 left-4 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[color:var(--accent-main)] text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
-                <Flame className="w-3 h-3" /> Hot pick
-              </span>
-            </div>
-            <div className="md:col-span-5 p-6 sm:p-8 flex flex-col">
-              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)]">Featured plan</div>
-              <h3 className="font-display text-2xl sm:text-3xl font-bold mt-1.5 text-[color:var(--text-primary)] leading-tight">{featured.name}</h3>
-              <p className="text-sm text-[color:var(--text-secondary)] mt-2 line-clamp-2">{featured.description}</p>
-              <div className="grid grid-cols-3 gap-2.5 mt-5 mb-6">
+        {/* ===== Featured plan — prospectus ===== */}
+        {featured && featuredEnabled && (
+          <div className="relative w-full h-[420px] sm:h-[460px] border-b border-[color:var(--lh-line)] overflow-hidden" data-testid="featured-plan">
+            <img
+              src={featured.image_url ? resolveUrl(featured.image_url) : FEATURED_FALLBACK_BG}
+              alt={featured.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/25" />
+            <span className="absolute top-5 left-6 lh-mono text-[10px] tracking-[0.24em] text-white/90 border border-white/40 px-3 py-1.5">
+              FEATURED PROSPECTUS
+            </span>
+            <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-8 text-white">
+              <h3 className="lh-display text-3xl sm:text-5xl leading-[0.9]">{featured.name}</h3>
+              <p className="text-sm text-white/70 mt-3 max-w-md line-clamp-2">{featured.description}</p>
+              <div className="grid grid-cols-3 gap-4 border-t border-white/25 pt-4 mt-5 lh-mono">
                 {[
-                  { label: "Daily", value: `${featured.daily_profit_percent}%` },
-                  { label: "Days", value: featured.duration_days },
-                  { label: "Total ROI", value: `${(featured.daily_profit_percent * featured.duration_days).toFixed(0)}%` },
+                  { label: "DAILY", value: `${featured.daily_profit_percent}%` },
+                  { label: "DURATION", value: `${featured.duration_days}D` },
+                  { label: "TOTAL ROI", value: `${(featured.daily_profit_percent * featured.duration_days).toFixed(0)}%` },
                 ].map((m) => (
-                  <div key={m.label} className="rounded-xl bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] px-2.5 py-3">
-                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">{m.label}</div>
-                    <div className="font-mono font-semibold text-base mt-1 text-[color:var(--text-primary)]">{m.value}</div>
+                  <div key={m.label}>
+                    <div className="text-[9px] tracking-[0.2em] text-white/55">{m.label}</div>
+                    <div className="text-xl sm:text-2xl mt-1 tracking-tight">{m.value}</div>
                   </div>
                 ))}
               </div>
               <Link
                 to="/invest"
                 data-testid="featured-cta"
-                className="mt-auto w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] font-semibold hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5 transition-all"
+                className="group mt-6 inline-flex items-center justify-between gap-6 w-full sm:w-auto bg-white text-black px-7 py-4 lh-mono text-xs uppercase tracking-widest hover:bg-[color:var(--lh-accent)] hover:text-white transition-colors duration-150"
               >
-                Invest from {formatNaira(featured.price)} <ArrowRight className="w-4 h-4" />
+                Invest from {formatNaira(featured.price)}
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ===== Secondary section — independent toggle ===== */}
-      {secondaryEnabled && (
-        showImage ? (
-          <div className="mt-6 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-default)] animate-fade-up" data-testid="home-below-featured-image">
-            <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />
-          </div>
-        ) : (
-          <div className="mt-7 animate-fade-up">
-            <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] mb-3">Quick actions</div>
-            <div className="flex sm:grid sm:grid-cols-3 gap-3 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 snap-x pb-1">
-              {[
-                { to: "/team", icon: Users, tone: "brand", title: "Invite & earn", sub: `Earn ${settings.gen1_percent || 10}% / ${settings.gen2_percent || 5}% across 2 generations`, testid: "cta-team" },
-                { to: "/coupons", icon: Ticket, tone: "accent", title: "Got a coupon?", sub: "Redeem promo codes for instant cash", testid: "cta-coupon" },
-                { to: "/my-packages", icon: Briefcase, tone: "gold", title: "Your packages", sub: "Track active investments & profits", testid: "cta-packages" },
-              ].map((c) => {
-                const tones = {
-                  brand: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
-                  accent: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
-                  gold: "bg-[color:var(--gold-soft)] text-[color:var(--gold)]",
-                };
-                return (
-                  <Link
-                    key={c.to}
-                    to={c.to}
-                    data-testid={c.testid}
-                    className="snap-start shrink-0 w-[62%] sm:w-auto card-soft p-4 flex flex-col gap-3 min-h-[150px] hover:-translate-y-0.5 transition-transform"
-                  >
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${tones[c.tone]}`}>
-                      <c.icon className="w-5 h-5" />
-                    </div>
-                    <div className="mt-auto">
-                      <div className="font-display font-semibold text-[color:var(--text-primary)]">{c.title}</div>
-                      <div className="text-xs text-[color:var(--text-secondary)] mt-1 leading-snug">{c.sub}</div>
-                    </div>
-                  </Link>
-                );
-              })}
+        {/* ===== Secondary — image OR index list ===== */}
+        {secondaryEnabled && (
+          showImage ? (
+            <div className="border-b border-[color:var(--lh-line)]" data-testid="home-below-featured-image">
+              <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />
             </div>
-          </div>
-        )
-      )}
+          ) : (
+            <div data-testid="quick-actions-list">
+              <div className="px-6 lg:px-8 pt-7 pb-3">
+                <div className="lh-mono text-[10px] tracking-[0.26em] text-[color:var(--lh-muted)]">INDEX — QUICK ACTIONS</div>
+              </div>
+              {indexLinks.map((c, i) => (
+                <Link
+                  key={c.to}
+                  to={c.to}
+                  data-testid={c.testid}
+                  className="group flex items-center justify-between gap-4 px-6 lg:px-8 py-6 border-t border-[color:var(--lh-line)] last:border-b transition-colors duration-150 hover:bg-[color:var(--lh-fg)] hover:text-[color:var(--lh-bg)]"
+                >
+                  <div className="flex items-center gap-5 min-w-0">
+                    <span className="lh-mono text-xs text-[color:var(--lh-muted)] group-hover:text-[color:var(--lh-bg)]">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="lh-display text-lg sm:text-xl">{c.label}</div>
+                      <div className="text-xs text-[color:var(--lh-muted)] group-hover:text-[color:var(--lh-bg)]/70 mt-0.5">{c.note}</div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 shrink-0 transition-transform group-hover:translate-x-1.5" />
+                </Link>
+              ))}
+            </div>
+          )
+        )}
+      </div>
 
-      {/* ===== Welcome modal — glassmorphism ===== */}
+      {/* ===== Welcome modal — stark overlay ===== */}
       <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
         <DialogContent
           data-testid="welcome-modal"
-          className="user-theme duration-500 w-[calc(100vw-2rem)] max-w-md rounded-[1.25rem] overflow-hidden p-0 border border-[color:var(--border-default)] shadow-2xl bg-[color:var(--surface)]"
+          className="ledger-home p-0 gap-0 w-[calc(100vw-2rem)] max-w-sm rounded-none border-2 border-[color:var(--lh-fg)] bg-[color:var(--lh-bg)] text-[color:var(--lh-fg)] shadow-[8px_8px_0_0_var(--lh-fg)]"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="relative h-40 overflow-hidden">
-            <img src={WELCOME_ART} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--surface)] via-transparent to-transparent" />
+          <div className="relative h-28 overflow-hidden border-b-2 border-[color:var(--lh-fg)]">
+            <img src={WELCOME_ART} alt="" className="w-full h-full object-cover grayscale" />
+            <div className="absolute inset-0 bg-[color:var(--lh-bg)]/30" />
           </div>
-          <div className="px-6 pt-4 pb-6">
-            <div className="inline-flex items-center gap-1.5 text-[color:var(--accent-main)] text-[10px] uppercase tracking-[0.18em] font-bold">
-              <Sparkle className="w-3 h-3" /> Welcome aboard
-            </div>
-            <DialogHeader>
-              <DialogTitle className="font-display text-2xl md:text-3xl font-semibold mt-2 text-[color:var(--text-primary)]" data-testid="welcome-modal-title">
-                {(() => {
-                  const tpl = settings.welcome_modal_title;
-                  if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
-                  return `Hi ${firstName} — welcome to Naturalis`;
-                })()}
-              </DialogTitle>
-            </DialogHeader>
-            <p className="mt-2 text-sm text-[color:var(--text-secondary)] leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
+          <div className="p-7">
+            <div className="lh-mono text-[10px] tracking-[0.26em] text-[color:var(--lh-accent)]">WELCOME ABOARD</div>
+            <h2 className="lh-display text-3xl mt-3 leading-[0.95]" data-testid="welcome-modal-title">
+              {(() => {
+                const tpl = settings.welcome_modal_title;
+                if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
+                return `Hi ${firstName}`;
+              })()}
+            </h2>
+            <p className="mt-3 text-sm text-[color:var(--lh-muted)] leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
               {settings.welcome_message ||
-                "Earn daily returns on every plan you fund. Top up your wallet, pick a plan, and watch your profit land every 24 hours. Refer friends to earn across 2 generations."}
+                "Earn daily returns on every plan you fund. Top up, pick a plan, and watch profit land every 24 hours. Refer friends to earn across 2 generations."}
             </p>
-            <DialogFooter className="flex-col sm:flex-col gap-3 mt-5">
-              <Link
-                to="/deposit"
+            <Link
+              to="/deposit"
+              onClick={closeWelcome}
+              data-testid="welcome-bonus-cta"
+              className="mt-6 w-full inline-flex items-center justify-between gap-4 bg-[color:var(--lh-accent)] text-[color:var(--lh-accent-ink)] px-5 py-4 lh-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity"
+            >
+              Claim {formatNaira(settings.welcome_bonus ?? 750)} bonus
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            {settings.telegram_url && (
+              <a
+                href={settings.telegram_url}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={closeWelcome}
-                data-testid="welcome-bonus-cta"
-                className="w-full inline-flex items-center justify-center gap-2 bg-[color:var(--accent-main)] hover:bg-[color:var(--accent-hover)] text-white font-semibold rounded-full px-5 py-3 shadow-md shadow-[color:var(--accent-main)]/25 transition-colors"
+                data-testid="welcome-telegram-btn"
+                className="mt-3 w-full inline-flex items-center justify-between gap-4 border border-[color:var(--lh-fg)] px-5 py-4 lh-mono text-xs uppercase tracking-widest hover:bg-[color:var(--lh-fg)] hover:text-[color:var(--lh-bg)] transition-colors duration-150"
               >
-                <Sparkles className="w-4 h-4" /> Get started — claim your {formatNaira(settings.welcome_bonus ?? 750)} bonus
-              </Link>
-              {settings.telegram_url && (
-                <a
-                  href={settings.telegram_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={closeWelcome}
-                  data-testid="welcome-telegram-btn"
-                  className="w-full inline-flex items-center justify-center gap-2 bg-[#229ED9] hover:bg-[#1f8fc4] text-white font-semibold rounded-full px-5 py-3 shadow-md transition-colors"
-                >
-                  <Send className="w-4 h-4" /> Join our Telegram group
-                </a>
-              )}
-            </DialogFooter>
+                Join Telegram
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -406,6 +406,54 @@
   }
 }
 
+/* =========================================================
+   LEDGER HOME — neo-brutalist editorial home page.
+   Scoped to `.ledger-home` ONLY, so every other user page keeps
+   the approved "Botanical Bank" look untouched.
+   ========================================================= */
+@layer components {
+  .ledger-home {
+    --lh-bg: #FAFAF7;
+    --lh-fg: #0B0B0A;
+    --lh-muted: #6E6E68;
+    --lh-line: rgba(11, 11, 10, 0.14);
+    --lh-accent: #F5360A;
+    --lh-accent-ink: #FFFFFF;
+    background: var(--lh-bg);
+    color: var(--lh-fg);
+    font-family: 'Satoshi', sans-serif;
+  }
+  .dark .ledger-home {
+    --lh-bg: #070706;
+    --lh-fg: #F7F6F2;
+    --lh-muted: #8C8C85;
+    --lh-line: rgba(247, 246, 242, 0.16);
+    --lh-accent: #FF4D1F;
+    --lh-accent-ink: #0B0B0A;
+  }
+  .ledger-home .lh-display {
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+  }
+  .ledger-home .lh-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+@keyframes lh-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.lh-marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: lh-marquee 24s linear infinite;
+}
+.lh-marquee-wrap:hover .lh-marquee-track {
+  animation-play-state: paused;
+}
+
 @keyframes claim-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(0.85); }
