@@ -6,7 +6,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
 import { ArrowRight, ArrowUpRight, Check } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const FEATURED_FALLBACK_BG =
@@ -299,17 +299,17 @@ export default function Dashboard() {
           </div>
           <div className="p-7">
             <div className="lh-mono text-[10px] tracking-[0.26em] text-[color:var(--lh-accent)]">WELCOME ABOARD</div>
-            <h2 className="lh-display text-3xl mt-3 leading-[0.95]" data-testid="welcome-modal-title">
+            <DialogTitle className="lh-display text-3xl mt-3 leading-[0.95] font-normal" data-testid="welcome-modal-title">
               {(() => {
                 const tpl = settings.welcome_modal_title;
                 if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
                 return `Hi ${firstName}`;
               })()}
-            </h2>
-            <p className="mt-3 text-sm text-[color:var(--lh-muted)] leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
+            </DialogTitle>
+            <DialogDescription className="mt-3 text-sm text-[color:var(--lh-muted)] leading-relaxed whitespace-pre-wrap" data-testid="welcome-message">
               {settings.welcome_message ||
                 "Earn daily returns on every plan you fund. Top up, pick a plan, and watch profit land every 24 hours. Refer friends to earn across 2 generations."}
-            </p>
+            </DialogDescription>
             <Link
               to="/deposit"
               onClick={closeWelcome}

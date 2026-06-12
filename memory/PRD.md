@@ -1,4 +1,18 @@
-# Evoque-Nova — PRD & Implementation Log
+# Naturalis — PRD & Implementation Log
+
+## Recent Changes (Jun 2026 — iteration 71)
+
+### Home page (Dashboard) FULL structural redesign — "Editorial Ledger" (neo-brutalist)
+
+User rejected the prior 3 home redesigns (blue/gold, green/coral, earthy botanical) as "feeling the same — not a color change alone, change the ENTIRE design/feel." Design agent produced an Archetype-4 (Swiss/high-contrast brutalist) blueprint. Reinvented the home STRUCTURE, not a recolor:
+
+- **New scoped style** `.ledger-home` in `index.css` (light + dark monochrome ink/paper palette + `--lh-accent` safety-orange, `lh-marquee` keyframes). **Scoped so ONLY the home page changes** — every other user page keeps the approved "Botanical Bank" green theme (regression confirmed by testing agent).
+- **Dashboard.jsx fully rebuilt** edge-to-edge (negative margins cancel UserLayout padding): top scrolling announcement **marquee ticker**, editorial **GOOD DAY, NAME** greeting, massive mono **TOTAL LEDGER BALANCE** vault, **split brutalist** 2-col Deposit(orange)/Withdraw(invert-on-hover) actions, terminal-row **daily reward**, full-bleed magazine **FEATURED PROSPECTUS** plan, numbered **INDEX — QUICK ACTIONS** list (invert-on-hover, translating arrows), and a stark hard-shadow **welcome modal**. All prior data-testids preserved + new ones (home-announcement-ticker, home-greeting, wallet-balance-display, primary-actions-grid, quick-actions-list).
+- Welcome modal migrated to Radix `DialogTitle`/`DialogDescription` (fixes a11y console warnings).
+
+**Verified (testing agent, frontend-only, iteration_14.json):** 100% of testable scenarios pass on desktop 1440px + mobile 430px, light + dark; nav works; no horizontal overflow; regression PASSED (other pages unchanged). featured-plan/quick-actions branches hidden only because current admin flags use image-mode + featured disabled (correct conditional behavior). No live data mutated.
+
+
 
 ## Recent Changes (Jun 2026 — iteration 70)
 
