@@ -5,13 +5,11 @@ import { api, API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Phone, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import ThemeToggle from "@/components/ThemeToggle";
-import { useBranding } from "@/context/BrandingContext";
+import AuthShell from "@/components/AuthShell";
 
 export default function Login() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
-  const { logoUrl } = useBranding();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -66,39 +64,15 @@ export default function Login() {
   };
 
   return (
-    <div className="user-theme min-h-screen flex bg-[color:var(--app-bg)]">
-      <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
-              <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
-            </div>
-            <div className="font-display text-3xl font-bold">
-              Natura<span className="text-white/90">lis</span>
-            </div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Daily returns</div>
-            <h2 className="font-display text-5xl font-semibold tracking-tight mt-3 leading-[1.05]">
-              Grow your money,<br/>every <span className="text-white">24 hours</span>.
-            </h2>
-            <p className="mt-4 max-w-md text-white/85 leading-relaxed">
-              Pick a plan, invest, and watch profits land in your wallet every day. Built for Nigerians, paid in Naira.
-            </p>
-          </div>
-          <div className="text-xs text-white/70">Secure · Transparent · Naira-native</div>
-        </div>
-      </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-10">
-        <form onSubmit={submit} className="w-full max-w-md animate-fade-up" data-testid="login-form">
-          <div className="flex items-center justify-between">
-            <div className="text-label">Sign in</div>
-            <ThemeToggle />
-          </div>
-          <h1 className="font-display text-4xl font-semibold tracking-tight mt-2 text-[color:var(--text-primary)]">Welcome back</h1>
-          <p className="text-[color:var(--text-secondary)] mt-2 text-sm">Use your phone and password to access your wallet.</p>
-
-          <label className="block mt-8 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Phone number (11 digits)</label>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to access your wallet"
+      testid="login-card"
+      footer={<>New here? <Link to="/register" data-testid="go-register-link" className="text-[color:var(--brand)] font-semibold underline underline-offset-2">Create an account</Link></>}
+    >
+      <form onSubmit={submit} className="space-y-5" data-testid="login-form">
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Phone number (11 digits)</label>
           <div className="relative mt-2">
             <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
             <input
@@ -106,11 +80,13 @@ export default function Login() {
               value={phone} onChange={(e)=>setPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
               placeholder="08012345678"
               data-testid="login-phone-input"
-              className="w-full pl-10 pr-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] font-mono"
+              className="w-full pl-10 pr-3 py-3 input-base font-mono"
             />
           </div>
+        </div>
 
-          <div className="flex items-center justify-between mt-5">
+        <div>
+          <div className="flex items-center justify-between">
             <label className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Password</label>
             <Link to="/forgot-password" data-testid="forgot-password-link" className="text-xs font-semibold text-[color:var(--brand)] hover:underline underline-offset-2">
               Forgot password?
@@ -122,24 +98,19 @@ export default function Login() {
               type="password" required value={password} onChange={(e)=>setPassword(e.target.value)}
               placeholder="••••••••"
               data-testid="login-password-input"
-              className="w-full pl-10 pr-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
+              className="w-full pl-10 pr-3 py-3 input-base"
             />
           </div>
+        </div>
 
-          <button
-            type="submit" disabled={loading}
-            data-testid="login-submit-btn"
-            className="mt-7 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold transition-colors disabled:opacity-60"
-          >
-            {loading ? "Signing in…" : (<>Sign in <ArrowRight className="w-4 h-4" /></>)}
-          </button>
-
-          <p className="text-sm text-[color:var(--text-secondary)] mt-6 text-center">
-            New here?{" "}
-            <Link to="/register" data-testid="go-register-link" className="text-[color:var(--brand)] font-semibold underline underline-offset-2">Create an account</Link>
-          </p>
-        </form>
-      </div>
-    </div>
+        <button
+          type="submit" disabled={loading}
+          data-testid="login-submit-btn"
+          className="w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3.5 rounded-full font-semibold transition-colors disabled:opacity-60"
+        >
+          {loading ? "Signing in…" : (<>Sign in <ArrowRight className="w-4 h-4" /></>)}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

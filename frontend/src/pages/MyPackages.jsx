@@ -65,7 +65,7 @@ export default function MyPackages() {
         {[{v:"all",l:"All"},{v:"active",l:"Active"},{v:"completed",l:"Completed"}].map(t => (
           <button key={t.v} onClick={() => setFilter(t.v)} data-testid={`pkg-filter-${t.v}`}
             className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${
-              filter === t.v ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
+              filter === t.v ? "bg-[color:var(--brand)] text-[color:var(--brand-ink)] border-[color:var(--brand)]" : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
             }`}>{t.l}</button>
         ))}
       </div>

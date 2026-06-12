@@ -176,7 +176,7 @@ export default function Deposit() {
           )}
           <button type="submit" disabled={busy}
             data-testid="deposit-submit-btn"
-            className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold disabled:opacity-60">
+            className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3.5 rounded-full font-semibold disabled:opacity-60">
             <ArrowDownToLine className="w-4 h-4" /> {busy ? "Processing…" : "Proceed to pay"}
           </button>
           {settingsLoaded && settings.payment_mode !== "live" && (

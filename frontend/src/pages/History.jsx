@@ -45,7 +45,7 @@ export default function History() {
           <button key={t.v} onClick={() => setFilter(t.v)} data-testid={`filter-${t.v || "all"}`}
             className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               filter === t.v
-                ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]"
+                ? "bg-[color:var(--brand)] text-[color:var(--brand-ink)] border-[color:var(--brand)]"
                 : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
             }`}>
             {t.label}

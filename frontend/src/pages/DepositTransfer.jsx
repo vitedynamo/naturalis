@@ -218,13 +218,13 @@ export default function DepositTransfer() {
           {!expired ? (
             <button onClick={() => verify(false)} disabled={verifying || !isPending}
               data-testid="deposit-verify-btn"
-              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold disabled:opacity-60">
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3.5 rounded-full font-semibold disabled:opacity-60">
               <RefreshCw className={`w-4 h-4 ${verifying ? "animate-spin" : ""}`} /> {verifying ? "Checking…" : "I have paid — check status"}
             </button>
           ) : (
             <button onClick={() => navigate("/deposit")}
               data-testid="transfer-start-new-btn"
-              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold">
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3.5 rounded-full font-semibold">
               Start a new deposit
             </button>
           )}

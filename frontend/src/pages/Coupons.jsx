@@ -62,7 +62,7 @@ export default function Coupons() {
             placeholder="e.g. NAIJA2026"
             className="w-full mt-2 px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] uppercase font-mono" />
           <button type="submit" disabled={busy || locked} data-testid="redeem-btn"
-            className="mt-5 w-full bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3 rounded-full font-semibold disabled:opacity-60">
+            className="mt-5 w-full bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3 rounded-full font-semibold disabled:opacity-60">
             {busy ? "Redeeming…" : "Redeem coupon"}
           </button>
         </form>

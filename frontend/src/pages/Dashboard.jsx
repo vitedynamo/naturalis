@@ -83,7 +83,7 @@ function DailyClaimBanner({ onClaimed }) {
           justClaimed
             ? "bg-[color:var(--success)] text-white"
             : ready
-              ? "bg-[color:var(--brand)] text-white hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5"
+              ? "bg-[color:var(--brand)] text-[color:var(--brand-ink)] hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5"
               : "bg-[color:var(--surface-2)] text-[color:var(--text-tertiary)] cursor-not-allowed"
         } disabled:cursor-not-allowed`}
       >
@@ -117,22 +117,27 @@ export default function Dashboard() {
     )[0];
 
   const firstName = user?.name?.split(" ")[0] || "Investor";
+  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const featuredEnabled = settings.home_featured_plan_enabled !== false;
   const secondaryEnabled = settings.home_secondary_section_enabled !== false;
   const showImage = settings.home_below_featured_mode === "image" && settings.home_below_featured_image_url;
 
   return (
     <UserLayout>
-      {/* ===== Typographic balance hero (no card) ===== */}
+      {/* ===== Editorial balance hero ===== */}
       <section className="pt-1 animate-fade-up" data-testid="dashboard-hero">
-        <div className="font-body text-xs font-bold uppercase tracking-[0.22em] text-[color:var(--text-tertiary)]">Good day, {firstName}</div>
-        <div className="font-body text-[11px] uppercase tracking-[0.18em] text-[color:var(--text-tertiary)] mt-5">Total balance</div>
-        <div
-          className="metric-num text-5xl sm:text-6xl text-[color:var(--text-primary)] leading-none mt-2 break-all"
-          data-testid="hero-balance"
-          style={{ textShadow: "0 2px 28px rgba(10,77,46,0.14)" }}
-        >
-          {formatNaira(user?.wallet_balance)}
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-body text-xs font-bold uppercase tracking-[0.22em] text-[color:var(--text-tertiary)]">Good day, {firstName}</div>
+          <div className="font-mono text-[11px] text-[color:var(--text-tertiary)] tabular-nums">{today}</div>
+        </div>
+        <div className="mt-6 border-t border-[color:var(--border-default)] pt-6">
+          <div className="font-body text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-tertiary)]">Total balance</div>
+          <div
+            className="font-display font-extrabold text-6xl sm:text-7xl tracking-tighter text-[color:var(--text-primary)] leading-[0.95] mt-3 break-all"
+            data-testid="hero-balance"
+          >
+            {formatNaira(user?.wallet_balance)}
+          </div>
         </div>
         <div className="flex gap-3 mt-7">
           <Link
@@ -145,7 +150,7 @@ export default function Dashboard() {
           <Link
             to="/withdraw"
             data-testid="hero-withdraw-btn"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-[color:var(--border-default)] text-[color:var(--text-primary)] font-semibold hover:bg-[color:var(--surface-alt)] transition-colors"
+            className="glass-pill flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[color:var(--text-primary)] font-semibold hover:-translate-y-0.5 transition-transform"
           >
             <ArrowUpFromLine className="w-4 h-4" /> Withdraw
           </Link>
@@ -173,41 +178,41 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===== Featured plan — immersive poster ===== */}
+      {/* ===== Featured plan — asymmetric bento ===== */}
       {featured && featuredEnabled && (
-        <div className="mt-6 animate-fade-up">
-          <div className="relative overflow-hidden rounded-[var(--radius)] aspect-[4/3] sm:aspect-[16/9] border border-[color:var(--border-default)]" data-testid="featured-plan">
-            {featured.image_url ? (
-              <img src={resolveUrl(featured.image_url)} alt={featured.name} className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-              <img src={FEATURED_FALLBACK_BG} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7 text-white">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">Featured plan</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[color:var(--accent-main)] text-white text-[9px] font-bold uppercase tracking-wider">
-                  <Flame className="w-2.5 h-2.5" /> Hot pick
-                </span>
-              </div>
-              <h3 className="font-display text-2xl sm:text-3xl font-semibold mt-1.5 leading-tight">{featured.name}</h3>
-              <p className="text-sm text-white/75 mt-1.5 line-clamp-2 max-w-xl">{featured.description}</p>
-              <div className="grid grid-cols-3 gap-2 mt-4 max-w-md">
+        <div className="mt-7 animate-fade-up">
+          <div className="card-soft grid grid-cols-1 md:grid-cols-12 overflow-hidden" data-testid="featured-plan">
+            <div className="md:col-span-7 relative min-h-[180px] md:min-h-[320px]">
+              <img
+                src={featured.image_url ? resolveUrl(featured.image_url) : FEATURED_FALLBACK_BG}
+                alt={featured.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
+              <span className="absolute top-4 left-4 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[color:var(--accent-main)] text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+                <Flame className="w-3 h-3" /> Hot pick
+              </span>
+            </div>
+            <div className="md:col-span-5 p-6 sm:p-8 flex flex-col">
+              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)]">Featured plan</div>
+              <h3 className="font-display text-2xl sm:text-3xl font-bold mt-1.5 text-[color:var(--text-primary)] leading-tight">{featured.name}</h3>
+              <p className="text-sm text-[color:var(--text-secondary)] mt-2 line-clamp-2">{featured.description}</p>
+              <div className="grid grid-cols-3 gap-2.5 mt-5 mb-6">
                 {[
                   { label: "Daily", value: `${featured.daily_profit_percent}%` },
                   { label: "Days", value: featured.duration_days },
                   { label: "Total ROI", value: `${(featured.daily_profit_percent * featured.duration_days).toFixed(0)}%` },
                 ].map((m) => (
-                  <div key={m.label} className="rounded-xl bg-white/10 backdrop-blur px-3 py-2.5 border border-white/10">
-                    <div className="text-[9px] uppercase tracking-wider text-white/60 font-bold">{m.label}</div>
-                    <div className="font-mono font-semibold text-base mt-0.5">{m.value}</div>
+                  <div key={m.label} className="rounded-xl bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] px-2.5 py-3">
+                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">{m.label}</div>
+                    <div className="font-mono font-semibold text-base mt-1 text-[color:var(--text-primary)]">{m.value}</div>
                   </div>
                 ))}
               </div>
               <Link
                 to="/invest"
                 data-testid="featured-cta"
-                className="mt-5 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[color:var(--brand)] text-white font-semibold hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5 transition-all"
+                className="mt-auto w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] font-semibold hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5 transition-all"
               >
                 Invest from {formatNaira(featured.price)} <ArrowRight className="w-4 h-4" />
               </Link>

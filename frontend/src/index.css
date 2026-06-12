@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
-@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&f[]=satoshi@400,500,700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,800&f[]=satoshi@400,500,700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -126,111 +126,113 @@
     --radius: 1rem;
 
     /* Shadcn HSL tokens (so portaled dialogs/popovers match) */
-    --background: 120 6% 96%;
-    --foreground: 146 51% 8%;
+    --background: 40 20% 96%;
+    --foreground: 130 11% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 146 51% 8%;
+    --card-foreground: 130 11% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 146 51% 8%;
-    --primary: 152 77% 17%;
+    --popover-foreground: 130 11% 11%;
+    --primary: 136 29% 14%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 150 5% 92%;
-    --secondary-foreground: 146 51% 8%;
-    --muted: 150 5% 92%;
-    --muted-foreground: 142 16% 36%;
-    --accent: 6 100% 60%;
+    --secondary: 140 18% 90%;
+    --secondary-foreground: 130 11% 11%;
+    --muted: 40 15% 90%;
+    --muted-foreground: 136 8% 34%;
+    --accent: 11 58% 52%;
     --accent-foreground: 0 0% 100%;
-    --border: 140 8% 83%;
-    --input: 140 8% 83%;
-    --ring: 152 77% 17%;
+    --border: 40 12% 80%;
+    --input: 40 12% 80%;
+    --ring: 136 29% 14%;
 
-    /* App tokens — light */
-    --app-bg: #F4F5F4;
+    /* App tokens — light ("Botanical Bank") */
+    --app-bg: #F8F6F2;
     --surface: #FFFFFF;
-    --surface-alt: #EAECEB;
-    --surface-2: #DFE3E1;
-    --text-primary: #0A1F13;
-    --text-secondary: #4D6B58;
-    --text-tertiary: #8CA395;
+    --surface-alt: #F2EFEA;
+    --surface-2: #E8E4DD;
+    --text-primary: #181E19;
+    --text-secondary: #515E54;
+    --text-tertiary: #88988C;
 
-    --brand: #0A4D2E;
-    --brand-hover: #083B23;
-    --brand-soft: #E6F0EB;
-    --accent-main: #FF4733;
-    --accent-hover: #E63A26;
-    --accent-soft: #FFEBE8;
-    --gold: #D4AF37;
-    --gold-soft: #F9F6E8;
-    --success: #14854B;
-    --success-soft: #DDF2E6;
-    --warning: #F5A623;
-    --error: #D0021B;
-    --error-soft: #FCE3E5;
+    --brand: #1A3020;
+    --brand-hover: #2C4834;
+    --brand-soft: #E1EBE4;
+    --brand-ink: #FFFFFF;
+    --accent-main: #C95B42;
+    --accent-hover: #B04A33;
+    --accent-soft: #F5EBE8;
+    --gold: #B8935A;
+    --gold-soft: #F5EFE6;
+    --success: #285C43;
+    --success-soft: #E3EEE8;
+    --warning: #E0923D;
+    --error: #A83636;
+    --error-soft: #FBE9E9;
 
-    --border-default: #D1D8D4;
-    --border-light: #E4EAE6;
+    --border-default: #D3CDC4;
+    --border-light: #E8E4DD;
 
-    --shadow-sm: 0 1px 2px rgba(10, 31, 19, 0.05);
-    --shadow-md: 0 4px 16px rgba(10, 31, 19, 0.08);
-    --shadow-lg: 0 18px 44px rgba(10, 31, 19, 0.12);
+    --shadow-sm: 0 1px 2px rgba(24, 30, 25, 0.05);
+    --shadow-md: 0 4px 16px rgba(24, 30, 25, 0.08);
+    --shadow-lg: 0 18px 44px rgba(24, 30, 25, 0.12);
   }
 
   .dark .user-theme {
-    --background: 150 47% 4%;
-    --foreground: 0 0% 96%;
-    --card: 150 33% 6%;
-    --card-foreground: 0 0% 96%;
-    --popover: 150 33% 6%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 149 78% 46%;
-    --primary-foreground: 150 47% 4%;
-    --secondary: 150 30% 10%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 150 30% 10%;
-    --muted-foreground: 146 14% 68%;
-    --accent: 11 100% 65%;
+    --background: 135 11% 7%;
+    --foreground: 135 15% 95%;
+    --card: 135 11% 10%;
+    --card-foreground: 135 15% 95%;
+    --popover: 135 11% 10%;
+    --popover-foreground: 135 15% 95%;
+    --primary: 136 19% 65%;
+    --primary-foreground: 135 11% 7%;
+    --secondary: 136 19% 14%;
+    --secondary-foreground: 135 15% 95%;
+    --muted: 135 11% 13%;
+    --muted-foreground: 135 10% 66%;
+    --accent: 10 60% 61%;
     --accent-foreground: 0 0% 100%;
-    --border: 147 29% 15%;
-    --input: 147 29% 15%;
-    --ring: 149 78% 46%;
+    --border: 135 11% 20%;
+    --input: 135 11% 20%;
+    --ring: 136 19% 65%;
 
-    --app-bg: #050E09;
-    --surface: #0A140F;
-    --surface-alt: #112018;
-    --surface-2: #182C22;
-    --text-primary: #F4F5F4;
-    --text-secondary: #A3B8AD;
-    --text-tertiary: #698074;
+    --app-bg: #0F1310;
+    --surface: #161C17;
+    --surface-alt: #1D241F;
+    --surface-2: #252D27;
+    --text-primary: #F0F4F1;
+    --text-secondary: #A3B1A7;
+    --text-tertiary: #6D7E73;
 
-    --brand: #1AD173;
-    --brand-hover: #4CE093;
-    --brand-soft: #0A291A;
-    --accent-main: #FF6B4A;
-    --accent-hover: #FF8C73;
-    --accent-soft: #3A140C;
-    --gold: #E3C565;
-    --gold-soft: #2A2412;
-    --success: #1AD173;
-    --success-soft: #0A291A;
-    --warning: #FFB84D;
-    --error: #FF4D4D;
-    --error-soft: #3A1414;
+    --brand: #97B59F;
+    --brand-hover: #B2CBB9;
+    --brand-soft: #1E2D22;
+    --brand-ink: #0F1310;
+    --accent-main: #D97762;
+    --accent-hover: #ED927E;
+    --accent-soft: #3D211B;
+    --gold: #D1B381;
+    --gold-soft: #362B1D;
+    --success: #5D9F7F;
+    --success-soft: #182C23;
+    --warning: #E5A860;
+    --error: #C95B5B;
+    --error-soft: #3B1C1C;
 
-    --border-default: #1C3326;
-    --border-light: #14241B;
+    --border-default: #2D3930;
+    --border-light: #232C25;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
     --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.7);
     --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.8);
   }
 
-  /* User-side typography — Clash Display headings + Satoshi body */
+  /* User-side typography — Cabinet Grotesk headings + Satoshi body */
   .user-theme {
     font-family: 'Satoshi', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   .user-theme h1, .user-theme h2, .user-theme h3, .user-theme h4, .user-theme h5,
   .user-theme .font-display {
-    font-family: 'Clash Display', sans-serif;
+    font-family: 'Cabinet Grotesk', 'Satoshi', sans-serif;
   }
   .user-theme .metric-num, .user-theme .font-mono {
     font-family: 'JetBrains Mono', monospace;
@@ -369,17 +371,17 @@
       radial-gradient(120% 120% at 100% 0%, rgba(251, 191, 36, 0.35) 0%, transparent 55%),
       linear-gradient(135deg, #312E81 0%, #4338CA 50%, #6D28D9 100%);
   }
-  /* User-side hero — deep forest green with a warm coral glow */
+  /* User-side hero — deep olive forest with a warm terracotta glow (white-text safe) */
   .user-theme .hero-gradient {
     background:
-      radial-gradient(120% 110% at 100% 0%, rgba(255, 71, 51, 0.22) 0%, transparent 55%),
-      linear-gradient(140deg, #0E6B3F 0%, #0A4D2E 55%, #06341E 100%);
+      radial-gradient(120% 110% at 100% 0%, rgba(201, 91, 66, 0.28) 0%, transparent 55%),
+      linear-gradient(140deg, #234A30 0%, #1A3020 55%, #101F15 100%);
   }
   .dark .user-theme .hero-gradient {
     background:
-      radial-gradient(120% 110% at 100% 0%, rgba(255, 107, 74, 0.16) 0%, transparent 55%),
-      radial-gradient(130% 120% at 0% 0%, rgba(26, 209, 115, 0.18) 0%, transparent 55%),
-      linear-gradient(140deg, #0C3322 0%, #0A1F14 55%, #050E09 100%);
+      radial-gradient(120% 110% at 100% 0%, rgba(217, 119, 98, 0.20) 0%, transparent 55%),
+      radial-gradient(130% 120% at 0% 0%, rgba(151, 181, 159, 0.14) 0%, transparent 55%),
+      linear-gradient(140deg, #1B2A20 0%, #131A15 55%, #0B0F0C 100%);
   }
   .grain::after {
     content: "";
@@ -393,6 +395,7 @@
   /* User-side: pill buttons + floating glass nav */
   .user-theme .btn-primary,
   .user-theme .btn-accent { border-radius: 9999px; }
+  .user-theme .btn-primary { color: var(--brand-ink); }
   .user-theme .pill { border-radius: 9999px; }
   .glass-pill {
     backdrop-filter: blur(18px);

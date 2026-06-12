@@ -144,7 +144,7 @@ export default function UserLayout({ children }) {
                   <span
                     className={`flex items-center justify-center transition-all duration-300 ${
                       isActive
-                        ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
+                        ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
                         : "w-9 h-9 text-[color:var(--text-tertiary)]"
                     }`}
                   >
@@ -165,7 +165,7 @@ export default function UserLayout({ children }) {
                 <span
                   className={`flex items-center justify-center transition-all duration-300 ${
                     isActive
-                      ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
+                      ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
                       : "w-9 h-9 text-[color:var(--text-tertiary)]"
                   }`}
                 >

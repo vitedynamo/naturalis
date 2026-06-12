@@ -130,7 +130,7 @@ export default function Invest() {
                 <button
                   onClick={() => openInvest(p)}
                   data-testid={`invest-btn-${p.id}`}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
+                  className="mt-4 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
                 >
                   <TrendingUp className="w-4 h-4" /> Invest now
                 </button>
