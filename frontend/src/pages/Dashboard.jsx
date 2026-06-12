@@ -4,12 +4,14 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatNaira } from "@/lib/format";
-import { ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight, Megaphone, Send, Sparkle, Gift, Briefcase, Check } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight,
+  Megaphone, Send, Sparkle, Briefcase, Check, Coins, Calendar, TrendingUp, Wallet, ChevronRight,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-const FEATURED_FALLBACK_BG = "https://images.unsplash.com/photo-1677611998429-1baa4371456b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGZvcmVzdCUyMGdyZWVuJTIwZ2VvbWV0cmljJTIwdGV4dHVyZXxlbnwwfHx8fDE3ODEyNzMwODN8MA&ixlib=rb-4.1.0&q=85";
 const WELCOME_ART = "https://images.unsplash.com/photo-1777576968636-efa4ed929c9a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwbW9uZXklMjB3ZWFsdGglMjBjb25jZXB0JTIwdGVycmFjb3R0YSUyMHNhbmR8ZW58MHx8fHwxNzgxMjczMDgzfDA&ixlib=rb-4.1.0&q=85";
 
 function resolveUrl(url) {
@@ -26,18 +28,14 @@ function fmtCountdown(sec) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/* Daily reward — dense structural status banner */
+/* Daily reward — slim claim strip */
 function DailyClaimBanner({ onClaimed }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
-      api.get("/daily-claim/status")
-        .then(({ data }) => { if (!cancelled) setStatus(data); })
-        .catch(() => {});
-    load();
+    api.get("/daily-claim/status").then(({ data }) => { if (!cancelled) setStatus(data); }).catch(() => {});
     const t = setInterval(() => setStatus((s) => s ? { ...s, cooldown_remaining_sec: Math.max(0, s.cooldown_remaining_sec - 1) } : s), 1000);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
@@ -59,36 +57,75 @@ function DailyClaimBanner({ onClaimed }) {
   };
   return (
     <div
-      className="mt-7 rounded-[var(--radius)] p-4 sm:p-5 relative overflow-hidden border border-[color:var(--border-default)] bg-[color:var(--surface-alt)] animate-fade-up flex items-center gap-4"
+      className="mt-4 rounded-[var(--radius)] p-3.5 sm:p-4 border border-[color:var(--gold)]/40 bg-[color:var(--gold-soft)] flex items-center gap-3 animate-fade-up"
       data-testid="daily-claim-card"
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <span className="relative flex w-2.5 h-2.5 shrink-0">
-          {ready && <span className="animate-claim-pulse absolute inline-flex w-full h-full rounded-full bg-[color:var(--success)] opacity-70" />}
-          <span className={`relative inline-flex rounded-full w-2.5 h-2.5 ${ready ? "bg-[color:var(--success)]" : "bg-[color:var(--text-tertiary)]"}`} />
-        </span>
-        <div className="min-w-0">
-          <div className="font-body text-[10px] uppercase tracking-[0.2em] font-bold text-[color:var(--text-tertiary)]">Daily reward</div>
-          <div className="font-display font-medium text-lg leading-tight text-[color:var(--text-primary)] mt-0.5">
-            {formatNaira(status.amount)}
-            {!ready && <span className="font-mono text-xs text-[color:var(--text-secondary)] ml-2">· {fmtCountdown(status.cooldown_remaining_sec)}</span>}
-          </div>
+      <div className="w-10 h-10 rounded-xl bg-[color:var(--gold)]/20 text-[color:var(--gold)] flex items-center justify-center shrink-0">
+        <Sparkles className="w-5 h-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="font-display font-semibold text-[color:var(--text-primary)] leading-tight">
+          Daily reward · {formatNaira(status.amount)}
+        </div>
+        <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">
+          {ready ? "Available now — claim before it resets" : `Next claim in ${fmtCountdown(status.cooldown_remaining_sec)}`}
         </div>
       </div>
       <button
         onClick={claim}
         disabled={!ready || busy}
         data-testid="daily-claim-btn"
-        className={`shrink-0 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
+        className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
           justClaimed
             ? "bg-[color:var(--success)] text-white"
             : ready
-              ? "bg-[color:var(--brand)] text-[color:var(--brand-ink)] hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5"
+              ? "bg-[color:var(--gold)] text-white hover:brightness-95 hover:-translate-y-0.5"
               : "bg-[color:var(--surface-2)] text-[color:var(--text-tertiary)] cursor-not-allowed"
         } disabled:cursor-not-allowed`}
       >
-        {justClaimed ? <><Check className="w-4 h-4" /> Claimed</> : <><Sparkles className="w-4 h-4" /> {busy ? "Claiming…" : ready ? "Claim now" : "Locked"}</>}
+        {justClaimed ? <><Check className="w-4 h-4" /> Done</> : busy ? "Claiming…" : ready ? "Claim" : "Locked"}
       </button>
+    </div>
+  );
+}
+
+/* Investment plan card */
+function PlanCard({ p, onInvest }) {
+  const totalRoi = (p.daily_profit_percent * p.duration_days).toFixed(0);
+  return (
+    <div
+      className="snap-start shrink-0 w-[80%] xs:w-[72%] sm:w-auto card-soft overflow-hidden group hover:-translate-y-0.5 transition-transform"
+      data-testid={`plan-card-${p.id}`}
+    >
+      <div className="aspect-[16/9] w-full bg-[color:var(--surface-alt)] overflow-hidden relative">
+        {p.image_url ? (
+          <img src={resolveUrl(p.image_url)} alt={p.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-[color:var(--text-tertiary)] text-sm">No image</div>
+        )}
+        <div className="absolute top-3 right-3 pill pill-accent backdrop-blur shadow-md">
+          <Flame className="w-3 h-3" /> {totalRoi}% ROI
+        </div>
+      </div>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-display font-bold text-base leading-tight text-[color:var(--text-primary)] truncate">{p.name}</div>
+            <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">{p.daily_profit_percent}% daily · {p.duration_days} days</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">From</div>
+            <div className="font-display font-bold text-sm text-[color:var(--brand)] leading-tight">{formatNaira(p.price)}</div>
+          </div>
+        </div>
+        <button
+          onClick={() => onInvest(p)}
+          data-testid={`plan-invest-${p.id}`}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-2.5 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
+        >
+          <TrendingUp className="w-4 h-4" /> Invest
+        </button>
+      </div>
     </div>
   );
 }
@@ -96,174 +133,227 @@ function DailyClaimBanner({ onClaimed }) {
 export default function Dashboard() {
   const { user, refresh } = useAuth();
   const { settings } = useSettings();
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
+  const [activeCount, setActiveCount] = useState(0);
   const [welcomeOpen, setWelcomeOpen] = useState(settings.welcome_modal_active !== false);
 
   useEffect(() => {
     (async () => {
       await refresh();
-      const { data: ps } = await api.get("/products");
-      setProducts(ps);
+      try {
+        const { data: ps } = await api.get("/products");
+        setProducts(ps);
+      } catch { /* noop */ }
+      try {
+        const { data: inv } = await api.get("/investments");
+        setActiveCount((inv || []).filter((i) => i.status === "active").length);
+      } catch { /* noop */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const closeWelcome = () => setWelcomeOpen(false);
-
-  const featured =
-    products.find((p) => p.id === settings.featured_product_id) ||
-    [...products].sort(
-      (a, b) => (b.daily_profit_percent * b.duration_days) - (a.daily_profit_percent * a.duration_days),
-    )[0];
+  const goInvest = () => navigate("/invest");
 
   const firstName = user?.name?.split(" ")[0] || "Investor";
-  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" });
   const featuredEnabled = settings.home_featured_plan_enabled !== false;
   const secondaryEnabled = settings.home_secondary_section_enabled !== false;
   const showImage = settings.home_below_featured_mode === "image" && settings.home_below_featured_image_url;
 
+  const featured =
+    products.find((p) => p.id === settings.featured_product_id) ||
+    [...products].sort((a, b) => (b.daily_profit_percent * b.duration_days) - (a.daily_profit_percent * a.duration_days))[0];
+  const otherPlans = products.filter((p) => !featured || p.id !== featured.id);
+
+  const stats = [
+    { icon: Coins, label: "Total earned", value: formatNaira(user?.total_earnings || 0, { compact: true }), tone: "accent", testid: "stat-earnings" },
+    { icon: Briefcase, label: "Active plans", value: String(activeCount), tone: "brand", testid: "stat-packages", to: "/my-packages" },
+    { icon: Users, label: "Referral bonus", value: formatNaira(user?.referral_earnings || 0, { compact: true }), tone: "gold", testid: "stat-referral", to: "/team" },
+  ];
+  const toneMap = {
+    brand: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
+    accent: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
+    gold: "bg-[color:var(--gold-soft)] text-[color:var(--gold)]",
+  };
+
   return (
     <UserLayout>
-      {/* ===== Editorial balance hero ===== */}
-      <section className="pt-1 animate-fade-up" data-testid="dashboard-hero">
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-body text-xs font-bold uppercase tracking-[0.22em] text-[color:var(--text-tertiary)]">Good day, {firstName}</div>
-          <div className="font-mono text-[11px] text-[color:var(--text-tertiary)] tabular-nums">{today}</div>
-        </div>
-        <div className="mt-6 border-t border-[color:var(--border-default)] pt-6">
-          <div className="font-body text-[11px] uppercase tracking-[0.2em] text-[color:var(--text-tertiary)]">Total balance</div>
-          <div
-            className="font-display font-extrabold text-6xl sm:text-7xl tracking-tighter text-[color:var(--text-primary)] leading-[0.95] mt-3 break-all"
-            data-testid="hero-balance"
-          >
-            {formatNaira(user?.wallet_balance)}
+      <div data-testid="dashboard-hero">
+        {/* ===== Greeting ===== */}
+        <div className="flex items-center justify-between gap-3 animate-fade-up">
+          <div>
+            <div className="font-body text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--text-tertiary)]">{today}</div>
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-1 text-[color:var(--text-primary)]">Hi, {firstName} 👋</h1>
           </div>
         </div>
-        <div className="flex gap-3 mt-7">
-          <Link
-            to="/deposit"
-            data-testid="hero-deposit-btn"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-[color:var(--accent-main)] text-white font-semibold shadow-md shadow-[color:var(--accent-main)]/25 hover:bg-[color:var(--accent-hover)] hover:-translate-y-0.5 transition-all"
-          >
-            <ArrowDownToLine className="w-4 h-4" /> Deposit
-          </Link>
-          <Link
-            to="/withdraw"
-            data-testid="hero-withdraw-btn"
-            className="glass-pill flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[color:var(--text-primary)] font-semibold hover:-translate-y-0.5 transition-transform"
-          >
-            <ArrowUpFromLine className="w-4 h-4" /> Withdraw
-          </Link>
-        </div>
-      </section>
 
-      {/* ===== Daily reward ===== */}
-      <DailyClaimBanner onClaimed={refresh} />
-
-      {/* ===== Announcement (editorial) ===== */}
-      {settings.home_announcement_active && (settings.home_announcement || settings.home_announcement_image_url) && (
-        <div className="mt-5 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-light)] bg-[color:var(--brand-soft)] animate-fade-up" data-testid="home-announcement">
-          {settings.home_announcement_image_url && (
-            <img src={resolveUrl(settings.home_announcement_image_url)} alt="Announcement"
-                 className="w-full max-h-56 object-cover" data-testid="home-announcement-image" />
-          )}
-          {settings.home_announcement && (
-            <div className="p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[color:var(--surface)] text-[color:var(--brand)] flex items-center justify-center shrink-0">
-                <Megaphone className="w-4 h-4" />
-              </div>
-              <div className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{settings.home_announcement}</div>
+        {/* ===== Wallet card ===== */}
+        <div
+          className="mt-5 relative overflow-hidden rounded-[var(--radius)] hero-gradient text-white p-6 sm:p-7 shadow-lg animate-fade-up"
+          data-testid="wallet-card"
+        >
+          <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-8 w-48 h-48 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+          <div className="relative">
+            <div className="flex items-center gap-2 text-white/75 text-[11px] uppercase tracking-[0.2em] font-semibold">
+              <Wallet className="w-3.5 h-3.5" /> Wallet balance
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== Featured plan — asymmetric bento ===== */}
-      {featured && featuredEnabled && (
-        <div className="mt-7 animate-fade-up">
-          <div className="card-soft grid grid-cols-1 md:grid-cols-12 overflow-hidden" data-testid="featured-plan">
-            <div className="md:col-span-7 relative min-h-[180px] md:min-h-[320px]">
-              <img
-                src={featured.image_url ? resolveUrl(featured.image_url) : FEATURED_FALLBACK_BG}
-                alt={featured.name}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
-              <span className="absolute top-4 left-4 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[color:var(--accent-main)] text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
-                <Flame className="w-3 h-3" /> Hot pick
-              </span>
+            <div className="font-display font-extrabold text-4xl sm:text-5xl tracking-tight mt-2.5 break-all" data-testid="hero-balance">
+              {formatNaira(user?.wallet_balance)}
             </div>
-            <div className="md:col-span-5 p-6 sm:p-8 flex flex-col">
-              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)]">Featured plan</div>
-              <h3 className="font-display text-2xl sm:text-3xl font-bold mt-1.5 text-[color:var(--text-primary)] leading-tight">{featured.name}</h3>
-              <p className="text-sm text-[color:var(--text-secondary)] mt-2 line-clamp-2">{featured.description}</p>
-              <div className="grid grid-cols-3 gap-2.5 mt-5 mb-6">
-                {[
-                  { label: "Daily", value: `${featured.daily_profit_percent}%` },
-                  { label: "Days", value: featured.duration_days },
-                  { label: "Total ROI", value: `${(featured.daily_profit_percent * featured.duration_days).toFixed(0)}%` },
-                ].map((m) => (
-                  <div key={m.label} className="rounded-xl bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] px-2.5 py-3">
-                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">{m.label}</div>
-                    <div className="font-mono font-semibold text-base mt-1 text-[color:var(--text-primary)]">{m.value}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex gap-3 mt-6">
               <Link
-                to="/invest"
-                data-testid="featured-cta"
-                className="mt-auto w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] font-semibold hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5 transition-all"
+                to="/deposit"
+                data-testid="hero-deposit-btn"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-white text-[color:var(--brand)] font-semibold shadow-md hover:-translate-y-0.5 transition-transform"
               >
-                Invest from {formatNaira(featured.price)} <ArrowRight className="w-4 h-4" />
+                <ArrowDownToLine className="w-4 h-4" /> Deposit
+              </Link>
+              <Link
+                to="/withdraw"
+                data-testid="hero-withdraw-btn"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-white/15 backdrop-blur border border-white/30 text-white font-semibold hover:bg-white/25 transition-colors"
+              >
+                <ArrowUpFromLine className="w-4 h-4" /> Withdraw
               </Link>
             </div>
           </div>
         </div>
-      )}
 
-      {/* ===== Secondary section — independent toggle ===== */}
-      {secondaryEnabled && (
-        showImage ? (
-          <div className="mt-6 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-default)] animate-fade-up" data-testid="home-below-featured-image">
-            <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />
+        {/* ===== Stat tiles ===== */}
+        <div className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-3 animate-fade-up">
+          {stats.map((s) => {
+            const Inner = (
+              <>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${toneMap[s.tone]}`}>
+                  <s.icon className="w-4 h-4" />
+                </div>
+                <div className="mt-2.5">
+                  <div className="font-display font-bold text-base sm:text-lg text-[color:var(--text-primary)] leading-none">{s.value}</div>
+                  <div className="text-[10px] sm:text-xs text-[color:var(--text-secondary)] mt-1 leading-tight">{s.label}</div>
+                </div>
+              </>
+            );
+            return s.to ? (
+              <Link key={s.testid} to={s.to} data-testid={s.testid} className="card-soft p-3 sm:p-4 flex flex-col hover:-translate-y-0.5 transition-transform">{Inner}</Link>
+            ) : (
+              <div key={s.testid} data-testid={s.testid} className="card-soft p-3 sm:p-4 flex flex-col">{Inner}</div>
+            );
+          })}
+        </div>
+
+        {/* ===== Daily reward ===== */}
+        <DailyClaimBanner onClaimed={refresh} />
+
+        {/* ===== Announcement ===== */}
+        {settings.home_announcement_active && (settings.home_announcement || settings.home_announcement_image_url) && (
+          <div className="mt-4 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-light)] bg-[color:var(--brand-soft)] animate-fade-up" data-testid="home-announcement">
+            {settings.home_announcement_image_url && (
+              <img src={resolveUrl(settings.home_announcement_image_url)} alt="Announcement" className="w-full max-h-56 object-cover" data-testid="home-announcement-image" />
+            )}
+            {settings.home_announcement && (
+              <div className="p-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[color:var(--surface)] text-[color:var(--brand)] flex items-center justify-center shrink-0">
+                  <Megaphone className="w-4 h-4" />
+                </div>
+                <div className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{settings.home_announcement}</div>
+              </div>
+            )}
           </div>
-        ) : (
+        )}
+
+        {/* ===== Featured plan — highlight banner ===== */}
+        {featured && featuredEnabled && (
           <div className="mt-7 animate-fade-up">
-            <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] mb-3">Quick actions</div>
-            <div className="flex sm:grid sm:grid-cols-3 gap-3 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 snap-x pb-1">
-              {[
-                { to: "/team", icon: Users, tone: "brand", title: "Invite & earn", sub: `Earn ${settings.gen1_percent || 10}% / ${settings.gen2_percent || 5}% across 2 generations`, testid: "cta-team" },
-                { to: "/coupons", icon: Ticket, tone: "accent", title: "Got a coupon?", sub: "Redeem promo codes for instant cash", testid: "cta-coupon" },
-                { to: "/my-packages", icon: Briefcase, tone: "gold", title: "Your packages", sub: "Track active investments & profits", testid: "cta-packages" },
-              ].map((c) => {
-                const tones = {
-                  brand: "bg-[color:var(--brand-soft)] text-[color:var(--brand)]",
-                  accent: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
-                  gold: "bg-[color:var(--gold-soft)] text-[color:var(--gold)]",
-                };
-                return (
-                  <Link
-                    key={c.to}
-                    to={c.to}
-                    data-testid={c.testid}
-                    className="snap-start shrink-0 w-[62%] sm:w-auto card-soft p-4 flex flex-col gap-3 min-h-[150px] hover:-translate-y-0.5 transition-transform"
-                  >
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${tones[c.tone]}`}>
-                      <c.icon className="w-5 h-5" />
+            <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mb-3">Featured plan</div>
+            <div className="card-soft overflow-hidden grid grid-cols-1 sm:grid-cols-12" data-testid="featured-plan">
+              <div className="sm:col-span-5 relative min-h-[150px]">
+                {featured.image_url ? (
+                  <img src={resolveUrl(featured.image_url)} alt={featured.name} className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 hero-gradient" />
+                )}
+                <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[color:var(--accent-main)] text-white text-[10px] font-bold uppercase tracking-wider shadow">
+                  <Flame className="w-3 h-3" /> Hot pick
+                </span>
+              </div>
+              <div className="sm:col-span-7 p-5">
+                <h3 className="font-display text-xl sm:text-2xl font-bold text-[color:var(--text-primary)] leading-tight">{featured.name}</h3>
+                <p className="text-sm text-[color:var(--text-secondary)] mt-1.5 line-clamp-2">{featured.description}</p>
+                <div className="grid grid-cols-3 gap-2 mt-4">
+                  {[
+                    { label: "Daily", value: `${featured.daily_profit_percent}%`, icon: Coins },
+                    { label: "Days", value: featured.duration_days, icon: Calendar },
+                    { label: "ROI", value: `${(featured.daily_profit_percent * featured.duration_days).toFixed(0)}%`, icon: TrendingUp },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-xl bg-[color:var(--surface-alt)] border border-[color:var(--border-light)] px-2 py-2.5">
+                      <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">{m.label}</div>
+                      <div className="font-display font-bold text-sm mt-0.5 text-[color:var(--text-primary)]">{m.value}</div>
                     </div>
-                    <div className="mt-auto">
-                      <div className="font-display font-semibold text-[color:var(--text-primary)]">{c.title}</div>
-                      <div className="text-xs text-[color:var(--text-secondary)] mt-1 leading-snug">{c.sub}</div>
-                    </div>
-                  </Link>
-                );
-              })}
+                  ))}
+                </div>
+                <button
+                  onClick={goInvest}
+                  data-testid="featured-cta"
+                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-[color:var(--brand)] text-[color:var(--brand-ink)] font-semibold hover:bg-[color:var(--brand-hover)] hover:-translate-y-0.5 transition-all"
+                >
+                  Invest from {formatNaira(featured.price)} <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
-        )
-      )}
+        )}
 
-      {/* ===== Welcome modal — glassmorphism ===== */}
+        {/* ===== Plans — scrollable list ===== */}
+        {products.length > 0 && (
+          <div className="mt-7 animate-fade-up" data-testid="plans-section">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)]">Investment plans</div>
+              <Link to="/invest" data-testid="see-all-plans" className="inline-flex items-center gap-0.5 text-sm font-semibold text-[color:var(--brand)] hover:gap-1.5 transition-all">
+                See all <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 snap-x pb-1">
+              {(featuredEnabled ? otherPlans : products).map((p) => (
+                <PlanCard key={p.id} p={p} onInvest={goInvest} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Secondary quick actions / custom image ===== */}
+        {secondaryEnabled && (
+          showImage ? (
+            <div className="mt-6 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-default)] animate-fade-up" data-testid="home-below-featured-image">
+              <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />
+            </div>
+          ) : (
+            <div className="mt-7 animate-fade-up">
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-[color:var(--text-tertiary)] mb-3">More</div>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/team" data-testid="cta-team" className="card-soft p-4 flex items-center gap-3 hover:-translate-y-0.5 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[color:var(--brand-soft)] text-[color:var(--brand)] flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></div>
+                  <div className="min-w-0">
+                    <div className="font-display font-semibold text-[color:var(--text-primary)] text-sm">Invite & earn</div>
+                    <div className="text-xs text-[color:var(--text-secondary)] mt-0.5 truncate">{settings.gen1_percent || 10}% / {settings.gen2_percent || 5}% bonus</div>
+                  </div>
+                </Link>
+                <Link to="/coupons" data-testid="cta-coupon" className="card-soft p-4 flex items-center gap-3 hover:-translate-y-0.5 transition-transform">
+                  <div className="w-10 h-10 rounded-xl bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] flex items-center justify-center shrink-0"><Ticket className="w-5 h-5" /></div>
+                  <div className="min-w-0">
+                    <div className="font-display font-semibold text-[color:var(--text-primary)] text-sm">Redeem coupon</div>
+                    <div className="text-xs text-[color:var(--text-secondary)] mt-0.5 truncate">Promo codes for cash</div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* ===== Welcome modal ===== */}
       <Dialog open={welcomeOpen} onOpenChange={(o) => { if (!o) closeWelcome(); }}>
         <DialogContent
           data-testid="welcome-modal"
