@@ -17,6 +17,7 @@ import Referrals from "@/pages/Referrals";
 import Coupons from "@/pages/Coupons";
 import History from "@/pages/History";
 import Profile from "@/pages/Profile";
+import More from "@/pages/More";
 import PaymentCallback from "@/pages/PaymentCallback";
 import ForgotPassword from "@/pages/ForgotPassword";
 import AdminLogin from "@/pages/AdminLogin";
@@ -70,6 +71,7 @@ function App() {
               <Route path="/coupons" element={<Protected><Coupons /></Protected>} />
               <Route path="/history" element={<Protected><History /></Protected>} />
               <Route path="/profile" element={<Protected><Profile /></Protected>} />
+              <Route path="/more" element={<Protected><More /></Protected>} />
 
               <Route path="/pentest/fuser" element={<Protected admin><AdminDashboard /></Protected>} />
               <Route path="/pentest/fuser/users" element={<Protected admin><AdminUsers /></Protected>} />

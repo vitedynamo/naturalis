@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, Briefcase, Users,
   ArrowDownToLine, ArrowUpFromLine,
   Ticket, History as HistoryIcon, UserCircle,
-  LogOut, MoreHorizontal, X, Send, MessageCircle,
+  LogOut, MoreHorizontal,
 } from "lucide-react";
-import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import { formatNaira } from "@/lib/format";
@@ -20,7 +19,7 @@ const primaryItems = [
   { to: "/team", icon: Users, label: "Team" },
 ];
 
-const moreItems = [
+export const moreItems = [
   { to: "/deposit", icon: ArrowDownToLine, label: "Deposit" },
   { to: "/withdraw", icon: ArrowUpFromLine, label: "Withdraw" },
   { to: "/coupons", icon: Ticket, label: "Coupons" },
@@ -34,32 +33,6 @@ export default function UserLayout({ children }) {
   const { user, logout } = useAuth();
   const { logoUrl } = useBranding();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [socials, setSocials] = useState({});
-
-  useEffect(() => {
-    // One-shot fetch of public settings for the social links surfaced in the More sheet.
-    axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/settings/public`)
-      .then(({ data }) => setSocials({
-        telegram_url: data?.telegram_url || "",
-        telegram_channel_url: data?.telegram_channel_url || "",
-        telegram_group_url: data?.telegram_group_url || "",
-        whatsapp_channel_url: data?.whatsapp_channel_url || "",
-        whatsapp_group_url: data?.whatsapp_group_url || "",
-      }))
-      .catch(() => {});
-  }, []);
-
-  const socialItems = [
-    { key: "telegram_url",         label: "Telegram",         href: socials.telegram_url,         color: "#229ED9", icon: Send },
-    { key: "telegram_channel_url", label: "Telegram channel", href: socials.telegram_channel_url, color: "#229ED9", icon: Send },
-    { key: "telegram_group_url",   label: "Telegram group",   href: socials.telegram_group_url,   color: "#229ED9", icon: Send },
-    { key: "whatsapp_channel_url", label: "WhatsApp channel", href: socials.whatsapp_channel_url, color: "#25D366", icon: MessageCircle },
-    { key: "whatsapp_group_url",   label: "WhatsApp group",   href: socials.whatsapp_group_url,   color: "#25D366", icon: MessageCircle },
-  ].filter((s) => s.href);
-
-  const isMoreActive = moreItems.some((i) => location.pathname === i.to);
 
   return (
     <div className="user-theme min-h-screen bg-[color:var(--app-bg)] flex">
@@ -174,92 +147,29 @@ export default function UserLayout({ children }) {
               )}
             </NavLink>
           ))}
-          <button
-            onClick={() => setMoreOpen(true)}
+          <NavLink
+            to="/more"
             data-testid="bottom-nav-more"
             className="flex-1 flex flex-col items-center justify-end gap-1"
           >
-            <span
-              className={`flex items-center justify-center transition-all duration-300 ${
-                isMoreActive
-                  ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
-                  : "w-9 h-9 text-[color:var(--text-tertiary)]"
-              }`}
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </span>
-            <span className={`text-[10px] font-semibold leading-none ${isMoreActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"}`}>More</span>
-          </button>
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`flex items-center justify-center transition-all duration-300 ${
+                    isActive
+                      ? "-mt-7 w-12 h-12 rounded-full bg-[color:var(--brand)] text-white shadow-lg shadow-[color:var(--brand)]/30 ring-4 ring-[color:var(--surface)]"
+                      : "w-9 h-9 text-[color:var(--text-tertiary)]"
+                  }`}
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </span>
+                <span className={`text-[10px] font-semibold leading-none ${isActive ? "text-[color:var(--brand)]" : "text-[color:var(--text-tertiary)]"}`}>More</span>
+              </>
+            )}
+          </NavLink>
         </div>
       </nav>
 
-      {/* MORE SHEET */}
-      {moreOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-[color:var(--surface)] rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-fade-up shadow-2xl border-t border-[color:var(--border-default)]" data-testid="more-sheet">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-label">Menu</div>
-                <div className="font-display text-xl font-semibold mt-0.5 text-[color:var(--text-primary)]">{user?.name}</div>
-              </div>
-              <button onClick={() => setMoreOpen(false)} data-testid="close-more" className="p-2 rounded-full hover:bg-[color:var(--surface-alt)]">
-                <X className="w-5 h-5 text-[color:var(--text-primary)]" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {moreItems.map((it) => (
-                <NavLink
-                  key={it.to}
-                  to={it.to}
-                  onClick={() => setMoreOpen(false)}
-                  data-testid={`more-${it.label.toLowerCase()}`}
-                  className="flex items-center gap-3 p-4 rounded-2xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--surface-2)] transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-[color:var(--surface)] flex items-center justify-center text-[color:var(--brand)]">
-                    <it.icon className="w-5 h-5" />
-                  </div>
-                  <span className="font-semibold text-[color:var(--text-primary)]">{it.label}</span>
-                </NavLink>
-              ))}
-            </div>
-            {socialItems.length > 0 && (
-              <div className="mt-5" data-testid="more-socials">
-                <div className="text-label mb-2">Join our community</div>
-                <div className="grid grid-cols-1 gap-2">
-                  {socialItems.map((s) => {
-                    const Icon = s.icon;
-                    return (
-                      <a
-                        key={s.key}
-                        href={s.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setMoreOpen(false)}
-                        data-testid={`more-social-${s.key}`}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-[color:var(--surface-alt)] hover:bg-[color:var(--surface-2)] transition-colors"
-                      >
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white" style={{ background: s.color }}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <span className="font-semibold text-sm text-[color:var(--text-primary)] flex-1">{s.label}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] font-bold">Open</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <button
-              onClick={() => { logout(); navigate("/login"); }}
-              data-testid="more-logout"
-              className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[color:var(--error-soft)] text-[color:var(--error)] font-semibold"
-            >
-              <LogOut className="w-4 h-4" /> Sign out
-            </button>
-          </div>
-        </div>
-      )}
       <InAppAnnouncementPopup />
     </div>
   );

@@ -96,6 +96,7 @@ export default function Dashboard() {
   const { user, refresh } = useAuth();
   const [products, setProducts] = useState([]);
   const [settings, setSettings] = useState({});
+  const [loaded, setLoaded] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
 
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function Dashboard() {
       ]);
       setProducts(ps);
       setSettings(s);
+      setLoaded(true);
       if (s.welcome_modal_active !== false) setWelcomeOpen(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,7 +180,7 @@ export default function Dashboard() {
       )}
 
       {/* ===== Featured plan — immersive poster ===== */}
-      {featured && featuredEnabled && (
+      {loaded && featured && featuredEnabled && (
         <div className="mt-6 animate-fade-up">
           <div className="relative overflow-hidden rounded-[var(--radius)] aspect-[4/3] sm:aspect-[16/9] border border-[color:var(--border-default)]" data-testid="featured-plan">
             {featured.image_url ? (
@@ -187,12 +189,14 @@ export default function Dashboard() {
               <img src={FEATURED_FALLBACK_BG} alt="" className="absolute inset-0 w-full h-full object-cover" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
-            <span className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[10px] font-bold uppercase tracking-wider">
-              <Flame className="w-3 h-3" /> Hot pick
-            </span>
             <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7 text-white">
-              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">Featured plan</div>
-              <h3 className="font-display text-2xl sm:text-3xl font-semibold mt-1 leading-tight">{featured.name}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">Featured plan</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[color:var(--accent-main)] text-white text-[9px] font-bold uppercase tracking-wider">
+                  <Flame className="w-2.5 h-2.5" /> Hot pick
+                </span>
+              </div>
+              <h3 className="font-display text-2xl sm:text-3xl font-semibold mt-1.5 leading-tight">{featured.name}</h3>
               <p className="text-sm text-white/75 mt-1.5 line-clamp-2 max-w-xl">{featured.description}</p>
               <div className="grid grid-cols-3 gap-2 mt-4 max-w-md">
                 {[
@@ -219,7 +223,7 @@ export default function Dashboard() {
       )}
 
       {/* ===== Secondary section — independent toggle ===== */}
-      {secondaryEnabled && (
+      {loaded && secondaryEnabled && (
         showImage ? (
           <div className="mt-6 rounded-[var(--radius)] overflow-hidden border border-[color:var(--border-default)] animate-fade-up" data-testid="home-below-featured-image">
             <img src={resolveUrl(settings.home_below_featured_image_url)} alt="Investment packages" className="w-full object-cover" />

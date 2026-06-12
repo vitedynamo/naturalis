@@ -1,5 +1,17 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 67)
+
+### Dashboard redesign — 3 fixes from user feedback
+
+1. **Cards-before-image flash fixed**: added a `loaded` state in `Dashboard.jsx`; the featured-plan + secondary sections now render only after `/settings/public` resolves, so the default quick-action cards no longer flash before the configured packages image appears.
+2. **Featured-plan label overlap fixed**: removed the absolute top-left "Hot pick" badge (which overlapped the "Featured plan" overline on the 4:3 mobile poster) and placed "Hot pick" as an inline chip next to the "Featured plan" overline inside the bottom content block — no overlap at any aspect ratio.
+3. **"More" is now a real page**: replaced the bottom-sheet with a dedicated `/more` route (`pages/More.jsx`, added to `App.js`). The bottom-nav "More" item is now a `NavLink` to `/more` (with active state). The page lists Quick links (Deposit/Withdraw/Coupons/History/Profile), "Join our community" social links, and Sign out. `UserLayout` exports `moreItems`; the old More-sheet + socials fetch were removed from `UserLayout`.
+
+**Verified:** frontend compiles; `/more` renders correctly (screenshot). Live Atlas DB untouched.
+
+
+
 ## Recent Changes (Jun 2026 — iteration 66)
 
 ### User-side FULL redesign #2 — "Verdant Growth" + decoupled home toggles
