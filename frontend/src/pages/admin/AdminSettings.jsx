@@ -400,16 +400,6 @@ export default function AdminSettings() {
               <Toggle checked={!!s.require_withdrawal_pin} onChange={(v) => setS({ ...s, require_withdrawal_pin: v })} label="Require 4-digit withdrawal PIN" hint="Users will be prompted for their PIN before each withdrawal. Off = PIN bypassed." testid="require-pin-toggle" />
             </Section>
 
-            <Section title="Registration security questions" hint="The two security questions new users set during sign-up. They power the self-service 'Forgot password' flow. Turn OFF to remove them from registration (users will then rely on admin-assisted password resets).">
-              <Toggle
-                checked={s.require_security_questions !== false}
-                onChange={(v) => setS({ ...s, require_security_questions: v })}
-                label="Ask security questions during registration"
-                hint="When ON, new users must pick two questions and answers. When OFF, the section is hidden on the registration form and not required."
-                testid="require-security-questions-toggle"
-              />
-            </Section>
-
             <Section title="Automation & opening hours" hint="Auto-payout pushes money out the moment a user requests it. With it off, withdrawals queue for admin approval.">
               <div className="space-y-3">
                 <Toggle checked={!!s.auto_payout_enabled}     onChange={(v) => setS({ ...s, auto_payout_enabled: v })} label="Auto-payout enabled"   hint="When ON, user withdrawals process instantly. Failed transfers fall back to pending." testid="auto-payout-toggle" />
@@ -443,7 +433,18 @@ export default function AdminSettings() {
         )}
 
         {tab === "password" && (
-          <PasswordSection />
+          <>
+            <Section title="Registration security questions" hint="The two security questions new users set during sign-up. They power the self-service 'Forgot password' flow. Turn OFF to remove them from registration (users will then rely on admin-assisted password resets).">
+              <Toggle
+                checked={s.require_security_questions !== false}
+                onChange={(v) => setS({ ...s, require_security_questions: v })}
+                label="Ask security questions during registration"
+                hint="When ON, new users must pick two questions and answers. When OFF, the section is hidden on the registration form and not required."
+                testid="require-security-questions-toggle"
+              />
+            </Section>
+            <PasswordSection />
+          </>
         )}
 
         {tab === "referrals" && (
