@@ -45,7 +45,7 @@ export default function AdminLogin() {
         <div className="relative">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-xl">
-              <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+              <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
             </div>
             <div>
               <div className="font-display font-extrabold text-xl tracking-tight">EVOQUE-NOVA</div>
@@ -59,7 +59,7 @@ export default function AdminLogin() {
             <ShieldCheck className="w-3 h-3" /> Restricted area
           </div>
           <h1 className="font-display text-4xl xl:text-5xl font-extrabold tracking-tight mt-4 leading-[1.05]">
-            Mission control<br />for Evoque-Nova.
+            Mission control<br />for Naturalis.
           </h1>
           <p className="text-white/70 mt-4 max-w-md text-sm leading-relaxed">
             Approve withdrawals, monitor deposits in real time, manage plans, fraud signals and platform profit — all from one console.
@@ -71,7 +71,7 @@ export default function AdminLogin() {
           </ul>
         </div>
 
-        <div className="text-[11px] text-white/40 relative">© Evoque-Nova · Operations only</div>
+        <div className="text-[11px] text-white/40 relative">© Naturalis · Operations only</div>
       </div>
 
       {/* Right panel: login form */}

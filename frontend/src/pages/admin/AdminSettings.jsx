@@ -346,7 +346,7 @@ export default function AdminSettings() {
                     type="text"
                     value={s.transfer_description_template || ""}
                     onChange={(e) => setS({ ...s, transfer_description_template: e.target.value })}
-                    placeholder="Evoque-Nova deposit"
+                    placeholder="Naturalis deposit"
                     data-testid="transfer-desc-input"
                     className="w-full input-base"
                   />
@@ -688,7 +688,7 @@ export default function AdminSettings() {
         )}
 
         {tab === "branding" && (
-          <Section title="Brand logo" hint="Used on the admin sidebar, the admin login page, the user sign-in / register / forgot-password screens, and the browser favicon (rel icon). Square images work best — 256×256 PNG or JPG. Leave empty to fall back to the default Evoque-Nova logo.">
+          <Section title="Brand logo" hint="Used on the admin sidebar, the admin login page, the user sign-in / register / forgot-password screens, and the browser favicon (rel icon). Square images work best — 256×256 PNG or JPG. Leave empty to fall back to the default Naturalis logo.">
             <div className="flex items-start gap-6 flex-wrap">
               <div>
                 <span className="block text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)] mb-1.5">Current logo</span>

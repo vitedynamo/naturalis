@@ -43,11 +43,11 @@ export default function UserLayout({ children }) {
         <div className="px-6 py-6 border-b border-[color:var(--border-default)] flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center overflow-hidden shrink-0">
-              <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+              <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
             </div>
             <div className="min-w-0">
               <div className="font-display font-bold text-lg tracking-tight text-[color:var(--brand)] whitespace-nowrap">
-                Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
+                Natura<span className="text-[color:var(--accent-main)]">lis</span>
               </div>
               <div className="text-label mt-0.5 leading-tight">Daily Returns</div>
             </div>
@@ -97,10 +97,10 @@ export default function UserLayout({ children }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-[color:var(--surface)]/95 backdrop-blur border-b border-[color:var(--border-default)] px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center overflow-hidden shrink-0">
-            <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+            <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
           </div>
           <div className="font-display font-bold text-base text-[color:var(--brand)] whitespace-nowrap">
-            Evoque<span className="text-[color:var(--accent-main)]">-Nova</span>
+            Natura<span className="text-[color:var(--accent-main)]">lis</span>
           </div>
         </div>
         <div className="flex items-center gap-2">

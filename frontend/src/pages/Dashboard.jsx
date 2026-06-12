@@ -278,7 +278,7 @@ export default function Dashboard() {
                 {(() => {
                   const tpl = settings.welcome_modal_title;
                   if (tpl && tpl.trim()) return tpl.replace(/\{name\}/g, firstName);
-                  return `Hi ${firstName} — welcome to Evoque-Nova`;
+                  return `Hi ${firstName} — welcome to Naturalis`;
                 })()}
               </DialogTitle>
             </DialogHeader>

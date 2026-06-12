@@ -380,7 +380,7 @@ export default function AdminDeposits() {
               : viewing.method === "marasoft"
                 ? "Marasoft ID (gateway-side)"
                 : "Gateway ID (gateway-side)";
-            const narration = viewing.narration || `Evoque-Nova ${ourRef}`;
+            const narration = viewing.narration || `Naturalis ${ourRef}`;
             const rawJson = JSON.stringify(
               {
                 reference: ourRef,

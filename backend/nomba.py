@@ -189,7 +189,7 @@ async def _call_with_fallback(
 async def transfer_to_bank(
     *, client_id: str, client_secret: str, account_id: str,
     amount_naira: float, account_number: str, account_name: str, bank_code: str,
-    merchant_tx_ref: str, sender_name: str = "Evoque-Nova", narration: str = "Withdrawal payout",
+    merchant_tx_ref: str, sender_name: str = "Naturalis", narration: str = "Withdrawal payout",
     environment: str | None = None,
 ) -> dict:
     """Initiate a bank transfer via Nomba. Raises RuntimeError if Nomba rejects the transfer.

@@ -1701,7 +1701,7 @@ async def public_settings(request: Request):
         "auto_payout_enabled": s.get("auto_payout_enabled", False),
         # Iteration 52 — exposed for user-side rendering
         "deposit_bonus_percent": s.get("deposit_bonus_percent", 0.0),
-        "transfer_description_template": s.get("transfer_description_template", "Evoque-Nova deposit"),
+        "transfer_description_template": s.get("transfer_description_template", "Naturalis deposit"),
         "multi_gateway_enabled": s.get("multi_gateway_enabled", False),
         "let_users_choose_gateway": s.get("let_users_choose_gateway", False),
         "quick_deposit_amounts": s.get("quick_deposit_amounts") or [3000, 5000, 10000, 25000, 50000, 100000],

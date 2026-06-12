@@ -32,7 +32,7 @@ function Brand() {
   return (
     <div className="px-5 pt-5 pb-4 flex items-center gap-3">
       <div className="w-11 h-11 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-lg shadow-black/30">
-        <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+        <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div className="leading-tight">
         <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">EVOQUE-NOVA</div>

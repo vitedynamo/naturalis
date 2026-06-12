@@ -21,7 +21,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="Evoque-Nova API")
+app = FastAPI(title="Naturalis API")
 app.state.db = db
 
 # Wire the in-process Fixie request counter so httpx event hooks can $inc the
@@ -33,7 +33,7 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.get("/")
 async def root():
-    return {"message": "Evoque-Nova API", "ts": datetime.now(timezone.utc).isoformat()}
+    return {"message": "Naturalis API", "ts": datetime.now(timezone.utc).isoformat()}
 
 
 @api_router.get("/health")

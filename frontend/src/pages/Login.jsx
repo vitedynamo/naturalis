@@ -71,10 +71,10 @@ export default function Login() {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
-              <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
+              <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
             </div>
             <div className="font-display text-3xl font-bold">
-              Evoque<span className="text-white/90">-Nova</span>
+              Natura<span className="text-white/90">lis</span>
             </div>
           </div>
           <div>
