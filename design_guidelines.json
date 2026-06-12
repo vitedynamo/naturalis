@@ -1,116 +1,147 @@
 {
-  "theme_and_archetype": {
-    "primary_archetype": "Archetype 5 (Luxury) + Archetype 4 (Swiss & High-Contrast)",
-    "mood": "Exclusive, premium, high-speed, authoritative.",
-    "core_concept": "A wealth club interface. Using deep absolute blacks, hyper-crisp 1px electric blue borders, and warm gold accents to create tension between cold technology and warm wealth."
+  "theme_concept": {
+    "name": "Verdant Growth (Editorial Structural)",
+    "description": "A completely new, distinctive UI for Evoque-Nova that rejects typical generic fintech templates (indigo/blue). Rooted in E1's 'Organic & Earthy' archetype mixed with 'Swiss Structure'. Utilizes deep forest greens, pale sage, and striking coral/terracotta accents. This communicates grounded wealth, organic growth, and elite structural clarity. Features raw typographic hierarchy, cardless grids with 1px borders, and high-contrast focal points.",
+    "archetype": "Archetype 1 (Organic & Earthy) + Archetype 4 (Swiss & High-Contrast)"
   },
   "typography": {
-    "heading_font": "Clash Display",
-    "body_font": "IBM Plex Sans",
-    "mono_font": "JetBrains Mono",
+    "import_instructions": "Import 'Clash Display' and 'Satoshi' via Fontshare. Import 'JetBrains Mono' via Google Fonts.",
+    "font_families": {
+      "display": "'Clash Display', sans-serif",
+      "body": "'Satoshi', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
     "rules": {
-      "headings": "font-heading tracking-tight text-text-primary",
-      "body": "font-sans leading-relaxed text-text-secondary",
-      "numbers_and_metrics": "font-heading tracking-tighter tabular-nums text-text-primary",
-      "labels": "font-mono uppercase tracking-[0.2em] text-[10px] sm:text-xs text-text-tertiary"
+      "h1": "font-display text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tighter leading-none text-text-primary",
+      "h2": "font-display text-2xl sm:text-3xl font-medium tracking-tight text-text-primary",
+      "h3": "font-display text-xl font-medium tracking-tight text-text-primary",
+      "body": "font-body text-base leading-relaxed text-text-secondary",
+      "mono_numbers": "font-mono font-medium tracking-tight text-text-primary",
+      "overline": "font-body text-xs font-bold uppercase tracking-[0.2em] text-text-tertiary"
     }
   },
   "colors": {
-    "dark_theme": {
-      "--app-bg": "#050505",
-      "--surface": "#0F0F0F",
-      "--surface-alt": "#171717",
-      "--surface-2": "#262626",
-      "--brand": "#1E50FF",
-      "--brand-hover": "#3B6CFF",
-      "--brand-soft": "rgba(30, 80, 255, 0.12)",
-      "--accent-main": "#F5D061",
-      "--accent-hover": "#FCD970",
-      "--accent-soft": "rgba(245, 208, 97, 0.12)",
-      "--gold": "#F5D061",
-      "--gold-soft": "rgba(245, 208, 97, 0.15)",
-      "--success": "#22C55E",
-      "--warning": "#F59E0B",
-      "--error": "#EF4444",
-      "--text-primary": "#FFFFFF",
-      "--text-secondary": "#A3A3A3",
-      "--text-tertiary": "#737373",
-      "--border": "rgba(255, 255, 255, 0.08)"
-    },
-    "light_theme": {
-      "--app-bg": "#FAFAFA",
+    "light": {
+      "--app-bg": "#F4F5F4",
       "--surface": "#FFFFFF",
-      "--surface-alt": "#F5F5F5",
-      "--surface-2": "#E5E5E5",
-      "--brand": "#0038FF",
-      "--brand-hover": "#002ECC",
-      "--brand-soft": "#E6EBFF",
-      "--accent-main": "#D4AF37",
-      "--accent-hover": "#B5952F",
-      "--accent-soft": "#FDF8E8",
+      "--surface-alt": "#EAECEB",
+      "--surface-2": "#DFE3E1",
+      "--text-primary": "#0A1F13",
+      "--text-secondary": "#4D6B58",
+      "--text-tertiary": "#8CA395",
+      "--brand": "#0A4D2E",
+      "--brand-hover": "#083B23",
+      "--brand-soft": "#E6F0EB",
+      "--accent-main": "#FF4733",
+      "--accent-hover": "#E63A26",
+      "--accent-soft": "#FFEBE8",
       "--gold": "#D4AF37",
-      "--gold-soft": "#FDF8E8",
-      "--success": "#16A34A",
-      "--warning": "#D97706",
-      "--error": "#DC2626",
-      "--text-primary": "#0A0A0A",
-      "--text-secondary": "#525252",
-      "--text-tertiary": "#A3A3A3",
-      "--border": "rgba(0, 0, 0, 0.08)"
+      "--gold-soft": "#F9F6E8",
+      "--success": "#14854B",
+      "--warning": "#F5A623",
+      "--error": "#D0021B",
+      "--border-default": "#D1D8D4",
+      "--border-light": "#E4EAE6",
+      "--radius": "1rem"
+    },
+    "dark": {
+      "--app-bg": "#050E09",
+      "--surface": "#0A140F",
+      "--surface-alt": "#112018",
+      "--surface-2": "#182C22",
+      "--text-primary": "#F4F5F4",
+      "--text-secondary": "#A3B8AD",
+      "--text-tertiary": "#698074",
+      "--brand": "#1AD173",
+      "--brand-hover": "#4CE093",
+      "--brand-soft": "#0A291A",
+      "--accent-main": "#FF6B4A",
+      "--accent-hover": "#FF8C73",
+      "--accent-soft": "#3A140C",
+      "--gold": "#E3C565",
+      "--gold-soft": "#2A2412",
+      "--success": "#1AD173",
+      "--warning": "#FFB84D",
+      "--error": "#FF4D4D",
+      "--border-default": "#1C3326",
+      "--border-light": "#14241B"
     }
-  },
-  "styling_recipes": {
-    "hero_gradient": {
-      "light": "bg-[radial-gradient(ellipse_at_top_right,_var(--brand-soft)_0%,_transparent_70%),_radial-gradient(ellipse_at_bottom_left,_var(--gold-soft)_0%,_transparent_50%)]",
-      "dark": "bg-[radial-gradient(ellipse_at_top_right,_rgba(30,80,255,0.15)_0%,_transparent_60%),_radial-gradient(ellipse_at_bottom_left,_rgba(245,208,97,0.08)_0%,_transparent_50%)]"
-    },
-    "surface_treatment": {
-      "cards": "bg-surface border border-border/40 shadow-sm rounded-lg",
-      "glass": "backdrop-blur-xl bg-surface/70 border border-border/50 shadow-[0_8px_32px_rgba(0,0,0,0.04)]",
-      "tracing_beam_active": "relative overflow-hidden before:absolute before:inset-0 before:-z-10 before:p-[1px] before:bg-gradient-to-br before:from-brand before:to-transparent before:rounded-lg"
-    },
-    "grain_overlay": "after:content-[''] after:pointer-events-none after:absolute after:inset-0 after:bg-[url('/noise.png')] after:opacity-[0.03] after:mix-blend-overlay z-0"
   },
   "layout_blueprint": {
-    "wallet_balance_hero": {
-      "structure": "Bento Grid - Main span. Generous padding (p-8)",
-      "styling": "Card with `hero-gradient` applied. Top section: subtle 'Wallet Balance' mono label. Middle: Huge balance text `text-5xl sm:text-6xl font-heading tracking-tighter tabular-nums`. Bottom: Flex row for Deposit/Withdraw buttons.",
-      "buttons": "Deposit: Solid brand background with text-white (no gold text on blue to maintain contrast). Withdraw: Outline/Ghost button with 1px border-border and text-text-primary hover:bg-surface-alt.",
-      "testid_requirements": "data-testid='wallet-balance-amount', data-testid='btn-deposit', data-testid='btn-withdraw'"
-    },
-    "daily_claim_reward_card": {
-      "structure": "Compact card, highly prominent (Gold accent focus).",
-      "styling": "Dark mode: 1px solid gold border (`border-[#F5D061]/30`) with a very soft gold inner glow (`shadow-[inset_0_0_20px_var(--gold-soft)]`).",
-      "content": "Flex-col. Timer in mono font `tabular-nums tracking-widest text-gold`. Large 'Claim' button with solid gold background, black text. If claimed, disabled state with grayscale.",
-      "testid_requirements": "data-testid='daily-claim-timer', data-testid='btn-claim-reward'"
-    },
-    "featured_investment_plan": {
-      "structure": "Tall card (row-span-2) in bento grid.",
-      "styling": "Image on top (max-h-40 object-cover rounded-t-lg), text below. Use high contrast. 1px solid border. Hover effect: slight lift (`-translate-y-1`) and border changes to `--brand`.",
-      "metrics": "Display metrics (Daily %, Days) in a 2-column grid with mono labels above large numeric values. Avoid standard bullet points.",
-      "testid_requirements": "data-testid='featured-plan-card', data-testid='btn-invest-now'"
-    },
-    "quick_action_cards": {
-      "structure": "Grid of 2 to 3 small square cards.",
-      "styling": "Flat background (`bg-surface`), `rounded-lg`, 1px border. Minimalist icons (Phosphor/Lucide) colored in `--brand`. Text should be heavily left-aligned.",
-      "testid_requirements": "data-testid='quick-action-[name]'"
-    },
-    "admin_announcement_banner": {
-      "structure": "Full width thin strip above or below hero.",
-      "styling": "Solid brand color (Royal Blue) background with white text, or pure black with gold text. Marquee or static centering. Close 'x' button on right.",
-      "testid_requirements": "data-testid='announcement-banner'"
-    },
-    "navigation": {
-      "mobile_bottom_nav": "Glassmorphism background (`backdrop-blur-xl bg-surface/80`). Icons active state: Gold or Electric Blue. No labels if icons are extremely clear, or tiny text-xs.",
-      "desktop_sidebar": "Solid `bg-app-bg`, right border `border-border/40`. Clean list of links. Active state: 1px left border in `--brand`, background `--brand-soft`.",
-      "testid_requirements": "data-testid='nav-[page-name]'"
+    "dashboard_home": {
+      "structure": "Bento Grid (Control Room style) on desktop, linear vertical stack with generous spacing (p-6, p-8) on mobile. Avoids independent floating cards; uses full-width sections or structural borders.",
+      "wallet_balance": {
+        "design": "Typographic Hero. No card container. A large, stark greeting above a massive balance number using the mono font. Generous top padding. Balance text should have a subtle text-shadow for depth.",
+        "actions": "Two prominent buttons inline or directly below. 'Deposit' is solid --accent-main (coral punch), 'Withdraw' is an outline button with --border-default and --text-primary."
+      },
+      "daily_claim": {
+        "design": "A dense, high-contrast structural banner spanning the width. Background is --surface-alt with a 1px solid --border-default. Contains a pulsing green status dot, the claim amount in mono, and an 'Active' or 'Claim Now' button. Countdown timer sits inline with mono font.",
+        "micro_interaction": "On claim, button scales down slightly, checkmark animates in, and background flashes --success briefly."
+      },
+      "announcement_banner": {
+        "design": "Editorial layout. Left side: Text and CTA. Right side: Image (optional). Background uses a textured --brand-soft fill. Sharp rounded corners (radius). Instead of heavy drop shadows, use a 1px --border-light. It should feel like a premium magazine snippet."
+      },
+      "featured_plan": {
+        "design": "Immersive 'Poster' card. Aspect ratio 4:3 (mobile) or 16:9 (desktop). Uses an abstract green geometric background image with a gradient overlay (`bg-gradient-to-t from-black/80 via-black/30 to-transparent`). All text inside is forced to white/light mode. Stats (Daily %, Days) exist in a subgrid at the bottom, mimicking a data dashboard overlay on art.",
+        "cta": "Large full-width button at the bottom of the card or sticky in the subgrid, using --brand color."
+      },
+      "secondary_section": {
+        "design": "Horizontal scroll / Carousel of 'Pill Cards'. These are tall, narrow widgets (aspect ratio 3:4) with soft backgrounds (--surface). They look like premium tactile clay objects (Neumorphism touch). Contains 'Invite & Earn', 'Redeem', etc."
+      },
+      "welcome_modal": {
+        "design": "Crystal Glassmorphism. `backdrop-blur-2xl` with `bg-surface/80` (or `bg-white/70` light, `bg-black/60` dark). 1px inner border. Top half features a high-quality abstract image. Bottom half uses centered typographic storytelling with an --accent-main CTA."
+      }
     }
   },
-  "implementation_notes": {
-    "css_variables": "Update `src/index.css` to replace the old indigo/pink/amber with the new exact hex codes provided in this JSON.",
-    "fonts": "Import Clash Display and IBM Plex Sans. In tailwind.config.js, map theme.fontFamily.heading to Clash Display and sans to IBM Plex Sans.",
-    "spacing": "Maintain generous spacing. Do not cram elements on mobile. Use `gap-4` to `gap-6` standard.",
-    "component_borders": "All cards should have `rounded-lg` (8px). Shadows should be minimal ambient or entirely replaced by crisp 1px borders to align with the 'Premium/Swiss' high-contrast aesthetic.",
-    "anti_ai_rules_applied": "No generic purple gradients. Center-aligned layouts are avoided in favor of strong left-alignment on data. Generous padding applied. Specific emotion (Luxury Fintech) targeted."
+  "navigation": {
+    "mobile_bottom_nav": {
+      "concept": "The 'Floating Glass Pill'. Detached from screen edges (e.g., bottom-6, left-4, right-4).",
+      "style": "backdrop-blur-xl bg-surface/80 border border-border-default shadow-[0_8px_32px_rgba(0,0,0,0.12)]. Flex layout with space-between.",
+      "items": "Icons use Lucide React. Inactive: text-text-tertiary. Active: Icon changes to --brand, and the item gets a soft --brand-soft background oval.",
+      "center_action": "The 'Invest' or 'Home' center button is extruded. It breaks the pill bounds (floats slightly higher) and is a solid circle with --brand or --accent-main background and white icon."
+    },
+    "desktop_sidebar": {
+      "concept": "Structural Rail.",
+      "style": "Fixed left. Background is --app-bg. Right edge is a strict 1px solid --border-default. No drop shadow.",
+      "active_state": "Active link has a left border highlight (4px solid --accent-main) and background becomes --surface-alt."
+    }
+  },
+  "css_recipes": {
+    "hero-gradient": "bg-gradient-to-br from-app-bg via-surface to-brand-soft/20",
+    "card-soft": "bg-surface border border-border-light rounded-[var(--radius)] shadow-sm",
+    "glass-panel": "backdrop-blur-xl bg-surface/70 border border-white/20 (dark: border-white/10) shadow-lg",
+    "btn-primary": "inline-flex items-center justify-center rounded-full bg-brand text-white font-medium transition-all hover:bg-brand-hover hover:scale-[0.98] active:scale-95",
+    "btn-accent": "inline-flex items-center justify-center rounded-full bg-accent-main text-white font-medium transition-all hover:bg-accent-hover hover:-translate-y-0.5 shadow-md hover:shadow-lg",
+    "metric-num": "font-mono text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary",
+    "grain": "before:content-[''] before:fixed before:inset-0 before:opacity-[0.03] before:pointer-events-none before:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuODUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgibm9pc2UpIi8+PC9zdmc+')] z-50"
+  },
+  "image_urls": {
+    "featured_plan_bg": {
+      "url": "https://images.unsplash.com/photo-1677611998429-1baa4371456b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGZvcmVzdCUyMGdyZWVuJTIwZ2VvbWV0cmljJTIwdGV4dHVyZXxlbnwwfHx8fDE3ODEyNzMwODN8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract green geometry to be used with a dark overlay for the Featured Investment Plan poster.",
+      "category": "backgrounds"
+    },
+    "welcome_modal_art": {
+      "url": "https://images.unsplash.com/photo-1777576968636-efa4ed929c9a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwbW9uZXklMjB3ZWFsdGglMjBjb25jZXB0JTIwdGVycmFjb3R0YSUyMHNhbmR8ZW58MHx8fHwxNzgxMjczMDgzfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Minimalist plant in terracotta pot. Represents organic wealth growth for the Welcome Modal.",
+      "category": "hero"
+    },
+    "announcement_banner_image": {
+      "url": "https://images.unsplash.com/photo-1616805765352-beedbad46b2a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhZnJpY2FuJTIwYnVzaW5lc3MlMjBsaWZlc3R5bGUlMjBtaW5pbWFsfGVufDB8fHx8MTc4MTI3MzA4M3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Modern African business lifestyle portrait to be used in the announcement or team sections.",
+      "category": "testimonials"
+    }
+  },
+  "testing_attributes": {
+    "rules": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case representing their role.",
+    "examples": [
+      "data-testid='wallet-balance-amount'",
+      "data-testid='deposit-action-button'",
+      "data-testid='withdraw-action-button'",
+      "data-testid='daily-claim-button'",
+      "data-testid='featured-plan-invest-button'",
+      "data-testid='bottom-nav-home-link'",
+      "data-testid='welcome-modal-close'"
+    ]
   }
 }
