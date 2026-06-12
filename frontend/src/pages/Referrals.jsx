@@ -98,7 +98,7 @@ export default function Referrals() {
   return (
     <UserLayout>
       <div className="text-label">Earn together</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">My Team</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">My Team</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Invite friends and earn a percentage of their daily profits — across 2 generations.</p>
 
       <div className="card-soft p-6 mt-6 hero-gradient text-white relative overflow-hidden" data-testid="referral-banner">

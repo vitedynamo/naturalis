@@ -63,7 +63,7 @@ export default function Invest() {
       <div className="flex items-end justify-between mb-6">
         <div>
           <div className="text-label">Investment Plans</div>
-          <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Pick a plan</h1>
+          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Pick a plan</h1>
           <p className="text-sm text-[color:var(--text-secondary)] mt-1">Earn daily profit for the plan duration. Profit lands in your wallet every 24 hours.</p>
         </div>
         <div className="hidden md:block text-right">
@@ -130,7 +130,7 @@ export default function Invest() {
                 <button
                   onClick={() => openInvest(p)}
                   data-testid={`invest-btn-${p.id}`}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--brand-hover)] hover:to-[color:var(--accent-main)] text-white py-3 rounded-xl font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
+                  className="mt-4 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
                 >
                   <TrendingUp className="w-4 h-4" /> Invest now
                 </button>

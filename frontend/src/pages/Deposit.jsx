@@ -109,7 +109,7 @@ export default function Deposit() {
   return (
     <UserLayout>
       <div className="text-label">Funds</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Deposit</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Deposit</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Top up your wallet.{settingsLoaded ? <> Minimum: <span className="font-semibold">{formatNaira(settings.min_deposit)}</span></> : null}</p>
 
       {pendingBankTransfer && (
@@ -184,7 +184,7 @@ export default function Deposit() {
           )}
           <button type="submit" disabled={busy}
             data-testid="deposit-submit-btn"
-            className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-lg font-semibold disabled:opacity-60">
+            className="mt-6 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold disabled:opacity-60">
             <ArrowDownToLine className="w-4 h-4" /> {busy ? "Processing…" : "Proceed to pay"}
           </button>
           {settingsLoaded && settings.payment_mode !== "live" && (

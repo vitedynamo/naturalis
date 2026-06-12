@@ -235,6 +235,9 @@
   .user-theme .metric-num, .user-theme .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+  .user-theme .text-label {
+    font-family: 'Satoshi', sans-serif;
+  }
 }
 
 

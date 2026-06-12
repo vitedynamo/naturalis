@@ -248,7 +248,7 @@ export default function Profile() {
   return (
     <UserLayout>
       <div className="text-label">Account</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Profile</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Profile</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="card-soft p-6">
@@ -352,7 +352,7 @@ export default function Profile() {
 
           <button type="submit" disabled={!bank.account_name || resolving}
             data-testid="save-bank-btn"
-            className="mt-5 flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+            className="mt-5 flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-full font-semibold">
             <Save className="w-4 h-4" /> Save bank
           </button>
         </form>
@@ -371,7 +371,7 @@ export default function Profile() {
             data-testid="pwd-new-input"
             className="w-full input-base" />
         </div>
-        <button data-testid="save-pwd-btn" className="mt-5 flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white px-5 py-2.5 rounded-lg font-semibold">
+        <button data-testid="save-pwd-btn" className="mt-5 flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white px-5 py-2.5 rounded-full font-semibold">
           <Save className="w-4 h-4" /> Update password
         </button>
       </form>
@@ -416,7 +416,7 @@ export default function Profile() {
             <button
               type="submit" disabled={pinBusy || pinForm.pin.length !== 4 || !pinForm.password}
               data-testid="set-pin-submit"
-              className="md:col-span-2 mt-1 flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+              className="md:col-span-2 mt-1 flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-full font-semibold">
               <Save className="w-4 h-4" /> {pinBusy ? "Saving…" : "Set withdrawal PIN"}
             </button>
           </form>
@@ -504,7 +504,7 @@ export default function Profile() {
                 <button
                   type="submit" disabled={pinBusy || resetForm.new_pin.length !== 4 || !resetForm.answer_1 || !resetForm.answer_2}
                   data-testid="reset-pin-submit"
-                  className="w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+                  className="w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-full font-semibold">
                   <Save className="w-4 h-4" /> {pinBusy ? "Resetting…" : "Reset PIN"}
                 </button>
               </form>
@@ -536,12 +536,12 @@ export default function Profile() {
               <button
                 type="submit" disabled={pinBusy}
                 data-testid="change-pin-submit"
-                className="flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-semibold">
+                className="flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] disabled:opacity-50 text-white px-5 py-2.5 rounded-full font-semibold">
                 <Save className="w-4 h-4" /> {pinBusy ? "Updating…" : "Update PIN"}
               </button>
               <button
                 type="button" onClick={() => { setShowChangePin(false); setChangePinForm({ old_pin: "", new_pin: "" }); }}
-                className="px-4 py-2.5 rounded-lg font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
+                className="px-4 py-2.5 rounded-full font-semibold text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-alt)]"
               >Cancel</button>
             </div>
           </form>

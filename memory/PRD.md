@@ -1,5 +1,20 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 68)
+
+### "Verdant Growth" rolled out across user pages
+
+Applied the new green/coral identity consistently to all in-app user pages (they already inherited the `.user-theme` palette/fonts/pill buttons; this pass tightened visual consistency):
+- **Headers** on Invest, Deposit, DepositTransfer, Withdraw, MyPackages, Profile, Referrals, Coupons, History changed from `font-extrabold` (800, not loaded for Clash Display) → `font-semibold` (600) for the clean editorial look.
+- **Primary CTAs** made pill-shaped (`rounded-full`): Invest "Invest now" (also de-gradiented to solid green), Deposit "Proceed to pay", Coupons "Redeem", DepositTransfer "I have paid"/"Start new deposit", and all 6 Profile action buttons.
+- `index.css`: scoped `.user-theme .text-label` to the Satoshi font for overline consistency.
+
+**Verified (read-only, live Atlas NOT mutated):** Invest + History render correctly with the new style; sidebar active states + wordmark correct in screenshots. Compiles clean.
+
+**Remaining:** Auth pages (Login / Register / Forgot Password) still use the old global theme — they don't use `UserLayout`, so they need a separate scoped restyle.
+
+
+
 ## Recent Changes (Jun 2026 — iteration 67)
 
 ### Dashboard redesign — 3 fixes from user feedback

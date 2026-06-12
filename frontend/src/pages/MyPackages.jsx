@@ -43,7 +43,7 @@ export default function MyPackages() {
       <div className="flex items-end justify-between mb-5">
         <div>
           <div className="text-label flex items-center gap-2"><Briefcase className="w-3 h-3" /> My investments</div>
-          <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">My Packages</h1>
+          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1 text-[color:var(--text-primary)]">My Packages</h1>
         </div>
         <Link to="/invest" data-testid="invest-more" className="btn-accent text-sm">+ New plan</Link>
       </div>

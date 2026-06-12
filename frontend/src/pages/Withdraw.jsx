@@ -85,7 +85,7 @@ export default function Withdraw() {
   return (
     <UserLayout>
       <div className="text-label">Funds</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">Withdraw</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1 text-[color:var(--text-primary)]">Withdraw</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">
         {settingsLoaded ? (
           <>

@@ -38,7 +38,7 @@ export default function Coupons() {
   return (
     <UserLayout>
       <div className="text-label">Bonuses</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Coupons</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Coupons</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Redeem a promo code to credit your wallet instantly.</p>
 
       {locked && (
@@ -62,7 +62,7 @@ export default function Coupons() {
             placeholder="e.g. NAIJA2026"
             className="w-full mt-2 px-3 py-3 bg-[color:var(--surface)] border border-[color:var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] uppercase font-mono" />
           <button type="submit" disabled={busy || locked} data-testid="redeem-btn"
-            className="mt-5 w-full bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3 rounded-lg font-semibold disabled:opacity-60">
+            className="mt-5 w-full bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3 rounded-full font-semibold disabled:opacity-60">
             {busy ? "Redeeming…" : "Redeem coupon"}
           </button>
         </form>

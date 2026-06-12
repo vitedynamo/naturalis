@@ -142,7 +142,7 @@ export default function DepositTransfer() {
       </button>
 
       <div className="text-label mt-3">Funds · Bank transfer</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1">Complete your transfer</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Complete your transfer</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">
         Send the exact amount below from your bank app. Your wallet credits automatically — no need to upload anything.
       </p>
@@ -218,13 +218,13 @@ export default function DepositTransfer() {
           {!expired ? (
             <button onClick={() => verify(false)} disabled={verifying || !isPending}
               data-testid="deposit-verify-btn"
-              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-lg font-semibold disabled:opacity-60">
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold disabled:opacity-60">
               <RefreshCw className={`w-4 h-4 ${verifying ? "animate-spin" : ""}`} /> {verifying ? "Checking…" : "I have paid — check status"}
             </button>
           ) : (
             <button onClick={() => navigate("/deposit")}
               data-testid="transfer-start-new-btn"
-              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-lg font-semibold">
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold">
               Start a new deposit
             </button>
           )}

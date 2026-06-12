@@ -37,7 +37,7 @@ export default function History() {
     <UserLayout>
       <div className="overflow-x-hidden" data-testid="history-root">
       <div className="text-label">Wallet log</div>
-      <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight mt-1 text-[color:var(--text-primary)]">Transaction History</h1>
+      <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1 text-[color:var(--text-primary)]">Transaction History</h1>
       <p className="text-sm text-[color:var(--text-secondary)] mt-1">Every credit and debit on your wallet, in one place.</p>
 
       <div className="flex gap-2 mt-5 pb-1 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="history-filters">
