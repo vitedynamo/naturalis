@@ -66,20 +66,20 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[color:var(--app-bg)]">
+    <div className="user-theme min-h-screen flex bg-[color:var(--app-bg)]">
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
               <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
             </div>
-            <div className="font-display text-3xl font-extrabold">
+            <div className="font-display text-3xl font-bold">
               Evoque<span className="text-white/90">-Nova</span>
             </div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Daily returns</div>
-            <h2 className="font-display text-5xl font-black tracking-tight mt-3 leading-[1.05]">
+            <h2 className="font-display text-5xl font-semibold tracking-tight mt-3 leading-[1.05]">
               Grow your money,<br/>every <span className="text-white">24 hours</span>.
             </h2>
             <p className="mt-4 max-w-md text-white/85 leading-relaxed">
@@ -95,7 +95,7 @@ export default function Login() {
             <div className="text-label">Sign in</div>
             <ThemeToggle />
           </div>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight mt-2 text-[color:var(--text-primary)]">Welcome back</h1>
+          <h1 className="font-display text-4xl font-semibold tracking-tight mt-2 text-[color:var(--text-primary)]">Welcome back</h1>
           <p className="text-[color:var(--text-secondary)] mt-2 text-sm">Use your phone and password to access your wallet.</p>
 
           <label className="block mt-8 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Phone number (11 digits)</label>
@@ -129,7 +129,7 @@ export default function Login() {
           <button
             type="submit" disabled={loading}
             data-testid="login-submit-btn"
-            className="mt-7 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-xl font-semibold transition-colors disabled:opacity-60"
+            className="mt-7 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white py-3.5 rounded-full font-semibold transition-colors disabled:opacity-60"
           >
             {loading ? "Signing in…" : (<>Sign in <ArrowRight className="w-4 h-4" /></>)}
           </button>

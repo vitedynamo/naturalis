@@ -25,12 +25,14 @@ export default function Register() {
   const [a2, setA2] = useState("");
   const [loading, setLoading] = useState(false);
   const [welcomeBonus, setWelcomeBonus] = useState(750);
+  const [secEnabled, setSecEnabled] = useState(true);
 
   useEffect(() => {
     const ref = sp.get("ref");
     if (ref) setReferralCode(ref);
     api.get("/settings/public").then(({ data }) => {
       if (typeof data?.welcome_bonus === "number") setWelcomeBonus(data.welcome_bonus);
+      if (typeof data?.require_security_questions === "boolean") setSecEnabled(data.require_security_questions);
     }).catch(() => { /* ignore */ });
   }, [sp]);
 
@@ -40,24 +42,28 @@ export default function Register() {
       toast.error("Phone number must be exactly 11 digits");
       return;
     }
-    if (q1 === q2) {
-      toast.error("Please choose two different security questions");
-      return;
-    }
-    if (!a1.trim() || !a2.trim()) {
-      toast.error("Please answer both security questions");
-      return;
+    if (secEnabled) {
+      if (q1 === q2) {
+        toast.error("Please choose two different security questions");
+        return;
+      }
+      if (!a1.trim() || !a2.trim()) {
+        toast.error("Please answer both security questions");
+        return;
+      }
     }
     setLoading(true);
     try {
       const payload = {
         phone, name, password,
         referral_code: referralCode || null,
-        security_question_1: q1,
-        security_answer_1: a1.trim(),
-        security_question_2: q2,
-        security_answer_2: a2.trim(),
       };
+      if (secEnabled) {
+        payload.security_question_1 = q1;
+        payload.security_answer_1 = a1.trim();
+        payload.security_question_2 = q2;
+        payload.security_answer_2 = a2.trim();
+      }
       const { data } = await api.post("/auth/register", payload);
       setSession(data.token, data.user);
       toast.success(`Welcome! ${formatNaira(welcomeBonus)} welcome bonus credited`);
@@ -70,18 +76,18 @@ export default function Register() {
   const otherQuestions = (current) => SECURITY_QUESTIONS.filter((q) => q !== current);
 
   return (
-    <div className="min-h-screen flex bg-[color:var(--app-bg)]">
+    <div className="user-theme min-h-screen flex bg-[color:var(--app-bg)]">
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
               <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
             </div>
-            <div className="font-display text-3xl font-extrabold">Evoque<span className="text-white/90">-Nova</span></div>
+            <div className="font-display text-3xl font-bold">Evoque<span className="text-white/90">-Nova</span></div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Get started</div>
-            <h2 className="font-display text-5xl font-black tracking-tight mt-3 leading-[1.05]">
+            <h2 className="font-display text-5xl font-semibold tracking-tight mt-3 leading-[1.05]">
               Earn while<br/>you sleep.
             </h2>
             <p className="mt-4 max-w-md text-white/85 leading-relaxed">
@@ -97,7 +103,7 @@ export default function Register() {
             <div className="text-label">Create account</div>
             <ThemeToggle />
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight mt-2 text-[color:var(--text-primary)]">Get started</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-2 text-[color:var(--text-primary)]">Get started</h1>
           <p className="text-sm text-[color:var(--text-secondary)] mt-2">
             Already have an account?{" "}
             <Link to="/login" data-testid="go-login-link" className="text-[color:var(--brand)] font-semibold hover:underline underline-offset-2">Sign in</Link>
@@ -137,6 +143,7 @@ export default function Register() {
               className="w-full pl-10 pr-3 py-3 input-base uppercase" />
           </div>
 
+          {secEnabled && (
           <div className="mt-6 p-4 rounded-xl bg-[color:var(--brand-soft)] border border-[color:var(--border-default)]" data-testid="security-block">
             <div className="flex items-center gap-2 text-[color:var(--brand)] font-semibold text-sm">
               <ShieldQuestion className="w-4 h-4" /> Security questions
@@ -159,6 +166,7 @@ export default function Register() {
             <input value={a2} onChange={(e)=>setA2(e.target.value)} required data-testid="register-a2-input"
               placeholder="Your answer" className="w-full mt-2 input-base" />
           </div>
+          )}
 
           <button type="submit" disabled={loading}
             data-testid="register-submit-btn"

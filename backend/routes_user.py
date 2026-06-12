@@ -117,6 +117,10 @@ async def register(data: RegisterRequest, request: Request):
     settings = await _settings(db)
     welcome = float(settings.get("welcome_bonus", 750.0))
 
+    # Enforce security questions only when the admin has them enabled
+    if settings.get("require_security_questions", True) and not all(sec_set):
+        raise HTTPException(400, "Security questions are required")
+
     user = {
         "id": gen_reference("u"),
         "phone": phone,
@@ -1723,6 +1727,7 @@ async def public_settings(request: Request):
         "home_below_featured_mode": s.get("home_below_featured_mode", "cards"),
         "home_below_featured_image_url": s.get("home_below_featured_image_url", ""),
         "home_secondary_section_enabled": s.get("home_secondary_section_enabled", True),
+        "require_security_questions": s.get("require_security_questions", True),
     }
 
 

@@ -214,6 +214,7 @@ export default function AdminSettings() {
         home_below_featured_mode: s.home_below_featured_mode || "cards",
         home_below_featured_image_url: s.home_below_featured_image_url || "",
         home_secondary_section_enabled: s.home_secondary_section_enabled !== false,
+        require_security_questions: s.require_security_questions !== false,
         quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
         require_withdrawal_pin: !!s.require_withdrawal_pin,
@@ -397,6 +398,16 @@ export default function AdminSettings() {
                 <Field label="Auto-payout limit (₦)" value={s.auto_payout_max_amount} onChange={(v) => setS({ ...s, auto_payout_max_amount: v })} testid="auto-payout-max" sub="Above this, requires admin approval. 0 = no cap." />
               </div>
               <Toggle checked={!!s.require_withdrawal_pin} onChange={(v) => setS({ ...s, require_withdrawal_pin: v })} label="Require 4-digit withdrawal PIN" hint="Users will be prompted for their PIN before each withdrawal. Off = PIN bypassed." testid="require-pin-toggle" />
+            </Section>
+
+            <Section title="Registration security questions" hint="The two security questions new users set during sign-up. They power the self-service 'Forgot password' flow. Turn OFF to remove them from registration (users will then rely on admin-assisted password resets).">
+              <Toggle
+                checked={s.require_security_questions !== false}
+                onChange={(v) => setS({ ...s, require_security_questions: v })}
+                label="Ask security questions during registration"
+                hint="When ON, new users must pick two questions and answers. When OFF, the section is hidden on the registration form and not required."
+                testid="require-security-questions-toggle"
+              />
             </Section>
 
             <Section title="Automation & opening hours" hint="Auto-payout pushes money out the moment a user requests it. With it off, withdrawals queue for admin approval.">

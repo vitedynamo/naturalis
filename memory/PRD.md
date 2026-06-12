@@ -1,5 +1,20 @@
 # Evoque-Nova — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 69)
+
+### Auth pages restyled + admin toggle for registration security questions
+
+**Auth restyle (Login / Register / ForgotPassword):** wrapped each page root in `.user-theme` so they inherit the new green/coral palette + Clash Display/Satoshi fonts + green `hero-gradient` (they previously used the old global theme). Lowered hero/heading weights (`font-black`/`font-extrabold` → `font-semibold`/`font-bold`, since Clash Display loads ≤700), made primary CTAs pill-shaped. Verified in light + dark.
+
+**Admin toggle — security questions during registration:**
+- Backend: added `require_security_questions: bool = True` to `Settings` + `SettingsUpdate` (models.py), exposed in `/api/settings/public`, and enforced in `/auth/register` (when ON and the 4 sec fields aren't all provided → 400; when OFF, registration is accepted without them).
+- Frontend `Register.jsx`: reads the setting; when OFF the Security-questions block is hidden and excluded from the payload + validation. Default ON.
+- Admin `AdminSettings.jsx`: new "Registration security questions" Section with `require-security-questions-toggle` (under Limits & PIN).
+
+**Verified:** compiles clean; `/api/settings/public` returns `require_security_questions`; all 3 auth pages render correctly (screenshots). NOTE: the toggle's hidden-state + register flow were validated by code review only — not exercised end-to-end to avoid creating junk users on the live Atlas DB.
+
+
+
 ## Recent Changes (Jun 2026 — iteration 68)
 
 ### "Verdant Growth" rolled out across user pages

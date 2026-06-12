@@ -78,18 +78,18 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[color:var(--app-bg)]">
+    <div className="user-theme min-h-screen flex bg-[color:var(--app-bg)]">
       <div className="hidden lg:flex w-1/2 hero-gradient text-white relative overflow-hidden grain">
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-black/30 backdrop-blur flex items-center justify-center overflow-hidden ring-1 ring-white/20">
               <img src={logoUrl} alt="Evoque-Nova" className="w-full h-full object-contain p-0.5" />
             </div>
-            <div className="font-display text-3xl font-extrabold">Evoque<span className="text-white/90">-Nova</span></div>
+            <div className="font-display text-3xl font-bold">Evoque<span className="text-white/90">-Nova</span></div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/80">Account recovery</div>
-            <h2 className="font-display text-5xl font-black tracking-tight mt-3 leading-[1.05]">
+            <h2 className="font-display text-5xl font-semibold tracking-tight mt-3 leading-[1.05]">
               Forgot your<br/>password?
             </h2>
             <p className="mt-4 max-w-md text-white/85 leading-relaxed">
@@ -106,7 +106,7 @@ export default function ForgotPassword() {
             <ThemeToggle />
           </div>
           <div className="mt-3 flex items-center gap-2 text-label"><KeyRound className="w-3.5 h-3.5" /> Reset password</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight mt-2 text-[color:var(--text-primary)]">Recover account</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-2 text-[color:var(--text-primary)]">Recover account</h1>
 
           <div className="mt-5 grid grid-cols-2 gap-2 bg-[color:var(--surface-alt)] p-1 rounded-xl" data-testid="recovery-mode-tabs">
             <button onClick={() => { setMode("questions"); setStep(1); }} data-testid="mode-questions"
