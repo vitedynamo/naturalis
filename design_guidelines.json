@@ -1,104 +1,70 @@
 {
-  "theme_strategy": {
-    "archetype": "4 (Swiss & High-Contrast / Neo-Brutalist Fintech)",
-    "rationale": "The user explicitly rejected three previous designs (Royal Blue/Gold, Green/Coral, Earthy) because they felt 'structurally the same' (standard big balance + card grid). To completely surprise and delight them, we are abandoning standard 'SaaS cards' entirely. We are using a 'Ledger / Prospectus' layout: full-bleed sections separated by stark borders, radical typography scaling (massive numbers, tiny mono labels), and aggressive contrast. This feels like an elite, high-end financial terminal rather than a generic template app.",
-    "color_palette": {
-      "light": {
-        "background": "0 0% 98%",
-        "foreground": "0 0% 4%",
-        "card": "0 0% 100%",
-        "card_foreground": "0 0% 4%",
-        "border": "0 0% 10%",
-        "primary": "14 100% 50%",
-        "primary_foreground": "0 0% 100%",
-        "muted": "0 0% 92%",
-        "muted_foreground": "0 0% 40%",
-        "accent": "14 100% 50%"
-      },
-      "dark": {
-        "background": "0 0% 2%",
-        "foreground": "0 0% 98%",
-        "card": "0 0% 5%",
-        "card_foreground": "0 0% 98%",
-        "border": "0 0% 20%",
-        "primary": "14 100% 50%",
-        "primary_foreground": "0 0% 100%",
-        "muted": "0 0% 10%",
-        "muted_foreground": "0 0% 60%",
-        "accent": "14 100% 50%"
-      },
-      "notes": "Primary is 'Safety Orange' (#FF3B00) used EXTREMELY sparingly (only for the exact CTA or active timer). 95% of the UI must be monochrome."
-    }
-  },
+  "theme": "LIGHT",
+  "archetype": "1 (Organic & Earthy)",
   "typography": {
-    "headings": "Cabinet Grotesk (font-black, uppercase, tight tracking)",
-    "body": "Satoshi (font-medium, readable)",
-    "numbers_and_labels": "JetBrains Mono (font-mono). Use for ALL balances, timers, and tiny overline labels.",
-    "hierarchy_rules": "Extreme contrast. Labels should be `text-[10px] tracking-[0.2em] uppercase`. Main balances should be `text-5xl md:text-7xl tracking-tighter`. Skip middle sizes."
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "Work Sans",
+    "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-black",
+    "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-black",
+    "body": "text-base leading-relaxed"
   },
-  "layout_system": {
-    "container": "No side padding on the main wrapper! `px-0`. Elements span edge-to-edge. Use inner padding (`p-6` or `p-8`) inside sections.",
-    "separators": "Use `border-b border-foreground/20` (or solid foreground) to separate every vertical section. NO gaps, NO floating cards. Everything is a stacked block.",
-    "border_radius": "Strictly `rounded-none`. This is a brutalist ledger, not a soft app."
+  "colors": {
+    "primary": "#2D5A27",
+    "secondary": "#E8F0E5",
+    "background": "#FDFDF9",
+    "surface": "#FFFFFF",
+    "text": "#1A2E19",
+    "text_muted": "#4A6B48"
   },
-  "component_instructions": {
-    "home_announcement": {
-      "type": "Marquee Ticker",
-      "design": "Instead of a static banner card, implement a continuous slow-scrolling marquee at the very top of the page. `bg-foreground text-background font-mono text-xs py-2 uppercase tracking-widest`. Use `react-fast-marquee`.",
-      "data_testid": "home-announcement-ticker"
+  "layout": {
+    "spacing": "Generous spacing. Use p-8 or p-12 for containers.",
+    "cards": "16:10 aspect ratio for plan headers. Use dark gradient overlay from bottom to top to ensure white text readability."
+  },
+  "image_urls": {
+    "Seedling": {
+      "url": "https://images.unsplash.com/photo-1557234195-bd9f290f0e4d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxzZWVkbGluZyUyMGVtZXJnaW5nJTIwc29pbHxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "a single small green seedling/sprout emerging from soil"
     },
-    "greeting": {
-      "type": "Editorial Header",
-      "design": "Full width block, `p-6 border-b border-border`. Top line: Today's date in JetBrains Mono `text-xs text-muted-foreground uppercase`. Bottom line: First name in Cabinet Grotesk `text-3xl font-black uppercase`. No avatars.",
-      "data_testid": "home-greeting"
+    "Sprout": {
+      "url": "https://images.unsplash.com/photo-1593850685398-e79bab596d1d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxtaWNyb2dyZWVucyUyMGdyb3dpbmd8ZW58MHx8fHwxNzgxMzM2NTc1fDA&ixlib=rb-4.1.0&q=85",
+      "description": "young green sprouts / microgreens breaking ground"
     },
-    "wallet_balance": {
-      "type": "The Ledger Vault",
-      "design": "Full width block, massive padding `py-12 px-6 border-b border-border`. Label: 'TOTAL LEDGER BALANCE' (`font-mono text-[10px] tracking-[0.2em] mb-4 block`). Value: `font-mono text-6xl tracking-tighter`. Do not put this in a 'card'. It is the page background itself.",
-      "data_testid": "wallet-balance-display"
+    "Sapling": {
+      "url": "https://images.unsplash.com/photo-1547106429-11e696f446d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxzYXBsaW5nJTIwdHJlZSUyMHN1bmxpZ2h0fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
+      "description": "a young sapling tree in sunlight"
     },
-    "primary_actions": {
-      "type": "Split Brutalist Block",
-      "design": "A grid of 2 columns right below the balance: `grid grid-cols-2 border-b border-border`. The Deposit and Withdraw buttons are NOT standard buttons. They are massive clickable zones. `p-6 text-center font-bold uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors`. Right border on the first item to separate them.",
-      "data_testid": "primary-actions-grid"
+    "Wildflower": {
+      "url": "https://images.unsplash.com/photo-1618813690183-c8a0e5de80f0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwxfHx3aWxkZmxvd2VycyUyMGZpZWxkfGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
+      "description": "a field of wildflowers / vibrant blooms"
     },
-    "daily_reward": {
-      "type": "The Pulse / Terminal Row",
-      "design": "A stark, high-contrast row. `flex items-center justify-between p-6 border-b border-border`. Left side: 'DAILY REWARD' label + Mono Countdown Timer. Right side: A sharp, square `rounded-none bg-primary text-primary-foreground px-6 py-3 font-mono text-sm` button. If on cooldown, make the button disabled and `bg-muted text-muted-foreground`.",
-      "data_testid": "daily-reward-section"
+    "Bamboo Grove": {
+      "url": "https://images.unsplash.com/photo-1586061968253-7bf5724aab7b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxiYW1ib28lMjBmb3Jlc3QlMjBncmVlbnxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "a green bamboo forest/grove"
     },
-    "featured_plan": {
-      "type": "The Prospectus (Magazine Spread)",
-      "design": "Full-bleed image section. `relative h-[400px] w-full border-b border-border`. Background image uses the black & white architecture photo. Heavy `bg-black/60` overlay. Content sits at the bottom of the container (`absolute bottom-0 p-6 w-full text-white`). Title: Cabinet Grotesk 4xl. Stats (ROI, Duration) in a `grid grid-cols-3 gap-4 border-t border-white/20 pt-4 mt-4 font-mono`. Invest CTA is a sharp white button with black text.",
-      "data_testid": "featured-investment-plan"
+    "Olive Grove": {
+      "url": "https://images.unsplash.com/photo-1591122523233-22037c1dec9f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxvbGl2ZSUyMHRyZWUlMjBicmFuY2hlc3xlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "an olive grove / olive tree branches"
     },
-    "quick_actions": {
-      "type": "Index List",
-      "design": "Forget grids of icons. Use a strict textual index list. Each action (Referral, Packages, Coupons) is a full-width row: `flex justify-between items-center p-6 border-b border-border hover:bg-foreground hover:text-background transition-all group`. Left side: Numbered index (`01`, `02`) + Action Name. Right side: Arrow icon (`->`) that translates right on hover.",
-      "data_testid": "quick-actions-list"
+    "Oakwood": {
+      "url": "https://images.unsplash.com/photo-1502082553048-f009c37129b9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxvYWslMjB0cmVlJTIwc3Ryb25nfGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
+      "description": "a strong oak tree / oak woodland"
     },
-    "welcome_modal": {
-      "type": "Stark Overlay",
-      "design": "Full screen `backdrop-blur-xl bg-background/90`. The modal content is a sharp rectangle `border-2 border-foreground bg-background p-8 rounded-none max-w-sm w-full mx-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]` (in dark mode, white shadow). Massive 'WELCOME' headline.",
-      "data_testid": "welcome-modal"
+    "Cedar Ridge": {
+      "url": "https://images.unsplash.com/photo-1551120738-c3fcea8d0cf8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxwaW5lJTIwZm9yZXN0JTIwbW91bnRhaW58ZW58MHx8fHwxNzgxMzM2NTY1fDA&ixlib=rb-4.1.0&q=85",
+      "description": "cedar/pine forest on a mountain ridge"
+    },
+    "Redwood": {
+      "url": "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxyZWR3b29kJTIwdHJlZXMlMjB0b3dlcmluZ3xlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "towering redwood/sequoia trees looking up"
+    },
+    "Evergreen Summit": {
+      "url": "https://images.unsplash.com/photo-1486707471592-8e7eb7e36f78?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxldmVyZ3JlZW4lMjBmb3Jlc3QlMjBtb3VudGFpbiUyMG1pc3R5fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
+      "description": "an evergreen forest mountain summit / misty pine peaks"
     }
   },
-  "motion_and_interaction": {
-    "hover_states": "Invert colors on hover for list items (background becomes foreground, text becomes background).",
-    "transitions": "Instant or very fast `duration-150`. Brutalism does not use slow, easing animations. It snaps.",
-    "scrolling": "Native smooth scrolling."
-  },
-  "media": {
-    "image_urls": {
-      "featured_plan_bg": {
-        "url": "https://images.unsplash.com/photo-1527576539890-dfa815648363?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwaGlnaCUyMGVuZCUyMGJsYWNrJTIwYW5kJTIwd2hpdGUlMjBhcmNoaXRlY3R1cmV8ZW58MHx8fHwxNzgxMjk1NzczfDA&ixlib=rb-4.1.0&q=85",
-        "description": "Minimalist high-end black and white architecture. Use as the background for the Featured Investment Plan to give an elite, structural feel."
-      },
-      "welcome_modal_bg": {
-        "url": "https://images.unsplash.com/photo-1658165598588-eac23c4d76ff?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHxtb25vY2hyb21lJTIwcGF0dGVybiUyMHRleHR1cmV8ZW58MHx8fHwxNzgxMjk1NzY3fDA&ixlib=rb-4.1.0&q=85",
-        "description": "Monochrome pattern texture. Can be used as a subtle noise overlay on the Welcome Modal or page background."
-      }
-    }
-  },
-  "implementation_notes_for_main_agent": "1. Do NOT wrap the main content in standard 'container mx-auto px-4' padding. The layout relies on full-bleed edge-to-edge borders. 2. Implement the typography scale strictly. Do not use 'text-lg' when the spec calls for extreme sizes (text-[10px] vs text-5xl). 3. Replace all 'Cards' with raw HTML `div` blocks carrying `border-b` classes. 4. Ensure `.user-theme.light` and `.user-theme.dark` CSS custom properties are updated in index.css as defined."
+  "instructions_to_main_agent": [
+    "Ensure the hero headers of the investment plans use a 16:10 aspect ratio.",
+    "Implement a dark gradient overlay on the images (e.g., from-black/70 to-transparent) to ensure the white text overlays are legible, meeting contrast standards.",
+    "Use data-testid on all interactive elements as per the testing requirements."
+  ]
 }
