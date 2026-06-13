@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import {
@@ -52,7 +52,9 @@ export default function InAppAnnouncementPopup() {
       <DialogContent
         className="max-w-md w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-3xl gap-0"
         data-testid="in-app-announcement"
+        aria-describedby={undefined}
       >
+        <DialogTitle className="sr-only">Announcement</DialogTitle>
         <div className={`relative bg-gradient-to-br ${tok.grad} text-white p-6`}>
           <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
           <button
