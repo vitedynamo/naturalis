@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatNaira, formatDate } from "@/lib/format";
-import { ArrowDownToLine, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
+import { ArrowDownToLine, ShieldCheck, Loader2, RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Deposit() {
@@ -209,47 +209,50 @@ export default function Deposit() {
             const isFailed = d.status === "failed";
             const isMarasoft = d.method === "marasoft";
             const isBusy = !!rechecking[d.reference];
+            const cfg = {
+              success: { Icon: CheckCircle2, ring: "bg-[color:var(--success-soft)] text-[color:var(--success)]", pill: "pill-success" },
+              error: { Icon: XCircle, ring: "bg-[color:var(--error-soft)] text-[color:var(--error)]", pill: "pill-error" },
+              warn: { Icon: Clock, ring: "bg-[color:var(--gold-soft)] text-[color:var(--warning)]", pill: "pill-warn" },
+            }[tone];
+            const StatusIcon = cfg.Icon;
             return (
               <div
                 key={d.id}
                 ref={(el) => { if (el) cardRefs.current[d.reference] = el; }}
                 className={`card-soft p-4 relative overflow-hidden transition-all ${isHighlighted ? "ring-2 ring-[color:var(--accent-main)] shadow-xl shadow-[color:var(--accent-main)]/20 scale-[1.02]" : ""}`}
                 data-testid={`dep-${d.id}`}>
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                  tone === "success" ? "bg-[color:var(--success)]"
-                  : tone === "error" ? "bg-[color:var(--error)]"
-                  : "bg-[color:var(--warning)]"
-                }`} />
-                <div className="pl-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">Amount</div>
-                      <div className="font-display font-bold text-2xl text-[color:var(--text-primary)] leading-tight mt-0.5">{formatNaira(d.amount)}</div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${cfg.ring}`}>
+                      {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <StatusIcon className="w-5 h-5" />}
                     </div>
-                    {isPending ? (
-                      <span className="pill pill-warn inline-flex items-center gap-1.5" data-testid={`dep-pill-checking-${d.id}`}>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        checking…
-                      </span>
-                    ) : (
-                      <span className={`pill ${tone === "success" ? "pill-success" : "pill-error"}`}>{d.status}</span>
-                    )}
+                    <div className="min-w-0">
+                      <div className="font-display font-bold text-xl text-[color:var(--text-primary)] leading-tight">{formatNaira(d.amount)}</div>
+                      <div className="text-[11px] text-[color:var(--text-tertiary)] capitalize mt-0.5">{d.method || "deposit"} · {formatDate(d.created_at)}</div>
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
-                    <span className="font-mono text-[color:var(--text-tertiary)] truncate" title={d.reference}>{d.reference}</span>
-                    <span className="shrink-0 text-[color:var(--text-secondary)]">{formatDate(d.created_at)}</span>
-                  </div>
-                  {(isFailed || isPending) && isMarasoft && (
-                    <button
-                      onClick={() => recheck(d.reference)}
-                      disabled={isBusy}
-                      data-testid={`dep-recheck-${d.id}`}
-                      className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-md border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors disabled:opacity-60">
-                      <RefreshCw className={`w-3 h-3 ${isBusy ? "animate-spin" : ""}`} />
-                      {isBusy ? "Rechecking…" : isFailed ? "Recheck — I actually paid" : "Recheck status"}
-                    </button>
+                  {isPending ? (
+                    <span className="pill pill-warn inline-flex items-center gap-1.5 shrink-0" data-testid={`dep-pill-checking-${d.id}`}>
+                      <Loader2 className="w-3 h-3 animate-spin" /> checking…
+                    </span>
+                  ) : (
+                    <span className={`pill ${cfg.pill} shrink-0 capitalize`}>{d.status}</span>
                   )}
                 </div>
+                <div className="mt-3 flex items-center justify-between gap-2 bg-[color:var(--surface-alt)] rounded-lg px-3 py-2">
+                  <span className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] shrink-0">Ref</span>
+                  <span className="font-mono text-[11px] text-[color:var(--text-secondary)] truncate" title={d.reference}>{d.reference}</span>
+                </div>
+                {(isFailed || isPending) && isMarasoft && (
+                  <button
+                    onClick={() => recheck(d.reference)}
+                    disabled={isBusy}
+                    data-testid={`dep-recheck-${d.id}`}
+                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors disabled:opacity-60">
+                    <RefreshCw className={`w-3 h-3 ${isBusy ? "animate-spin" : ""}`} />
+                    {isBusy ? "Rechecking…" : isFailed ? "Recheck — I actually paid" : "Recheck status"}
+                  </button>
+                )}
               </div>
             );
           })}
