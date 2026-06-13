@@ -6,8 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import { formatNaira } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Calendar, Coins, Flame } from "lucide-react";
+import { TrendingUp, Calendar, Coins, Leaf, Sprout, TreePine, Trees, Mountain, Flower2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+
+const NATURE_ICONS = [Leaf, Sprout, TreePine, Trees, Mountain, Flower2];
 
 function resolveImg(url) {
   if (!url) return "";
@@ -15,10 +17,95 @@ function resolveImg(url) {
   return `${process.env.REACT_APP_BACKEND_URL}${url}`;
 }
 
+/* Loading skeleton card */
+function SkeletonCard() {
+  return (
+    <div className="card-soft overflow-hidden" data-testid="plan-skeleton">
+      <div className="aspect-[16/10] w-full bg-[color:var(--surface-2)] animate-pulse" />
+      <div className="p-4 space-y-3">
+        <div className="h-4 w-2/3 rounded bg-[color:var(--surface-2)] animate-pulse" />
+        <div className="grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => <div key={i} className="h-12 rounded-xl bg-[color:var(--surface-alt)] animate-pulse" />)}
+        </div>
+        <div className="h-10 rounded-full bg-[color:var(--surface-2)] animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+/* Cowrywise-style investment plan card */
+function PlanCard({ p, idx, onInvest }) {
+  const totalRoi = (p.daily_profit_percent * p.duration_days).toFixed(0);
+  const dailyPayout = p.price * p.daily_profit_percent / 100;
+  const totalReturn = p.price + dailyPayout * p.duration_days;
+  const NatureIcon = NATURE_ICONS[idx % NATURE_ICONS.length];
+  return (
+    <div
+      className="card-soft overflow-hidden group animate-fade-up hover:-translate-y-0.5 transition-transform"
+      style={{ animationDelay: `${idx * 50}ms` }}
+      data-testid={`product-card-${p.id}`}
+    >
+      {/* Header — nature image with name overlaid */}
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
+        {p.image_url ? (
+          <img src={resolveImg(p.image_url)} alt={p.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="absolute inset-0 hero-gradient flex items-center justify-center">
+            <NatureIcon className="w-12 h-12 text-white/80" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+        <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/90 text-[color:var(--brand)] text-[11px] font-bold shadow">
+          <TrendingUp className="w-3 h-3" /> {totalRoi}% ROI
+        </div>
+        <div className="absolute bottom-3 left-4 right-4">
+          <div className="flex items-center gap-1.5 text-white/85 text-[10px] uppercase tracking-[0.15em] font-semibold">
+            <NatureIcon className="w-3 h-3" /> Naturalis plan
+          </div>
+          <div className="font-display font-bold text-xl text-white leading-tight truncate drop-shadow">{p.name}</div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-4">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-[color:var(--surface-alt)] p-2.5 text-center">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center justify-center gap-1"><Coins className="w-2.5 h-2.5" /> Daily</div>
+            <div className="font-bold text-sm text-[color:var(--accent-main)] mt-1">{formatNaira(dailyPayout, { compact: true })}</div>
+          </div>
+          <div className="rounded-xl bg-[color:var(--surface-alt)] p-2.5 text-center">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center justify-center gap-1"><Calendar className="w-2.5 h-2.5" /> Days</div>
+            <div className="font-bold text-sm text-[color:var(--text-primary)] mt-1">{p.duration_days}</div>
+          </div>
+          <div className="rounded-xl bg-[color:var(--surface-alt)] p-2.5 text-center">
+            <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center justify-center gap-1"><TrendingUp className="w-2.5 h-2.5" /> Total</div>
+            <div className="font-bold text-sm text-[color:var(--brand)] mt-1">{formatNaira(totalReturn, { compact: true })}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mt-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">From</div>
+            <div className="font-display font-bold text-lg text-[color:var(--text-primary)] leading-none">{formatNaira(p.price)}</div>
+          </div>
+          <button
+            onClick={() => onInvest(p)}
+            data-testid={`invest-btn-${p.id}`}
+            className="inline-flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] px-5 py-2.5 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 hover:-translate-y-0.5 transition-all"
+          >
+            Invest <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Invest() {
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [amount, setAmount] = useState("");
@@ -26,8 +113,13 @@ export default function Invest() {
   const amountRef = useRef(null);
 
   const load = async () => {
-    const { data } = await api.get("/products");
-    setProducts(data);
+    setLoading(true);
+    try {
+      const { data } = await api.get("/products");
+      setProducts(data);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -41,7 +133,6 @@ export default function Invest() {
   const submit = async () => {
     if (!selected) return;
     setSubmitting(true);
-    // Blur and disable input as soon as user confirms
     if (amountRef.current) {
       try { amountRef.current.blur(); } catch { /* noop */ }
     }
@@ -50,7 +141,6 @@ export default function Invest() {
       toast.success(`Invested ${formatNaira(amount)} in ${selected.name}`);
       setOpen(false);
       await refresh();
-      // Redirect to My Packages and scroll to the new investment
       navigate("/my-packages", { state: { highlightId: data?.investment?.id } });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Investment failed");
@@ -63,8 +153,8 @@ export default function Invest() {
       <div className="flex items-end justify-between mb-6">
         <div>
           <div className="text-label">Investment Plans</div>
-          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Pick a plan</h1>
-          <p className="text-sm text-[color:var(--text-secondary)] mt-1">Earn daily profit for the plan duration. Profit lands in your wallet every 24 hours.</p>
+          <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Grow with Naturalis</h1>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1">Pick a plan and earn daily profit — paid into your wallet every 24 hours.</p>
         </div>
         <div className="hidden md:block text-right">
           <div className="text-label">Wallet</div>
@@ -73,73 +163,12 @@ export default function Invest() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-        {products.map((p, idx) => {
-          const totalRoi = (p.daily_profit_percent * p.duration_days).toFixed(0);
-          const totalReturn = p.price + (p.price * p.daily_profit_percent / 100) * p.duration_days;
-          return (
-            <div key={p.id}
-              className="card-soft overflow-hidden relative animate-fade-up group hover:-translate-y-0.5 transition-transform"
-              style={{ animationDelay: `${idx * 60}ms` }}
-              data-testid={`product-card-${p.id}`}>
-              {/* Top status stripe */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[color:var(--brand)] to-[color:var(--accent-main)] z-10" />
-
-              <div className="aspect-[5/3] w-full bg-[color:var(--surface-alt)] overflow-hidden relative">
-                {p.image_url ? (
-                  <img src={resolveImg(p.image_url)} alt={p.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[color:var(--text-tertiary)]">No image</div>
-                )}
-                <div className="absolute top-3 right-3 pill pill-accent backdrop-blur shadow-md">
-                  <Flame className="w-3 h-3" /> {totalRoi}% ROI
-                </div>
-              </div>
-
-              <div className="p-4 md:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-display font-bold text-lg leading-tight text-[color:var(--text-primary)] truncate">{p.name}</div>
-                    <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">
-                      {p.daily_profit_percent}% daily · {p.duration_days} days
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)]">From</div>
-                    <div className="font-display font-bold text-base text-[color:var(--brand)] leading-tight">{formatNaira(p.price)}</div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-[color:var(--text-secondary)] mt-2 line-clamp-2">{p.description}</p>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-[color:var(--surface-alt)] p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center gap-1"><Coins className="w-2.5 h-2.5" /> Daily</div>
-                    <div className="font-bold text-sm text-[color:var(--accent-main)] mt-0.5">{formatNaira(p.price * p.daily_profit_percent / 100, { compact: true })}</div>
-                  </div>
-                  <div className="rounded-xl bg-[color:var(--surface-alt)] p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center gap-1"><Calendar className="w-2.5 h-2.5" /> Days</div>
-                    <div className="font-bold text-sm text-[color:var(--text-primary)] mt-0.5">{p.duration_days}</div>
-                  </div>
-                  <div className="rounded-xl bg-[color:var(--surface-alt)] p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-[color:var(--text-tertiary)] flex items-center gap-1"><TrendingUp className="w-2.5 h-2.5" /> Total</div>
-                    <div className="font-bold text-sm text-[color:var(--brand)] mt-0.5">{formatNaira(totalReturn, { compact: true })}</div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => openInvest(p)}
-                  data-testid={`invest-btn-${p.id}`}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] py-3 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 transition-all"
-                >
-                  <TrendingUp className="w-4 h-4" /> Invest now
-                </button>
-              </div>
-            </div>
-          );
-        })}
-        {products.length === 0 && (
-          <div className="col-span-full card-soft p-10 text-center text-[color:var(--text-secondary)]">No products available yet.</div>
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+        ) : products.length === 0 ? (
+          <div className="col-span-full card-soft p-10 text-center text-[color:var(--text-secondary)]" data-testid="plans-empty">No plans available yet. Please check back soon.</div>
+        ) : (
+          products.map((p, idx) => <PlanCard key={p.id} p={p} idx={idx} onInvest={openInvest} />)
         )}
       </div>
 

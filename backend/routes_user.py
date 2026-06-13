@@ -1592,29 +1592,60 @@ async def my_withdrawals(request: Request, user=Depends(get_current_user)):
 @router.get("/referrals")
 async def my_referrals(request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
-    refs = await db.referrals.find({"referrer_id": user["id"]}, {"_id": 0}).to_list(2000)
-    # Group by generation and join user names
-    out = {1: [], 2: []}
+    refs = await db.referrals.find(
+        {"referrer_id": user["id"]},
+        {"_id": 0, "referred_id": 1, "generation": 1},
+    ).to_list(5000)
+
+    # Map referred_id -> generation (prefer gen1 if a user appears in both)
+    gen_by_user = {}
     for r in refs:
-        if r.get("generation") not in (1, 2):
+        g = r.get("generation")
+        uid = r.get("referred_id")
+        if g not in (1, 2) or not uid:
             continue
-        u = await db.users.find_one({"id": r["referred_id"]}, {"_id": 0, "password_hash": 0})
+        gen_by_user[uid] = min(gen_by_user.get(uid, g), g)
+    referred_ids = list(gen_by_user.keys())
+
+    # Batch-load every referred user in ONE query (kills the previous N+1 over Atlas)
+    users_map = {}
+    if referred_ids:
+        async for u in db.users.find(
+            {"id": {"$in": referred_ids}},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "created_at": 1},
+        ):
+            users_map[u["id"]] = u
+
+    # Batch-load every referred user's investments in ONE query, then group in Python
+    invs_by_user = {}
+    if referred_ids:
+        async for i in db.investments.find(
+            {"user_id": {"$in": referred_ids}},
+            {"_id": 0, "id": 1, "user_id": 1, "product_name": 1, "amount": 1, "started_at": 1},
+        ).sort("started_at", -1):
+            invs_by_user.setdefault(i["user_id"], []).append(i)
+
+    out = {1: [], 2: []}
+    for uid, g in gen_by_user.items():
+        u = users_map.get(uid)
         if not u:
             continue
-        # Pull this referred user's investments for the team detail (amount + date)
-        invs = await db.investments.find({"user_id": u["id"]}, {"_id": 0}).sort("started_at", -1).to_list(50)
+        invs = invs_by_user.get(uid, [])
         total_invested = sum(float(i.get("amount", 0)) for i in invs)
-        out[r["generation"]].append({
+        out[g].append({
             "id": u["id"],
-            "name": u["name"],
-            "phone": u["phone"],
-            "joined_at": u["created_at"],
+            "name": u.get("name", ""),
+            "phone": u.get("phone", ""),
+            "joined_at": u.get("created_at"),
             "total_invested": total_invested,
             "investments": [
-                {"id": i["id"], "product_name": i["product_name"], "amount": i["amount"], "started_at": i["started_at"]}
+                {"id": i["id"], "product_name": i.get("product_name"), "amount": i.get("amount"), "started_at": i.get("started_at")}
                 for i in invs
             ],
         })
+    # Newest members first within each generation
+    for g in (1, 2):
+        out[g].sort(key=lambda x: x.get("joined_at") or "", reverse=True)
 
     # Sum referral earnings per gen
     pipeline_earn = await db.transactions.aggregate([
@@ -1727,6 +1758,7 @@ async def public_settings(request: Request):
         "home_below_featured_mode": s.get("home_below_featured_mode", "cards"),
         "home_below_featured_image_url": s.get("home_below_featured_image_url", ""),
         "home_secondary_section_enabled": s.get("home_secondary_section_enabled", True),
+        "home_plans_count": int(s.get("home_plans_count", 3) or 3),
         "require_security_questions": s.get("require_security_questions", True),
     }
 

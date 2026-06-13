@@ -410,6 +410,8 @@ class Settings(BaseModel):
     # Home: independent show/hide for the secondary section (cards/image) — decoupled
     # from the featured-plan toggle so either can be shown without the other.
     home_secondary_section_enabled: bool = True
+    # Home: how many investment plans to show on the dashboard "Investment plans" row.
+    home_plans_count: int = 3
     # Registration: require the two security questions (used for self-service password reset)
     require_security_questions: bool = True
     # Fixie static-IP proxy usage tracker. Fixie doesn't expose a usage API, so admins
@@ -490,6 +492,7 @@ class SettingsUpdate(BaseModel):
     home_below_featured_mode: Optional[str] = None  # cards | image
     home_below_featured_image_url: Optional[str] = None
     home_secondary_section_enabled: Optional[bool] = None
+    home_plans_count: Optional[int] = None
     require_security_questions: Optional[bool] = None
 
 

@@ -8,6 +8,7 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight,
   Megaphone, Send, Sparkle, Briefcase, Check, Coins, Calendar, TrendingUp, Wallet, ChevronRight,
+  Leaf, Sprout, TreePine, Trees, Mountain, Flower2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -89,9 +90,12 @@ function DailyClaimBanner({ onClaimed }) {
   );
 }
 
+const NATURE_ICONS = [Leaf, Sprout, TreePine, Trees, Mountain, Flower2];
+
 /* Investment plan card */
-function PlanCard({ p, onInvest }) {
+function PlanCard({ p, idx = 0, onInvest }) {
   const totalRoi = (p.daily_profit_percent * p.duration_days).toFixed(0);
+  const NatureIcon = NATURE_ICONS[idx % NATURE_ICONS.length];
   return (
     <div
       className="snap-start shrink-0 w-[80%] xs:w-[72%] sm:w-auto card-soft overflow-hidden group hover:-translate-y-0.5 transition-transform"
@@ -101,7 +105,9 @@ function PlanCard({ p, onInvest }) {
         {p.image_url ? (
           <img src={resolveUrl(p.image_url)} alt={p.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[color:var(--text-tertiary)] text-sm">No image</div>
+          <div className="absolute inset-0 hero-gradient flex items-center justify-center">
+            <NatureIcon className="w-9 h-9 text-white/85" />
+          </div>
         )}
         <div className="absolute top-3 right-3 pill pill-accent backdrop-blur shadow-md">
           <Flame className="w-3 h-3" /> {totalRoi}% ROI
@@ -160,6 +166,7 @@ export default function Dashboard() {
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" });
   const featuredEnabled = settings.home_featured_plan_enabled !== false;
   const secondaryEnabled = settings.home_secondary_section_enabled !== false;
+  const plansCount = Number(settings.home_plans_count) || 3;
   const showImage = settings.home_below_featured_mode === "image" && settings.home_below_featured_image_url;
 
   const featured =
@@ -316,8 +323,8 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 snap-x pb-1">
-              {(featuredEnabled ? otherPlans : products).map((p) => (
-                <PlanCard key={p.id} p={p} onInvest={goInvest} />
+              {(featuredEnabled ? otherPlans : products).slice(0, plansCount).map((p, i) => (
+                <PlanCard key={p.id} p={p} idx={i} onInvest={goInvest} />
               ))}
             </div>
           </div>

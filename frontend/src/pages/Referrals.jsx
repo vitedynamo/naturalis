@@ -80,10 +80,14 @@ function ReferralList({ gen, data }) {
 
 export default function Referrals() {
   const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [activeGen, setActiveGen] = useState(1);
 
   useEffect(() => {
-    api.get("/referrals").then(({ data }) => setInfo(data));
+    api.get("/referrals")
+      .then(({ data }) => setInfo(data))
+      .catch(() => toast.error("Could not load your team. Pull to refresh."))
+      .finally(() => setLoading(false));
   }, []);
 
   const link = info ? `${window.location.origin}/register?ref=${info.referral_code}` : "";
@@ -136,7 +140,18 @@ export default function Referrals() {
 
       {/* Selected generation's referrals */}
       <div className="mt-5">
-        <ReferralList gen={activeGen} data={current} />
+        {loading ? (
+          <div className="space-y-3" data-testid="team-loading">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card-soft p-4">
+                <div className="h-4 w-1/3 rounded bg-[color:var(--surface-2)] animate-pulse" />
+                <div className="h-3 w-1/4 rounded bg-[color:var(--surface-2)] animate-pulse mt-2" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ReferralList gen={activeGen} data={current} />
+        )}
       </div>
     </UserLayout>
   );

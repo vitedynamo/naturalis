@@ -214,6 +214,7 @@ export default function AdminSettings() {
         home_below_featured_mode: s.home_below_featured_mode || "cards",
         home_below_featured_image_url: s.home_below_featured_image_url || "",
         home_secondary_section_enabled: s.home_secondary_section_enabled !== false,
+        home_plans_count: Number(s.home_plans_count) || 3,
         require_security_questions: s.require_security_questions !== false,
         quick_deposit_amounts: (s.quick_deposit_amounts_raw || (s.quick_deposit_amounts || []).join(","))
           .split(",").map((x) => parseInt(String(x).replace(/[^\d]/g, ""), 10)).filter((n) => n > 0),
@@ -629,6 +630,17 @@ export default function AdminSettings() {
                 </select>
                 <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Currently selected: <span className="font-bold text-[color:var(--text-primary)]">{products.find((p) => p.id === s.featured_product_id)?.name || "— None —"}</span></span>
               </label>
+            </Section>
+
+            <Section title="Investment plans on home" hint="How many plan cards to show in the 'Investment plans' row on the user dashboard. The full list is always available on the Invest tab.">
+              <Field
+                label="Number of plans to show"
+                value={s.home_plans_count ?? 3}
+                step="1"
+                onChange={(v) => setS({ ...s, home_plans_count: v })}
+                testid="home-plans-count"
+                sub="Default 3. Set how many plans appear on the home page."
+              />
             </Section>
 
             <Section title="Section below featured plan" hint="An independent section on the user dashboard. Toggle it on/off separately from the featured plan, then choose the default action cards (Team / Coupon / Packages) or a custom image (e.g. a poster of your investment packages).">
