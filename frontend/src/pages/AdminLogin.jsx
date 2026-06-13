@@ -44,11 +44,11 @@ export default function AdminLogin() {
 
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center overflow-hidden shadow-xl">
               <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
             </div>
             <div>
-              <div className="font-display font-extrabold text-xl tracking-tight">EVOQUE-NOVA</div>
+              <div className="font-display font-extrabold text-xl tracking-tight">NATURALIS</div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/60 mt-0.5">Admin Console</div>
             </div>
           </div>

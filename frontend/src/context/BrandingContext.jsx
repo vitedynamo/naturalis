@@ -1,10 +1,10 @@
 /* Branding context — exposes the dynamic logo URL (uploaded by the admin) plus a
- * resolver. Falls back to the static `/evoque-nova-logo.png` packaged in /public.
+ * resolver. Falls back to the static `/naturalis-logo.png` packaged in /public.
  * Also updates the document favicon whenever the logo URL changes. */
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-const DEFAULT_LOGO = `${process.env.PUBLIC_URL || ""}/evoque-nova-logo.png`;
+const DEFAULT_LOGO = `${process.env.PUBLIC_URL || ""}/naturalis-logo.png`;
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const BrandingContext = createContext({

@@ -28,7 +28,7 @@ export default function AuthShell({ title, subtitle, children, footer, testid })
           data-testid={testid}
         >
           <div className="flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden ring-1 ring-[color:var(--border-default)] bg-[color:var(--surface)] flex items-center justify-center">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden ring-1 ring-[color:var(--border-default)] bg-white flex items-center justify-center">
               <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-1" />
             </div>
             <div className="font-display text-2xl font-bold tracking-tight mt-3 text-[color:var(--brand)]">

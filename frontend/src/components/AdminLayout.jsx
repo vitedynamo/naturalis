@@ -31,11 +31,11 @@ function Brand() {
   const { logoUrl } = useBranding();
   return (
     <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-      <div className="w-11 h-11 rounded-2xl bg-black flex items-center justify-center overflow-hidden shadow-lg shadow-black/30">
+      <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center overflow-hidden shadow-lg shadow-black/10 ring-1 ring-[color:var(--border-light)]">
         <img src={logoUrl} alt="Naturalis" className="w-full h-full object-contain p-0.5" />
       </div>
       <div className="leading-tight">
-        <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">EVOQUE-NOVA</div>
+        <div className="font-display font-extrabold text-[color:var(--text-primary)] text-base tracking-tight">NATURALIS</div>
         <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--text-tertiary)] mt-0.5">Admin Panel</div>
       </div>
     </div>
