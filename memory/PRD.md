@@ -1,8 +1,25 @@
 # Naturalis — PRD & Implementation Log
 
+## Recent Changes (Jun 2026 — iteration 73)
+
+### 3 user requests: Team bug fix · home plans limit · Invest redesign
+
+1. **Team page not displaying data (BUG, root cause N+1):** `/referrals` looked up each referred user + their investments with a separate Atlas query (e.g. King Manny = 57 gen-1 + 208 gen-2 = ~530 sequential round-trips), so the page hung/blanked for large referrers. **Rewrote `/referrals` to batch-load** all referred users and their investments via two `$in` queries + Python grouping. Verified via curl: King Manny's 265-member team now returns in ~1s (was timing out). Added a loading skeleton (`team-loading`) to `Referrals.jsx`.
+
+2. **Home plans limit (admin-customizable):** new Setting `home_plans_count` (default 3) in `models.py` Settings + SettingsUpdate, exposed on `/settings/public`, with a "Number of plans to show" field in Admin Settings → Home (`home-plans-count-input`). Dashboard slices the "Investment plans" row to this count. Verified: dashboard shows exactly 3 cards.
+
+3. **Invest page redesign (cowrywise) + nature visuals + loading skeletons:** `Invest.jsx` fully redesigned — image-header cards with the plan NAME overlaid in white, ROI badge, Daily/Days/Total stat row, From-price + Invest CTA. Plans without an uploaded image get a green `hero-gradient` tile with a rotating nature icon (Leaf/Sprout/TreePine/Trees/Mountain/Flower2) — same nature fallback applied to Dashboard plan cards. Added `SkeletonCard` loading state so the grid is never blank before products load.
+
+**Verified (testing agent, frontend, iteration_15.json):** 100% of 7 scenarios pass on desktop + mobile; Team loads (no hang), dashboard limited to 3 plans, Invest redesign + skeleton + dialog all correct; Botanical theme intact, no overflow. No live data mutated. Minor non-blocking: pre-existing Radix `aria-describedby` dialog warnings.
+
+## Recent Changes (Jun 2026 — iteration 72)
+
+### Home page reverted to "Botanical Bank" then re-laid-out (Cowrywise fintech)
+The neo-brutalist "Editorial Ledger" home (iter 71) was rejected by the user ("horrible"). Reverted Dashboard + removed `.ledger-home` CSS. Then rebuilt the home with a **Cowrywise-style fintech layout** (kept Botanical colors): greeting → colored green **wallet card** (balance + Deposit/Withdraw on the card) → **stat tiles** (Total earned / Active plans / Referral bonus) → slim gold **daily reward** strip → compact **featured plan** → prominent scrollable **investment plan cards** with "See all" → **More** quick actions (Invite/Coupon). Welcome modal retained.
+
 ## Recent Changes (Jun 2026 — iteration 71)
 
-### Home page (Dashboard) FULL structural redesign — "Editorial Ledger" (neo-brutalist)
+### Home page (Dashboard) FULL structural redesign — "Editorial Ledger" (neo-brutalist) — REVERTED in iter 72
 
 User rejected the prior 3 home redesigns (blue/gold, green/coral, earthy botanical) as "feeling the same — not a color change alone, change the ENTIRE design/feel." Design agent produced an Archetype-4 (Swiss/high-contrast brutalist) blueprint. Reinvented the home STRUCTURE, not a recolor:
 
