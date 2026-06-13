@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only verification of (1) redesigned top nav (mobile + desktop), (2) ONE-TAP invest (no dialog), (3) Team page new layout (KPI tiles + searchable member table). Tested on https://evoque-payout-fix.preview.emergentagent.com at 430x900 (mobile) and 1440x900 (desktop). Login user phone=08099887766, balance=₦1,000, referral=EGVZR52, 0 referrals. All 8 review-request scenarios PASSED. No live DB mutations (invest click returned 400 'Insufficient wallet balance' toast as intended).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Invest page header (desktop /invest)", "issues": ["Right-side 'WALLET / ₦1,000.00' header label sits in the same row as where the sonner toast appears, so the error toast overlaps the wallet label briefly. Non-blocking cosmetic only."]},
+      {"screen": "Pre-existing Radix warning", "issues": ["Console warning 'Missing Description or aria-describedby={undefined} for {DialogContent}' still fires from the welcome modal (InAppAnnouncementPopup). Invest dialog was removed in this iteration so that source is gone — only the welcome modal warning remains. Same as iteration 15, not introduced by this iteration."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_16.json"],
+  "action_items": [
+    "(Optional, a11y) Add <DialogDescription> to the welcome modal (InAppAnnouncementPopup) DialogContent to silence the recurring Radix warning."
+  ],
+  "critical_code_review_comments": [
+    "UserLayout.jsx mobile top bar correctly removes logo image, places Naturalis wordmark with wallet-under-name (data-testid='topbar-balance'), theme toggle on right; pt-16 main padding applied. Verified visually.",
+    "UserLayout.jsx desktop sidebar header correctly removes logo image and the previous green-gradient wallet card; replaced with wordmark + 'Wallet balance' label + sidebar-balance + theme toggle. NavLinks unchanged.",
+    "Invest.jsx invest() handler is fully one-tap: setInvestingId(p.id) → api.post('/invest') with amount=p.price → toast on success/error → navigate on success. No <Dialog> render anywhere in the file (grep-confirmed). Button shows 'Investing…' + Loader2 spinner during async call.",
+    "Referrals.jsx (/team) layout is clearly different from old two-big-tab-cards: green hero-gradient share banner, 4-up KpiTile grid, search input + 3 chip filter, table with MemberRow / loading skeleton / empty state. All required data-testids present."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% — all 8 review scenarios verified on mobile + desktop"},
+  "test_credentials": "phone 08099887766 / password newpwd (referral code EGVZR52, wallet ₦1,000.00, 0 referrals)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "MOBILE (430x900):\n- /dashboard top bar shows wordmark 'Naturalis' (top) + '₦1,000.00' (under, with wallet icon) on left, theme toggle (moon icon) on right. No <img> in the .lg:hidden.fixed.top-0 nav.\n- topbar-balance reads '₦1,000.00' on /dashboard, /invest, /team — confirmed all three pages.\n- Theme toggle click toggles documentElement class '' → 'dark' (verified). Bottom mobile-bottom-nav still floats and works.\n\nINVEST one-tap (both viewports):\n- Clicking invest-btn-D950RH6EF2 produces NO dialog ([role=dialog] count = 0 immediately after click). POST /invest fires with amount=plan.price → backend returns 400 → sonner toast 'Insufficient wallet balance. Please deposit.' shows. NO DB write. Confirmed safe.\n- plan-skeleton not observable because /products responds <500ms (same as iter 15). SkeletonCard code present in Invest.jsx lines 19-32, data-testid='plan-skeleton'. Will render on slow networks.\n\nTEAM (/team) new layout — all data-testids present:\n  referral-banner, referral-code='EGVZR52', copy-code-btn, copy-link-btn,\n  team-kpi-total (0), team-kpi-gen1 (0, label 'Gen 1 · 20%'), team-kpi-gen2 (0, 'Gen 2 · 3%'), team-kpi-earnings (₦0.00),\n  team-search (input), team-filter-all/1/2 (chip styling toggles to bg-[color:var(--brand)] when active — verified),\n  team-table, team-empty ('No referrals yet. Share your code to start building your team.'). \n  team-loading skeleton not observed because /referrals responds quickly; code path exists at lines 159-170.\n\nDESKTOP (1440x900):\n- aside has sidebar-balance='₦1,000.00', NO <img>, NO hero-gradient wallet card (verified via DOM query). Theme toggle in sidebar header works.\n- nav-invest / nav-team links route correctly. 4 product cards on /invest with image headers + ROI badge + stat row + From price + Invest CTA. Same one-tap behavior confirmed.\n\nRegression: documentElement.scrollWidth == clientWidth on both /invest and /team at both viewports (no horizontal overflow). Botanical green theme intact. Bottom mobile nav floats and is functional.",
+  "rca of the issue": "No bugs found. The previous iteration's invest Dialog was completely removed from Invest.jsx (no <Dialog>/<DialogContent> imports or JSX) and replaced with direct api.post('/invest', { product_id, amount: p.price }) inside invest(p). Per-card spinner is driven by investingId state with disabled={investing}. The error toast 'Insufficient wallet balance. Please deposit.' is surfaced from the backend 400 response via e.response.data.detail and confirms the one-tap path fires without DB mutation. Top nav refactor in UserLayout.jsx removed BrandingContext/logoUrl usage, replaced both desktop sidebar header and mobile top bar with wordmark + balance + theme-toggle layout, and added pt-16 to main for the mobile bar. Referrals.jsx fully rewritten with KpiTile + MemberRow components, search + filter chips, loading skeleton, empty state — visually distinct from the prior two-tab card layout."
+}

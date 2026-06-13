@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import UserLayout from "@/components/UserLayout";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatNaira } from "@/lib/format";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, Calendar, Coins, Leaf, Sprout, TreePine, Trees, Mountain, Flower2, ArrowRight } from "lucide-react";
+import { TrendingUp, Calendar, Coins, Leaf, Sprout, TreePine, Trees, Mountain, Flower2, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const NATURE_ICONS = [Leaf, Sprout, TreePine, Trees, Mountain, Flower2];
@@ -34,7 +32,7 @@ function SkeletonCard() {
 }
 
 /* Cowrywise-style investment plan card */
-function PlanCard({ p, idx, onInvest }) {
+function PlanCard({ p, idx, onInvest, investing }) {
   const totalRoi = (p.daily_profit_percent * p.duration_days).toFixed(0);
   const dailyPayout = p.price * p.daily_profit_percent / 100;
   const totalReturn = p.price + dailyPayout * p.duration_days;
@@ -45,7 +43,6 @@ function PlanCard({ p, idx, onInvest }) {
       style={{ animationDelay: `${idx * 50}ms` }}
       data-testid={`product-card-${p.id}`}
     >
-      {/* Header — nature image with name overlaid */}
       <div className="relative aspect-[16/10] w-full overflow-hidden">
         {p.image_url ? (
           <img src={resolveImg(p.image_url)} alt={p.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -66,7 +63,6 @@ function PlanCard({ p, idx, onInvest }) {
         </div>
       </div>
 
-      {/* Body */}
       <div className="p-4">
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-[color:var(--surface-alt)] p-2.5 text-center">
@@ -90,10 +86,11 @@ function PlanCard({ p, idx, onInvest }) {
           </div>
           <button
             onClick={() => onInvest(p)}
+            disabled={investing}
             data-testid={`invest-btn-${p.id}`}
-            className="inline-flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] px-5 py-2.5 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 hover:-translate-y-0.5 transition-all"
+            className="inline-flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] px-5 py-2.5 rounded-full font-semibold shadow-md shadow-[color:var(--brand)]/20 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0"
           >
-            Invest <ArrowRight className="w-4 h-4" />
+            {investing ? <><Loader2 className="w-4 h-4 animate-spin" /> Investing…</> : <>Invest <ArrowRight className="w-4 h-4" /></>}
           </button>
         </div>
       </div>
@@ -106,11 +103,7 @@ export default function Invest() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [amount, setAmount] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const amountRef = useRef(null);
+  const [investingId, setInvestingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -124,27 +117,18 @@ export default function Invest() {
 
   useEffect(() => { load(); }, []);
 
-  const openInvest = (p) => {
-    setSelected(p);
-    setAmount(String(p.price));
-    setOpen(true);
-  };
-
-  const submit = async () => {
-    if (!selected) return;
-    setSubmitting(true);
-    if (amountRef.current) {
-      try { amountRef.current.blur(); } catch { /* noop */ }
-    }
+  // One-tap invest — purchases at the plan price immediately, no confirmation popup.
+  const invest = async (p) => {
+    if (investingId) return;
+    setInvestingId(p.id);
     try {
-      const { data } = await api.post("/invest", { product_id: selected.id, amount: Number(amount) });
-      toast.success(`Invested ${formatNaira(amount)} in ${selected.name}`);
-      setOpen(false);
+      const { data } = await api.post("/invest", { product_id: p.id, amount: p.price });
+      toast.success(`Invested ${formatNaira(p.price)} in ${p.name}`);
       await refresh();
       navigate("/my-packages", { state: { highlightId: data?.investment?.id } });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Investment failed");
-      setSubmitting(false);
+      setInvestingId(null);
     }
   };
 
@@ -154,7 +138,7 @@ export default function Invest() {
         <div>
           <div className="text-label">Investment Plans</div>
           <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mt-1">Grow with Naturalis</h1>
-          <p className="text-sm text-[color:var(--text-secondary)] mt-1">Pick a plan and earn daily profit — paid into your wallet every 24 hours.</p>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1">Tap a plan to invest instantly — daily profit lands in your wallet every 24 hours.</p>
         </div>
         <div className="hidden md:block text-right">
           <div className="text-label">Wallet</div>
@@ -168,49 +152,9 @@ export default function Invest() {
         ) : products.length === 0 ? (
           <div className="col-span-full card-soft p-10 text-center text-[color:var(--text-secondary)]" data-testid="plans-empty">No plans available yet. Please check back soon.</div>
         ) : (
-          products.map((p, idx) => <PlanCard key={p.id} p={p} idx={idx} onInvest={openInvest} />)
+          products.map((p, idx) => <PlanCard key={p.id} p={p} idx={idx} onInvest={invest} investing={investingId === p.id} />)
         )}
       </div>
-
-      <Dialog open={open} onOpenChange={(o) => { if (!submitting) setOpen(o); }}>
-        <DialogContent
-          data-testid="invest-dialog"
-          className="duration-[1200ms] ease-out w-[calc(100vw-2rem)] max-w-lg rounded-2xl data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="font-display">Invest in {selected?.name}</DialogTitle>
-          </DialogHeader>
-          {selected && (
-            <div className="space-y-4">
-              <div className="rounded-lg bg-[color:var(--surface-alt)] p-3 text-sm">
-                Daily profit: <span className="font-semibold">{selected.daily_profit_percent}%</span> · Duration: <span className="font-semibold">{selected.duration_days} days</span>
-              </div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
-              <input
-                ref={amountRef}
-                type="number" min={selected.min_amount || selected.price} value={amount}
-                onChange={(e)=>setAmount(e.target.value)}
-                disabled
-                readOnly
-                tabIndex={-1}
-                data-testid="invest-amount-input"
-                className="w-full px-3 py-3 bg-[color:var(--surface-alt)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-semibold opacity-90 cursor-not-allowed focus:outline-none"
-              />
-              <div className="text-sm text-[color:var(--text-secondary)]">
-                Daily return: <span className="font-semibold text-[color:var(--text-primary)]">{formatNaira((Number(amount) || 0) * selected.daily_profit_percent / 100)}</span>
-              </div>
-              <div className="text-xs text-[color:var(--text-tertiary)]">Wallet balance: {formatNaira(user?.wallet_balance)}</div>
-            </div>
-          )}
-          <DialogFooter className="gap-3 sm:gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting} data-testid="invest-cancel">Cancel</Button>
-            <Button onClick={submit} disabled={submitting} data-testid="invest-submit" className="bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)]">
-              {submitting ? "Investing…" : "Confirm investment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </UserLayout>
   );
 }
