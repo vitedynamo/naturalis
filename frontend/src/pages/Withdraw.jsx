@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { formatNaira, formatDate } from "@/lib/format";
-import { ArrowUpFromLine, KeyRound, ShieldAlert } from "lucide-react";
+import { ArrowUpFromLine, KeyRound, Landmark, TrendingUp, CheckCircle2, Lock, ArrowRight, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
@@ -92,45 +92,96 @@ export default function Withdraw() {
         ) : <>&nbsp;</>}
       </p>
 
-      {!bankReady && (
-        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="bank-missing-warn">
-          <div className="font-semibold text-[color:var(--text-primary)]">Add your bank details</div>
-          <div className="text-sm text-[color:var(--text-secondary)] mt-1">You need to add a bank account before you can withdraw. Once added, every withdrawal will go to this account.</div>
-          <Link to="/profile" data-testid="add-bank-btn" className="mt-4 inline-block btn-primary text-sm">
-            Add bank
-          </Link>
-        </div>
-      )}
+      {/* Unlock-withdrawals checklist — replaces the old separate warning cards */}
+      {(() => {
+        const investPending = investmentsCount === 0;
+        const investLoading = investmentsCount === null;
+        const investDone = !investLoading && investmentsCount > 0;
+        const steps = [
+          {
+            key: "bank", done: !!bankReady, pending: !bankReady, loading: false, icon: Landmark,
+            title: "Add your bank account",
+            desc: bankReady ? `${user?.bank_name} · ${user?.account_number}` : "Withdrawals are paid to your saved bank account.",
+            to: "/profile", label: "Add bank", testid: "add-bank-btn", wrap: "bank-missing-warn",
+          },
+          ...(pinRequired ? [{
+            key: "pin", done: !!hasPin, pending: !hasPin, loading: false, icon: KeyRound,
+            title: "Set a 4-digit withdrawal PIN",
+            desc: hasPin ? "Your withdrawal PIN is set." : "A 4-digit PIN authorises each withdrawal.",
+            to: "/profile", label: "Set PIN", testid: "set-pin-link", wrap: "no-pin-banner",
+          }] : []),
+          {
+            key: "invest", done: investDone, pending: investPending, loading: investLoading, icon: TrendingUp,
+            title: "Purchase an active investment",
+            desc: investDone ? "You have a running plan." : "Withdrawals unlock once you have at least one active plan.",
+            to: "/invest", label: "Invest", testid: "go-invest-link", wrap: "no-investment-banner",
+          },
+        ];
+        const total = steps.length;
+        const completed = steps.filter((s) => s.done).length;
+        const allStepsDone = steps.every((s) => s.done);
+        if (allStepsDone && windowState.open) return null;
+        const pct = total ? (completed / total) * 100 : 0;
+        return (
+          <div className="mt-5 card-soft p-5" data-testid="withdraw-requirements">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-display font-bold text-lg text-[color:var(--text-primary)] leading-tight">Unlock withdrawals</div>
+                <div className="text-xs text-[color:var(--text-secondary)] mt-0.5">{completed} of {total} steps done — complete these to enable cash-outs.</div>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 rounded-full bg-[color:var(--surface-alt)] overflow-hidden">
+              <div className="h-full bg-[color:var(--brand)] transition-all duration-500" style={{ width: `${pct}%` }} />
+            </div>
 
-      {pinRequired && !hasPin && (
-        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="no-pin-banner">
-          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Set your withdrawal PIN</div>
-          <div className="text-sm text-[color:var(--text-secondary)] mt-1">A 4-digit PIN is required to authorise withdrawals. Set yours once on your profile page.</div>
-          <Link to="/profile" data-testid="set-pin-link" className="mt-4 inline-block btn-primary text-sm">
-            Set my PIN
-          </Link>
-        </div>
-      )}
+            <div className="mt-4 space-y-2.5">
+              {steps.map((s) => (
+                <div
+                  key={s.key}
+                  data-testid={s.pending ? s.wrap : undefined}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${
+                    s.done ? "border-[color:var(--border-light)] bg-[color:var(--surface-alt)]" : "border-[color:var(--border-default)]"
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    s.done ? "bg-[color:var(--success-soft)] text-[color:var(--success)]"
+                    : s.loading ? "bg-[color:var(--surface-2)] text-[color:var(--text-tertiary)]"
+                    : "bg-[color:var(--gold-soft)] text-[color:var(--warning)]"
+                  }`}>
+                    {s.done ? <CheckCircle2 className="w-5 h-5" /> : <s.icon className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-[color:var(--text-primary)] truncate">{s.title}</div>
+                    <div className="text-xs text-[color:var(--text-secondary)] truncate">{s.desc}</div>
+                  </div>
+                  {s.done ? (
+                    <span className="pill pill-success shrink-0">Done</span>
+                  ) : s.loading ? (
+                    <span className="text-xs text-[color:var(--text-tertiary)] shrink-0">…</span>
+                  ) : (
+                    <Link to={s.to} data-testid={s.testid}
+                      className="shrink-0 inline-flex items-center gap-1 bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-[color:var(--brand-ink)] text-xs font-semibold px-3.5 py-2 rounded-full transition-colors">
+                      {s.label} <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
 
-      {bankReady && !windowState.open && (
-        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="withdrawals-closed-banner">
-          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals closed</div>
-          <div className="text-sm text-[color:var(--text-secondary)] mt-1">{windowState.reason}</div>
-        </div>
-      )}
-
-      {/* Investment gate — block users with no currently-active investment */}
-      {investmentsCount === 0 && (
-        <div className="mt-4 card-soft p-5 border-l-4 border-[color:var(--warning)]" data-testid="no-investment-banner">
-          <div className="font-semibold text-[color:var(--text-primary)] flex items-center gap-2">Withdrawals require an active investment</div>
-          <div className="text-sm text-[color:var(--text-secondary)] mt-1">
-            You need at least one running investment to request a withdrawal. Completed or paused plans don't count — head to the Invest tab and pick a new plan to re-enable withdrawals.
+            {bankReady && !windowState.open && (
+              <div className="mt-3 flex items-start gap-2 rounded-2xl bg-[color:var(--gold-soft)] p-3 text-xs" data-testid="withdrawals-closed-banner">
+                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-[color:var(--warning)]" />
+                <span className="text-[color:var(--text-secondary)]">
+                  <span className="font-semibold text-[color:var(--text-primary)]">Withdrawals closed.</span> {windowState.reason}
+                </span>
+              </div>
+            )}
           </div>
-          <Link to="/invest" data-testid="go-invest-link" className="mt-4 inline-block btn-primary text-sm">
-            Browse plans
-          </Link>
-        </div>
-      )}
+        );
+      })()}
 
       <form onSubmit={submit} className="card-soft p-6 mt-6" data-testid="withdraw-form">
         <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)]">Amount (₦)</label>
