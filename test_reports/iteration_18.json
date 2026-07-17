@@ -1,0 +1,27 @@
+{
+  "summary": "Regression check after MONGO_URL fix (Atlas -> local mongo). Cloudflare 524/origin-timeout is GONE. Admin login, user register, user login, /auth/me, /products, and /admin/stats all return HTTP 200 in <1s via public URL. UI verified end-to-end: admin dashboard at /pentest/fuser renders real data; user dashboard shows ₦750 welcome bonus; /invest shows the 3 seeded plans (Agro Starter, Real Estate Growth, Gold Reserve).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin dashboard", "issues": ["Platform profit shows ₦-750.00 because the welcome bonus paid to the seeded test user is booked as a platform loss on an empty DB. Cosmetic only, not a bug from this fix."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_18.json"],
+  "action_items": [
+    "Route naming mismatch in the bug report: admin login is at /pentest/fuser/login, NOT /admin/login. The path /admin/login just falls through to the regular user /login page. If desired, add a redirect /admin/login -> /pentest/fuser/login in App.js so support docs match reality."
+  ],
+  "critical_code_review_comments": [
+    "MONGO_URL fix is correct — backend/.env now uses mongodb://localhost:27017 and DB_NAME=evoque_nova, and startup seed for admin + 3 products + settings works.",
+    "CORS_ORIGINS='*' with credentials-carrying JWT headers is fine (bearer auth, no cookies), but if cookies ever get added, this will break — worth noting for future."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin 08123456789/personally at /pentest/fuser/login. Fresh user re-registered: 08099887766/newpwd (name 'Test User', security Qs Pet=Rex, Mother=Smith).",
+  "seed_data_creation": "Registered regular user 08099887766 via POST /api/auth/register (welcome bonus ₦750 credited).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "DB is fresh mongodb://localhost:27017/evoque_nova. Only seeded admin (admin-root, phone 08123456789) + 3 products (Agro Starter, Real Estate Growth, Gold Reserve) + 1 test user (u_d6208ac30ac9bade / 08099887766) exist. Admin login route is /pentest/fuser/login on the frontend (not /admin/login). All auth uses POST /api/auth/login for both admin and user — backend checks is_admin flag on user record.",
+  "rca of the issue": "Prior Atlas SRV DNS was NXDOMAIN causing FastAPI startup crash -> ingress returned 502/524. Switching MONGO_URL to the container-local mongod resolved it; startup seed populated admin + products. Verified: admin login 0.42s, user login 0.31s, /products 0.09s, /admin/stats 0.09s over the public preview URL."
+}
