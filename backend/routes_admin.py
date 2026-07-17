@@ -1294,8 +1294,10 @@ async def list_deposits(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     await _expire_stale_pending_deposits(db)
     items = await db.deposits.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    user_ids = list({it["user_id"] for it in items})
+    umap = {u["id"]: u async for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1})}
     for it in items:
-        u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
+        u = umap.get(it["user_id"])
         it["user_name"] = u["name"] if u else "—"
         it["user_phone"] = u["phone"] if u else "—"
     return items
@@ -1341,8 +1343,10 @@ async def approve_deposit(deposit_id: str, request: Request, _admin=Depends(get_
 async def list_withdrawals(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     items = await db.withdrawals.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    user_ids = list({it["user_id"] for it in items})
+    umap = {u["id"]: u async for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1})}
     for it in items:
-        u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
+        u = umap.get(it["user_id"])
         it["user_name"] = u["name"] if u else "—"
         it["user_phone"] = u["phone"] if u else "—"
     return items
@@ -1412,8 +1416,10 @@ async def reject_withdrawal(wid: str, payload: AdminWithdrawalAction, request: R
 async def list_all_investments(request: Request, _admin=Depends(get_current_admin)):
     db = request.app.state.db
     items = await db.investments.find({}, {"_id": 0}).sort("started_at", -1).to_list(2000)
+    user_ids = list({it["user_id"] for it in items})
+    umap = {u["id"]: u async for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1})}
     for it in items:
-        u = await db.users.find_one({"id": it["user_id"]}, {"_id": 0, "name": 1, "phone": 1})
+        u = umap.get(it["user_id"])
         it["user_name"] = u["name"] if u else "—"
         it["user_phone"] = u["phone"] if u else "—"
     return items
