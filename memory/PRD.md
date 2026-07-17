@@ -1,5 +1,12 @@
 # Naturalis — PRD & Implementation Log
 
+## Recent Changes (Jul 2026 — DB migration + 10 nature plans)
+- **DB outage fixed:** original Atlas cluster (cluster1.mwunj) was deleted (DNS NXDOMAIN) → backend crashed → Cloudflare 524 on login. Repointed `MONGO_URL` to a NEW user-provided Atlas cluster (`naturalis.n2zdt.mongodb.net`, DB `evoque_nova`). Backend healthy; admin + user login verified.
+- **10 nature investment plans:** replaced all plans with a full growth ladder — Seedling ₦5k/4.0% → Sprout ₦10k/4.5% → Sapling ₦20k/5.0% → Wildflower ₦35k/5.5% → Bamboo Grove ₦50k/6.0% → Olive Grove ₦75k/6.5% → Oakwood ₦100k/7.0% → Cedar Ridge ₦175k/7.5% → Redwood ₦250k/8.0% → Evergreen Summit ₦500k/9.0%. Each has a validated Unsplash nature photo. `server.py` startup seed now creates all 10 so any fresh DB/redeploy matches.
+- **Logo:** Naturalis logo self-hosted at `/public/naturalis-logo.png`, applied app-wide via BrandingContext (auth/admin/favicon).
+- ⚠️ Production (https://naaturalis.com) must be **redeployed** with this MONGO_URL to pick up the new DB + plans + logo.
+
+
 ## Recent Changes (Jun 2026 — iteration 73)
 
 ### 3 user requests: Team bug fix · home plans limit · Invest redesign

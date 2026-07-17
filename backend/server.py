@@ -140,36 +140,16 @@ async def on_startup():
     count = await db.products.count_documents({})
     if count == 0:
         defaults = [
-            {
-                "name": "Seedling",
-                "description": "Plant your first seed. A gentle entry plan that grows your wallet with steady daily returns.",
-                "image_url": "https://images.unsplash.com/photo-1557234195-bd9f290f0e4d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxzZWVkbGluZyUyMGVtZXJnaW5nJTIwc29pbHxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
-                "price": 5000,
-                "daily_profit_percent": 4.0,
-                "duration_days": 30,
-                "min_amount": 5000,
-                "max_amount": 0,
-            },
-            {
-                "name": "Sprout",
-                "description": "Your money breaks ground. Watch your Sprout take root with reliable daily yields.",
-                "image_url": "https://images.unsplash.com/photo-1593850685398-e79bab596d1d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxtaWNyb2dyZWVucyUyMGdyb3dpbmd8ZW58MHx8fHwxNzgxMzM2NTc1fDA&ixlib=rb-4.1.0&q=85",
-                "price": 20000,
-                "daily_profit_percent": 5.0,
-                "duration_days": 40,
-                "min_amount": 20000,
-                "max_amount": 0,
-            },
-            {
-                "name": "Sapling",
-                "description": "A young plan finding its strength — dependable daily returns, day after day.",
-                "image_url": "https://images.unsplash.com/photo-1547106429-11e696f446d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxzYXBsaW5nJTIwdHJlZSUyMHN1bmxpZ2h0fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
-                "price": 50000,
-                "daily_profit_percent": 6.5,
-                "duration_days": 50,
-                "min_amount": 50000,
-                "max_amount": 0,
-            },
+            {"name": "Seedling", "description": "Plant your first seed. A gentle entry plan that grows your wallet with steady daily returns.", "image_url": "https://images.unsplash.com/photo-1557234195-bd9f290f0e4d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxzZWVkbGluZyUyMGVtZXJnaW5nJTIwc29pbHxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85", "price": 5000, "daily_profit_percent": 4.0, "duration_days": 30, "min_amount": 5000, "max_amount": 0},
+            {"name": "Sprout", "description": "Your money breaks ground. Watch your Sprout take root with reliable daily yields.", "image_url": "https://images.unsplash.com/photo-1593850685398-e79bab596d1d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxtaWNyb2dyZWVucyUyMGdyb3dpbmd8ZW58MHx8fHwxNzgxMzM2NTc1fDA&ixlib=rb-4.1.0&q=85", "price": 10000, "daily_profit_percent": 4.5, "duration_days": 30, "min_amount": 10000, "max_amount": 0},
+            {"name": "Sapling", "description": "A young plan finding its strength — dependable daily returns, day after day.", "image_url": "https://images.unsplash.com/photo-1547106429-11e696f446d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxzYXBsaW5nJTIwdHJlZSUyMHN1bmxpZ2h0fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85", "price": 20000, "daily_profit_percent": 5.0, "duration_days": 35, "min_amount": 20000, "max_amount": 0},
+            {"name": "Wildflower", "description": "Bloom a little brighter. Vibrant daily returns for growing investors.", "image_url": "https://images.unsplash.com/photo-1618813690183-c8a0e5de80f0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwxfHx3aWxkZmxvd2VycyUyMGZpZWxkfGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85", "price": 35000, "daily_profit_percent": 5.5, "duration_days": 35, "min_amount": 35000, "max_amount": 0},
+            {"name": "Bamboo Grove", "description": "Fast, resilient growth. Bamboo-quick daily yields that compound your harvest.", "image_url": "https://images.unsplash.com/photo-1586061968253-7bf5724aab7b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxiYW1ib28lMjBmb3Jlc3QlMjBncmVlbnxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85", "price": 50000, "daily_profit_percent": 6.0, "duration_days": 40, "min_amount": 50000, "max_amount": 0},
+            {"name": "Olive Grove", "description": "Patience bears fruit. A premium grove delivering rich daily returns.", "image_url": "https://images.unsplash.com/photo-1591122523233-22037c1dec9f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxvbGl2ZSUyMHRyZWUlMjBicmFuY2hlc3xlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85", "price": 75000, "daily_profit_percent": 6.5, "duration_days": 40, "min_amount": 75000, "max_amount": 0},
+            {"name": "Oakwood", "description": "Strong and dependable as oak. Substantial daily returns for serious growers.", "image_url": "https://images.unsplash.com/photo-1502082553048-f009c37129b9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxvYWslMjB0cmVlJTIwc3Ryb25nfGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85", "price": 100000, "daily_profit_percent": 7.0, "duration_days": 45, "min_amount": 100000, "max_amount": 0},
+            {"name": "Cedar Ridge", "description": "Rise above the canopy with elevated daily yields from a premium tier.", "image_url": "https://images.unsplash.com/photo-1551120738-c3fcea8d0cf8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxwaW5lJTIwZm9yZXN0JTIwbW91bnRhaW58ZW58MHx8fHwxNzgxMzM2NTY1fDA&ixlib=rb-4.1.0&q=85", "price": 175000, "daily_profit_percent": 7.5, "duration_days": 45, "min_amount": 175000, "max_amount": 0},
+            {"name": "Redwood", "description": "Towering returns — one of our tallest plans for ambitious portfolios.", "image_url": "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxyZWR3b29kJTIwdHJlZXMlMjB0b3dlcmluZ3xlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85", "price": 250000, "daily_profit_percent": 8.0, "duration_days": 50, "min_amount": 250000, "max_amount": 0},
+            {"name": "Evergreen Summit", "description": "The peak of the forest. Our flagship plan with the richest daily harvest.", "image_url": "https://images.unsplash.com/photo-1486707471592-8e7eb7e36f78?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxldmVyZ3JlZW4lMjBmb3Jlc3QlMjBtb3VudGFpbiUyMG1pc3R5fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85", "price": 500000, "daily_profit_percent": 9.0, "duration_days": 60, "min_amount": 500000, "max_amount": 0},
         ]
         for d in defaults:
             await db.products.insert_one({
