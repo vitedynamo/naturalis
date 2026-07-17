@@ -1,8 +1,12 @@
 export function formatNaira(amount, opts = {}) {
-  const { compact = false } = opts;
+  const { compact = false, exact = false } = opts;
   const n = Number(amount || 0);
   if (compact && Math.abs(n) >= 1000) {
     return "₦" + new Intl.NumberFormat("en-NG", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  }
+  // exact: show the precise value, dropping trailing .00 for whole numbers.
+  if (exact) {
+    return "₦" + new Intl.NumberFormat("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n);
   }
   return "₦" + new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
