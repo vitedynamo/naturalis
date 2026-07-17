@@ -8,7 +8,7 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowDownToLine, ArrowUpFromLine, Users, Ticket, Sparkles, Flame, ArrowRight,
   Megaphone, Send, Sparkle, Briefcase, Check, Coins, Calendar, TrendingUp, Wallet, ChevronRight,
-  Leaf, Sprout, TreePine, Trees, Mountain, Flower2,
+  Leaf, Sprout, TreePine, Trees, Mountain, Flower2, X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -370,6 +370,15 @@ export default function Dashboard() {
           <div className="relative h-40 overflow-hidden">
             <img src={WELCOME_ART} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--surface)] via-transparent to-transparent" />
+            <button
+              type="button"
+              onClick={closeWelcome}
+              data-testid="welcome-close-btn"
+              aria-label="Close"
+              className="absolute right-3 top-3 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/45 hover:bg-black/65 text-white backdrop-blur-sm transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <div className="px-6 pt-4 pb-6">
             <div className="inline-flex items-center gap-1.5 text-[color:var(--accent-main)] text-[10px] uppercase tracking-[0.18em] font-bold">
