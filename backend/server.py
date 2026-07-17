@@ -141,9 +141,9 @@ async def on_startup():
     if count == 0:
         defaults = [
             {
-                "name": "Agro Starter",
-                "description": "Invest in Nigerian agriculture. Daily returns from farm produce sales.",
-                "image_url": "https://images.unsplash.com/photo-1673200692829-fcdb7e267fc1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHxhZ3JpY3VsdHVyZSUyMGZhcm0lMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzc5MzEwMjc0fDA&ixlib=rb-4.1.0&q=85",
+                "name": "Seedling",
+                "description": "Plant your first seed. A gentle entry plan that grows your wallet with steady daily returns.",
+                "image_url": "https://images.unsplash.com/photo-1557234195-bd9f290f0e4d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxzZWVkbGluZyUyMGVtZXJnaW5nJTIwc29pbHxlbnwwfHx8fDE3ODEzMzY1NTl8MA&ixlib=rb-4.1.0&q=85",
                 "price": 5000,
                 "daily_profit_percent": 4.0,
                 "duration_days": 30,
@@ -151,9 +151,9 @@ async def on_startup():
                 "max_amount": 0,
             },
             {
-                "name": "Real Estate Growth",
-                "description": "Earn daily from property development across Lagos & Abuja.",
-                "image_url": "https://images.pexels.com/photos/27307400/pexels-photo-27307400.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+                "name": "Sprout",
+                "description": "Your money breaks ground. Watch your Sprout take root with reliable daily yields.",
+                "image_url": "https://images.unsplash.com/photo-1593850685398-e79bab596d1d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxtaWNyb2dyZWVucyUyMGdyb3dpbmd8ZW58MHx8fHwxNzgxMzM2NTc1fDA&ixlib=rb-4.1.0&q=85",
                 "price": 20000,
                 "daily_profit_percent": 5.0,
                 "duration_days": 40,
@@ -161,9 +161,9 @@ async def on_startup():
                 "max_amount": 0,
             },
             {
-                "name": "Gold Reserve",
-                "description": "Premium gold-backed plan with stable daily yields.",
-                "image_url": "https://images.pexels.com/photos/33539242/pexels-photo-33539242.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+                "name": "Sapling",
+                "description": "A young plan finding its strength — dependable daily returns, day after day.",
+                "image_url": "https://images.unsplash.com/photo-1547106429-11e696f446d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxzYXBsaW5nJTIwdHJlZSUyMHN1bmxpZ2h0fGVufDB8fHx8MTc4MTMzNjU1OXww&ixlib=rb-4.1.0&q=85",
                 "price": 50000,
                 "daily_profit_percent": 6.5,
                 "duration_days": 50,
