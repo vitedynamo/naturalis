@@ -6,10 +6,12 @@ from typing import Optional
 
 import bcrypt
 import jwt
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "naija-invest-dev-secret")
+load_dotenv()
+JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGO = "HS256"
 JWT_TTL_HOURS = 24 * 7
 
