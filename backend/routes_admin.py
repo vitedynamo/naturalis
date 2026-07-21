@@ -1312,7 +1312,14 @@ async def approve_deposit(deposit_id: str, request: Request, _admin=Depends(get_
         raise HTTPException(404, "Deposit not found")
     if deposit["status"] == "success":
         return {"status": "already_success"}
-    await db.deposits.update_one({"id": deposit_id}, {"$set": {"status": "success", "updated_at": _now_iso()}})
+    # Atomically claim the success transition — credit only if WE flipped it,
+    # so this can't double-credit a deposit already credited by verify/webhook/poll.
+    claim = await db.deposits.update_one(
+        {"id": deposit_id, "status": {"$ne": "success"}},
+        {"$set": {"status": "success", "updated_at": _now_iso()}},
+    )
+    if claim.modified_count != 1:
+        return {"status": "already_success"}
     new_user = await db.users.find_one_and_update(
         {"id": deposit["user_id"]},
         {"$inc": {"wallet_balance": float(deposit["amount"])}},
@@ -2157,25 +2164,36 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
     if new_gateway_id and new_gateway_id != d.get("gateway_id"):
         update["gateway_id"] = new_gateway_id
     if new_status == "success" and d.get("status") != "success":
-        # Credit user wallet idempotently
-        new_user = await db.users.find_one_and_update(
-            {"id": d["user_id"]},
-            {"$inc": {"wallet_balance": float(d["amount"])}},
-            return_document=True,
-            projection={"_id": 0},
+        # Atomically claim the success transition; credit the wallet only if WE flipped
+        # the row from non-success -> success. Prevents double-credit when the user-side
+        # verify/webhook path credits the same deposit concurrently.
+        claim = await db.deposits.update_one(
+            {"id": d["id"], "status": {"$ne": "success"}},
+            {"$set": update},
         )
-        if new_user:
-            await db.transactions.insert_one({
-                "id": gen_reference("tx"),
-                "user_id": d["user_id"],
-                "type": "deposit",
-                "amount": float(d["amount"]),
-                "description": "Deposit credited",
-                "balance_after": new_user["wallet_balance"],
-                "meta": {"reference": reference, "gateway": gateway, "by": "poll"},
-                "created_at": _now_iso(),
-            })
-    await db.deposits.update_one({"id": d["id"]}, {"$set": update})
+        if claim.modified_count == 1:
+            new_user = await db.users.find_one_and_update(
+                {"id": d["user_id"]},
+                {"$inc": {"wallet_balance": float(d["amount"])}},
+                return_document=True,
+                projection={"_id": 0},
+            )
+            if new_user:
+                await db.transactions.insert_one({
+                    "id": gen_reference("tx"),
+                    "user_id": d["user_id"],
+                    "type": "deposit",
+                    "amount": float(d["amount"]),
+                    "description": "Deposit credited",
+                    "balance_after": new_user["wallet_balance"],
+                    "meta": {"reference": reference, "gateway": gateway, "by": "poll"},
+                    "created_at": _now_iso(),
+                })
+        else:
+            # Someone else already credited this deposit — skip crediting.
+            action = "already_credited"
+    else:
+        await db.deposits.update_one({"id": d["id"]}, {"$set": update})
     fresh = await db.deposits.find_one({"id": d["id"]}, {"_id": 0})
     fresh["_refresh"] = action
     return fresh

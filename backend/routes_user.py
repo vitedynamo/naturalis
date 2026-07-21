@@ -886,6 +886,52 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
     return {"mode": "mock", "gateway": "mock", "reference": reference, "amount": data.amount}
 
 
+async def _credit_deposit_once(db, reference, *, gateway=None, source=None, extra_set=None):
+    """Atomically transition a deposit pending->success and credit the wallet EXACTLY once.
+
+    The status flip is done with a conditional update ({"status": {"$ne": "success"}}),
+    so if two requests race (verify + webhook, double-tap, re-poll) only the one whose
+    update actually modified the row credits the wallet. Returns (credited, deposit, wallet_balance).
+    """
+    set_fields = {"status": "success", "updated_at": _now_iso()}
+    if extra_set:
+        set_fields.update(extra_set)
+    claim = await db.deposits.update_one(
+        {"reference": reference, "status": {"$ne": "success"}},
+        {"$set": set_fields},
+    )
+    deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
+    if not deposit:
+        return False, None, None
+    if claim.modified_count != 1:
+        # Already credited by a concurrent request/webhook — do NOT credit again.
+        user_doc = await db.users.find_one({"id": deposit["user_id"]}, {"_id": 0})
+        return False, deposit, (user_doc or {}).get("wallet_balance")
+    new_user = await db.users.find_one_and_update(
+        {"id": deposit["user_id"]},
+        {"$inc": {"wallet_balance": deposit["amount"]}},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    meta = {"reference": reference}
+    if gateway:
+        meta["gateway"] = gateway
+    if source:
+        meta["source"] = source
+    await db.transactions.insert_one({
+        "id": gen_reference("tx"),
+        "user_id": deposit["user_id"],
+        "type": "deposit",
+        "amount": deposit["amount"],
+        "description": "Deposit",
+        "balance_after": new_user["wallet_balance"],
+        "meta": meta,
+        "created_at": _now_iso(),
+    })
+    deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
+    return True, deposit, new_user["wallet_balance"]
+
+
 @router.get("/deposit/verify/{reference}")
 async def deposit_verify(reference: str, request: Request, user=Depends(get_current_user)):
     db = request.app.state.db
@@ -1006,28 +1052,8 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
         )
 
     if gateway_status == "success":
-        await db.deposits.update_one(
-            {"reference": reference},
-            {"$set": {"status": "success", "updated_at": _now_iso()}},
-        )
-        new_user = await db.users.find_one_and_update(
-            {"id": user["id"]},
-            {"$inc": {"wallet_balance": deposit["amount"]}},
-            return_document=True,
-            projection={"_id": 0},
-        )
-        await db.transactions.insert_one({
-            "id": gen_reference("tx"),
-            "user_id": user["id"],
-            "type": "deposit",
-            "amount": deposit["amount"],
-            "description": "Deposit",
-            "balance_after": new_user["wallet_balance"],
-            "meta": {"reference": reference},
-            "created_at": _now_iso(),
-        })
-        deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
-        return {"status": "success", "deposit": deposit, "wallet_balance": new_user["wallet_balance"]}
+        credited, deposit, wallet_balance = await _credit_deposit_once(db, reference)
+        return {"status": "success", "deposit": deposit, "wallet_balance": wallet_balance}
     elif gateway_status == "failed":
         await db.deposits.update_one(
             {"reference": reference},
@@ -1055,26 +1081,7 @@ async def paystack_webhook(request: Request):
         reference = event["data"]["reference"]
         deposit = await db.deposits.find_one({"reference": reference}, {"_id": 0})
         if deposit and deposit["status"] != "success":
-            await db.deposits.update_one(
-                {"reference": reference},
-                {"$set": {"status": "success", "updated_at": _now_iso()}},
-            )
-            new_user = await db.users.find_one_and_update(
-                {"id": deposit["user_id"]},
-                {"$inc": {"wallet_balance": deposit["amount"]}},
-                return_document=True,
-                projection={"_id": 0},
-            )
-            await db.transactions.insert_one({
-                "id": gen_reference("tx"),
-                "user_id": deposit["user_id"],
-                "type": "deposit",
-                "amount": deposit["amount"],
-                "description": "Deposit",
-                "balance_after": new_user["wallet_balance"],
-                "meta": {"reference": reference, "source": "paystack_webhook"},
-                "created_at": _now_iso(),
-            })
+            await _credit_deposit_once(db, reference, source="paystack_webhook")
     return {"status": "ok"}
 
 
@@ -1163,27 +1170,8 @@ async def marasoft_webhook(request: Request):
     if not confirmed_success:
         return {"status": "ignored", "reason": "unconfirmed"}
 
-    # Credit wallet (idempotent — checked status=success above)
-    await db.deposits.update_one(
-        {"reference": reference},
-        {"$set": {"status": "success", "updated_at": _now_iso()}},
-    )
-    new_user = await db.users.find_one_and_update(
-        {"id": deposit["user_id"]},
-        {"$inc": {"wallet_balance": deposit["amount"]}},
-        return_document=True,
-        projection={"_id": 0},
-    )
-    await db.transactions.insert_one({
-        "id": gen_reference("tx"),
-        "user_id": deposit["user_id"],
-        "type": "deposit",
-        "amount": deposit["amount"],
-        "description": "Deposit",
-        "balance_after": new_user["wallet_balance"],
-        "meta": {"reference": reference, "gateway": "marasoft"},
-        "created_at": _now_iso(),
-    })
+    # Credit wallet (atomic — credits exactly once even under concurrent webhooks)
+    await _credit_deposit_once(db, reference, gateway="marasoft")
     return {"status": "ok"}
 
 
@@ -1226,27 +1214,10 @@ async def qorepay_webhook(request: Request):
     if qs not in ("success", "successful", "paid", "completed", "approved", "settled"):
         return {"status": "ignored", "reason": f"gateway_status_{qs or 'unknown'}"}
 
-    await db.deposits.update_one(
-        {"reference": reference},
-        {"$set": {"status": "success", "updated_at": _now_iso(),
-                  "gateway_id": str(qd.get("id") or qd.get("transaction_id") or "") or None}},
+    await _credit_deposit_once(
+        db, reference, gateway="qorepay",
+        extra_set={"gateway_id": str(qd.get("id") or qd.get("transaction_id") or "") or None},
     )
-    new_user = await db.users.find_one_and_update(
-        {"id": deposit["user_id"]},
-        {"$inc": {"wallet_balance": deposit["amount"]}},
-        return_document=True,
-        projection={"_id": 0},
-    )
-    await db.transactions.insert_one({
-        "id": gen_reference("tx"),
-        "user_id": deposit["user_id"],
-        "type": "deposit",
-        "amount": deposit["amount"],
-        "description": "Deposit",
-        "balance_after": new_user["wallet_balance"],
-        "meta": {"reference": reference, "gateway": "qorepay"},
-        "created_at": _now_iso(),
-    })
     return {"status": "ok"}
 
 
@@ -1281,27 +1252,10 @@ async def budpay_webhook(request: Request):
     if (bd.get("status") or "").lower() != "success":
         return {"status": "ignored", "reason": f"gateway_status_{(bd.get('status') or 'unknown').lower()}"}
 
-    await db.deposits.update_one(
-        {"reference": reference},
-        {"$set": {"status": "success", "updated_at": _now_iso(),
-                  "gateway_id": str(bd.get("id") or bd.get("transaction_id") or "") or None}},
+    await _credit_deposit_once(
+        db, reference, gateway="budpay",
+        extra_set={"gateway_id": str(bd.get("id") or bd.get("transaction_id") or "") or None},
     )
-    new_user = await db.users.find_one_and_update(
-        {"id": deposit["user_id"]},
-        {"$inc": {"wallet_balance": deposit["amount"]}},
-        return_document=True,
-        projection={"_id": 0},
-    )
-    await db.transactions.insert_one({
-        "id": gen_reference("tx"),
-        "user_id": deposit["user_id"],
-        "type": "deposit",
-        "amount": deposit["amount"],
-        "description": "Deposit",
-        "balance_after": new_user["wallet_balance"],
-        "meta": {"reference": reference, "gateway": "budpay"},
-        "created_at": _now_iso(),
-    })
     return {"status": "ok"}
 
 
