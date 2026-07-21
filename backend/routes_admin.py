@@ -153,46 +153,27 @@ _NG_BANKS_FALLBACK = [
 
 @router.get("/admin/banks")
 async def list_banks(request: Request, _admin=Depends(get_current_admin)):
-    """List Nigerian banks. Nomba → Paystack → static fallback."""
+    """List Nigerian banks using the CONFIGURED payout gateway first, so bank
+    codes match how withdrawals are paid out."""
     db = request.app.state.db
     now = time.time()
-    if _banks_cache["items"] and (now - _banks_cache["at"]) < 3600:
-        return _banks_cache["items"]
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
-    # Try Nomba
-    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+    gw_key = (s.get("payout_gateway") or "paystack").lower()
+    # Cache is keyed by gateway so switching payout gateway serves fresh codes.
+    if _banks_cache.get("items") and _banks_cache.get("gw") == gw_key and (now - _banks_cache["at"]) < 3600:
+        return _banks_cache["items"]
+    # Fetch using the CONFIGURED payout gateway first so bank codes match payouts.
+    from banks_util import gateway_order, bank_list_for
+    for gateway in gateway_order(s):
         try:
-            from nomba import list_banks as nomba_list
-            items = await nomba_list(
-                client_id=s["nomba_client_id"],
-                client_secret=s["nomba_client_secret"],
-                account_id=s["nomba_account_id"],
-                environment=s.get("nomba_environment"),
-            )
+            items = await bank_list_for(s, gateway)
             if items:
                 _banks_cache["items"] = items
                 _banks_cache["at"] = now
+                _banks_cache["gw"] = gw_key
                 return items
         except Exception:
-            pass
-    # Try Paystack
-    secret, _ = await _get_secret_key(db)
-    if secret:
-        try:
-            async with fixie_client(timeout=15) as client:
-                resp = await client.get(
-                    "https://api.paystack.co/bank",
-                    params={"country": "nigeria", "perPage": "200"},
-                    headers={"Authorization": f"Bearer {secret}"},
-                )
-                data = resp.json()
-            if data.get("status"):
-                items = [{"name": b["name"], "code": b["code"]} for b in data["data"]]
-                _banks_cache["items"] = items
-                _banks_cache["at"] = now
-                return items
-        except httpx.HTTPError:
-            pass
+            continue
     return _NG_BANKS_FALLBACK
 
 
@@ -212,6 +193,11 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
 
     if mode == "live" and secret:
         try:
+            from banks_util import remap_bank_code
+            s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+            # Re-map to Paystack's own bank code (matched by name) so the payout
+            # works even if the code was fetched via a different gateway.
+            bank_code = await remap_bank_code(s, "paystack", w.get("bank_name"), payload.bank_code)
             async with fixie_client(timeout=20) as client:
                 # 1. Create transfer recipient
                 rec_resp = await client.post(
@@ -221,7 +207,7 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
                         "type": "nuban",
                         "name": w["account_name"],
                         "account_number": w["account_number"],
-                        "bank_code": payload.bank_code,
+                        "bank_code": bank_code,
                         "currency": "NGN",
                     },
                 )
@@ -294,6 +280,10 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
     transfer_resp = None
 
     if mode == "live" and client_id and client_secret and account_id:
+        from banks_util import remap_bank_code
+        # Re-map to Nomba's own bank code (matched by name) so the payout works
+        # even if the code was fetched via a different gateway.
+        nb_bank_code = await remap_bank_code(s, "nomba", w.get("bank_name"), payload.bank_code)
         # PRE-FLIGHT balance check — reject if Nomba float is insufficient
         try:
             available = await nomba_balance(
@@ -325,7 +315,7 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
         try:
             resolved = await nomba_resolve_account(
                 client_id=client_id, client_secret=client_secret, account_id=account_id,
-                account_number=w["account_number"], bank_code=payload.bank_code,
+                account_number=w["account_number"], bank_code=nb_bank_code,
                 environment=s.get("nomba_environment"),
             )
             resolved_name = (resolved.get("account_name") or "").strip()
@@ -339,7 +329,7 @@ async def pay_withdrawal_via_nomba(wid: str, payload: PaystackPayRequest, reques
                 amount_naira=float(w["amount"]),
                 account_number=w["account_number"],
                 account_name=resolved_name or w["account_name"],
-                bank_code=payload.bank_code, merchant_tx_ref=transfer_ref,
+                bank_code=nb_bank_code, merchant_tx_ref=transfer_ref,
                 narration=payload.reason or f"Withdrawal {wid}",
                 environment=s.get("nomba_environment"),
             )

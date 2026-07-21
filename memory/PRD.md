@@ -24,6 +24,11 @@ Three independent token slots so admin + user + impersonation coexist in one bro
 `api.js` picks token by URL/route; 401 interceptor clears ONLY the rejected slot.
 
 ## Implemented (recent)
+- [Jun 2026] Gateway-aware bank fetching + payout code remap: `/banks`, `/banks/resolve`
+  and `/admin/banks` now fetch from the CONFIGURED `payout_gateway` first (not Nomba by
+  default). New `banks_util.py` adds `gateway_order`, `bank_list_for`, `resolve_for`,
+  `remap_bank_code`. All 4 payout paths re-map the saved bank_code to the payout gateway's
+  own code by bank NAME at send time. Verified: paystack list=259 (GTBank 058), nomba=626.
 - [Jun 2026] IP masking for Paystack: all 12 outbound Paystack calls (bank list, resolve,
   transaction init/verify, transferrecipient, transfer, transfer verify, balance) now route
   through the Fixie proxy via new `payments_proxy.fixie_client()` — same static IP as Nomba

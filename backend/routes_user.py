@@ -321,45 +321,25 @@ async def reset_withdrawal_pin(data: ResetWithdrawalPinRequest, request: Request
 # =========== BANKS (PUBLIC USER ENDPOINTS) ===========
 @router.get("/banks")
 async def banks_for_user(request: Request, user=Depends(get_current_user)):
-    """List Nigerian banks. Tries Nomba → Paystack → static fallback."""
+    """List Nigerian banks using the CONFIGURED payout gateway first, so the
+    bank codes match how withdrawals are actually paid out."""
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
-    # Try Nomba
-    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+    from banks_util import gateway_order, bank_list_for
+    for gateway in gateway_order(s):
         try:
-            from nomba import list_banks as nomba_list
-            items = await nomba_list(
-                client_id=s["nomba_client_id"],
-                client_secret=s["nomba_client_secret"],
-                account_id=s["nomba_account_id"],
-                environment=s.get("nomba_environment"),
-            )
+            items = await bank_list_for(s, gateway)
             if items:
                 return items
         except Exception as e:
-            logger.warning(f"Nomba bank list failed: {e}")
-    # Try Paystack
-    secret = s.get("paystack_secret_key") or ""
-    if secret:
-        try:
-            async with fixie_client(timeout=15) as client:
-                resp = await client.get(
-                    "https://api.paystack.co/bank",
-                    params={"country": "nigeria", "perPage": "200"},
-                    headers={"Authorization": f"Bearer {secret}"},
-                )
-                data = resp.json()
-            if data.get("status"):
-                return [{"name": b["name"], "code": b["code"]} for b in data["data"]]
-        except Exception:
-            pass
+            logger.warning(f"{gateway} bank list failed: {e}")
     from routes_admin import _NG_BANKS_FALLBACK
     return _NG_BANKS_FALLBACK
 
 
 @router.post("/banks/resolve")
 async def resolve_bank_account(payload: dict, request: Request, user=Depends(get_current_user)):
-    """Resolve account name. Tries Nomba → Paystack."""
+    """Resolve account name using the CONFIGURED payout gateway first."""
     account_number = (payload.get("account_number") or "").strip()
     bank_code = (payload.get("bank_code") or "").strip()
     if not account_number or not bank_code:
@@ -370,46 +350,24 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
     db = request.app.state.db
     s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
 
-    # Try Nomba
-    if s.get("nomba_client_id") and s.get("nomba_client_secret") and s.get("nomba_account_id"):
+    from banks_util import gateway_order, resolve_for
+    order = gateway_order(s)
+    last_err = None
+    for gateway in order:
         try:
-            from nomba import resolve_account as nomba_resolve
-            res = await nomba_resolve(
-                client_id=s["nomba_client_id"],
-                client_secret=s["nomba_client_secret"],
-                account_id=s["nomba_account_id"],
-                account_number=account_number,
-                bank_code=bank_code,
-                environment=s.get("nomba_environment"),
-            )
-            return {**res, "mode": "live", "provider": "nomba"}
+            res = await resolve_for(s, gateway, account_number, bank_code)
+            if res:
+                return res
         except Exception as e:
-            logger.warning(f"Nomba resolve failed: {e}")
-            # Fall through to Paystack
+            last_err = e
+            logger.warning(f"{gateway} resolve failed: {e}")
+            continue
 
-    # Try Paystack
-    secret = s.get("paystack_secret_key") or ""
-    if secret:
-        try:
-            async with fixie_client(timeout=15) as client:
-                resp = await client.get(
-                    "https://api.paystack.co/bank/resolve",
-                    params={"account_number": account_number, "bank_code": bank_code},
-                    headers={"Authorization": f"Bearer {secret}"},
-                )
-                data = resp.json()
-            if data.get("status") and data.get("data"):
-                return {
-                    "account_name": data["data"]["account_name"],
-                    "account_number": data["data"]["account_number"],
-                    "mode": "live",
-                    "provider": "paystack",
-                }
-            raise HTTPException(422, data.get("message") or "Could not resolve account")
-        except httpx.HTTPError as e:
-            raise HTTPException(502, f"Paystack lookup failed: {e}")
-
-    raise HTTPException(503, "Bank account verification is unavailable. Please ask the admin to configure Nomba or Paystack credentials.")
+    if last_err is not None:
+        raise HTTPException(502, f"Bank lookup failed: {last_err}")
+    if not order:
+        raise HTTPException(503, "Bank account verification is unavailable. Please ask the admin to configure Nomba or Paystack credentials.")
+    raise HTTPException(422, "Could not resolve account")
 
 
 # =========== FORGOT PASSWORD ===========
@@ -1455,11 +1413,13 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     return doc
                 # Sufficient (or balance check unavailable) — proceed
                 ref = gen_reference("ntr")
+                from banks_util import remap_bank_code
+                nb_bank_code = await remap_bank_code(settings, "nomba", user.get("bank_name"), user["bank_code"])
                 transfer_resp = await nomba_transfer(
                     client_id=settings["nomba_client_id"], client_secret=settings["nomba_client_secret"],
                     account_id=settings.get("nomba_account_id", ""),
                     amount_naira=net_amount, account_number=user["account_number"],
-                    account_name=user["account_name"], bank_code=user["bank_code"],
+                    account_name=user["account_name"], bank_code=nb_bank_code,
                     merchant_tx_ref=ref, narration=f"Auto payout {wid}",
                     environment=settings.get("nomba_environment"),
                 )
@@ -1502,12 +1462,16 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     doc["method"] = "auto"
                     doc["nomba_transaction_id"] = nomba_txn_id
             elif payout_gateway == "paystack" and mode == "live" and settings.get("paystack_secret_key"):
-                # Paystack: recipient + transfer
+                # Paystack: recipient + transfer. Re-map the saved bank_code to
+                # Paystack's own code (matched by bank name) so payout succeeds
+                # even if the code was originally fetched via a different gateway.
+                from banks_util import remap_bank_code
+                ps_bank_code = await remap_bank_code(settings, "paystack", user.get("bank_name"), user["bank_code"])
                 async with fixie_client(timeout=20) as client:
                     r1 = await client.post(
                         "https://api.paystack.co/transferrecipient",
                         headers={"Authorization": f"Bearer {settings['paystack_secret_key']}", "Content-Type": "application/json"},
-                        json={"type": "nuban", "name": user["account_name"], "account_number": user["account_number"], "bank_code": user["bank_code"], "currency": "NGN"},
+                        json={"type": "nuban", "name": user["account_name"], "account_number": user["account_number"], "bank_code": ps_bank_code, "currency": "NGN"},
                     )
                     rec = r1.json()
                     if not rec.get("status"):
