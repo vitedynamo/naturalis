@@ -220,6 +220,8 @@ export default function AdminWithdrawals() {
   const [banks, setBanks] = useState([]);
   const [nombaFloat, setNombaFloat] = useState(null);
   const [floatRefreshing, setFloatRefreshing] = useState(false);
+  const [paystackFloat, setPaystackFloat] = useState(null);
+  const [paystackRefreshing, setPaystackRefreshing] = useState(false);
   const [polling, setPolling] = useState(false);
   const [refreshingId, setRefreshingId] = useState(null);
 
@@ -265,7 +267,30 @@ export default function AdminWithdrawals() {
       setFloatRefreshing(false);
     }
   };
-  useEffect(() => { load(); loadFloat({ silent: true }); }, []);
+  const loadPaystackFloat = async ({ silent = false } = {}) => {
+    setPaystackRefreshing(true);
+    try {
+      const { data } = await api.get("/admin/paystack/balance");
+      setPaystackFloat(data);
+      if (!silent) {
+        if (data?.live === false) {
+          toast.info("Paystack live mode is OFF — settings need a live secret key");
+        } else if (data?.error) {
+          toast.error(`Paystack balance unavailable: ${data.error}`);
+        } else if (data?.balance != null) {
+          toast.success(`Paystack float: ${formatNaira(data.balance)}`);
+        } else {
+          toast.info("Paystack balance returned no data");
+        }
+      }
+    } catch (e) {
+      setPaystackFloat(null);
+      if (!silent) toast.error(e?.response?.data?.detail || "Could not fetch Paystack balance");
+    } finally {
+      setPaystackRefreshing(false);
+    }
+  };
+  useEffect(() => { load(); loadFloat({ silent: true }); loadPaystackFloat({ silent: true }); }, []);
 
   /* ----- derived stats ----- */
   const stats = useMemo(() => {
@@ -598,6 +623,11 @@ export default function AdminWithdrawals() {
           last={stats.paystackLast}
           pendingCount={stats.paystackPending}
           doneCount={stats.paystackDone}
+          balance={paystackFloat?.balance}
+          balanceLive={paystackFloat?.live}
+          balanceError={paystackFloat?.error}
+          onRefreshBalance={() => loadPaystackFloat()}
+          refreshing={paystackRefreshing}
         />
       </div>
 

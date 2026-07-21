@@ -2310,6 +2310,33 @@ async def admin_bulk_backfill_deposit_gateway_ids(request: Request, _admin=Depen
 
 
 # ===== Nomba float balance + transfer status =====
+@router.get("/admin/paystack/balance")
+async def admin_paystack_balance(request: Request, _admin=Depends(get_current_admin)):
+    """Return current Paystack merchant NGN float balance. Returns null balance if creds missing or live mode off."""
+    db = request.app.state.db
+    s = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    key = s.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY") or ""
+    if s.get("payment_mode") != "live" or not key:
+        return {"balance": None, "currency": "NGN", "live": False, "message": "Paystack live credentials not configured."}
+    try:
+        async with fixie_client(timeout=15) as client:
+            resp = await client.get(
+                "https://api.paystack.co/balance",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+        if resp.status_code == 401:
+            return {"balance": None, "currency": "NGN", "live": True, "error": "Paystack rejected the secret key (401)."}
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+        if resp.status_code >= 400:
+            return {"balance": None, "currency": "NGN", "live": True, "error": f"HTTP {resp.status_code}: {data.get('message') or resp.text[:120]}"}
+        bal_items = (data.get("data") or []) if isinstance(data, dict) else []
+        ngn = next((b for b in bal_items if (b.get("currency") or "").upper() == "NGN"), {})
+        bal = (ngn.get("balance") or 0) / 100  # paystack returns kobo
+        return {"balance": round(float(bal), 2), "currency": "NGN", "live": True}
+    except Exception as e:
+        return {"balance": None, "currency": "NGN", "live": True, "error": str(e)}
+
+
 @router.get("/admin/nomba/balance")
 async def admin_nomba_balance(request: Request, _admin=Depends(get_current_admin)):
     """Return current Nomba parent-account float balance. Returns null balance if creds missing or live mode off."""
