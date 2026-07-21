@@ -94,9 +94,13 @@ export default function Withdraw() {
 
       {/* Unlock-withdrawals checklist — replaces the old separate warning cards */}
       {(() => {
+        // Wait until BOTH settings and the investments count are known before
+        // evaluating requirements. Rendering earlier makes the card appear with
+        // "invest" unmet and then vanish once data loads — the one-second flash.
+        if (!settingsLoaded || investmentsCount === null) return null;
         const investPending = investmentsCount === 0;
-        const investLoading = investmentsCount === null;
-        const investDone = !investLoading && investmentsCount > 0;
+        const investLoading = false;
+        const investDone = investmentsCount > 0;
         const steps = [
           {
             key: "bank", done: !!bankReady, pending: !bankReady, loading: false, icon: Landmark,
