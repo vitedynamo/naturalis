@@ -24,6 +24,10 @@ Three independent token slots so admin + user + impersonation coexist in one bro
 `api.js` picks token by URL/route; 401 interceptor clears ONLY the rejected slot.
 
 ## Implemented (recent)
+- [Jun 2026] IP masking for Paystack: all 12 outbound Paystack calls (bank list, resolve,
+  transaction init/verify, transferrecipient, transfer, transfer verify, balance) now route
+  through the Fixie proxy via new `payments_proxy.fixie_client()` — same static IP as Nomba
+  (verified exit IP 52.87.82.133, Paystack HTTP 200). `_httpx` diagnostic untouched.
 - [Jun 2026] Verified admin/user session isolation in same browser — all invariants pass.
   Reported "sessions crash together" bug = STALE PRODUCTION CODE. Fix = redeploy.
 - [Jun 2026] Added visible circular close (X) button to Dashboard welcome modal.

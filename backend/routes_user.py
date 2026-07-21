@@ -7,6 +7,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from payments_proxy import fixie_client
 
 from auth import (
     hash_password,
@@ -341,7 +342,7 @@ async def banks_for_user(request: Request, user=Depends(get_current_user)):
     secret = s.get("paystack_secret_key") or ""
     if secret:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with fixie_client(timeout=15) as client:
                 resp = await client.get(
                     "https://api.paystack.co/bank",
                     params={"country": "nigeria", "perPage": "200"},
@@ -390,7 +391,7 @@ async def resolve_bank_account(payload: dict, request: Request, user=Depends(get
     secret = s.get("paystack_secret_key") or ""
     if secret:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with fixie_client(timeout=15) as client:
                 resp = await client.get(
                     "https://api.paystack.co/bank/resolve",
                     params={"account_number": account_number, "bank_code": bank_code},
@@ -743,7 +744,7 @@ async def deposit_init(data: DepositInitRequest, request: Request, user=Depends(
         secret = settings.get("paystack_secret_key") or os.environ.get("PAYSTACK_SECRET_KEY", "")
         amount_kobo = int(float(data.amount) * 100)
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 resp = await client.post(
                     "https://api.paystack.co/transaction/initialize",
                     headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
@@ -986,7 +987,7 @@ async def deposit_verify(reference: str, request: Request, user=Depends(get_curr
     elif gateway_used == "paystack" and mode == "live" and secret:
         try:
             from routes_admin import _extract_paystack_gateway_id
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 resp = await client.get(
                     f"https://api.paystack.co/transaction/verify/{reference}",
                     headers={"Authorization": f"Bearer {secret}"},
@@ -1502,7 +1503,7 @@ async def request_withdrawal(data: WithdrawRequest, request: Request, user=Depen
                     doc["nomba_transaction_id"] = nomba_txn_id
             elif payout_gateway == "paystack" and mode == "live" and settings.get("paystack_secret_key"):
                 # Paystack: recipient + transfer
-                async with httpx.AsyncClient(timeout=20) as client:
+                async with fixie_client(timeout=20) as client:
                     r1 = await client.post(
                         "https://api.paystack.co/transferrecipient",
                         headers={"Authorization": f"Bearer {settings['paystack_secret_key']}", "Content-Type": "application/json"},

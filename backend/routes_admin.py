@@ -16,6 +16,7 @@ from nomba import transfer_to_bank as nomba_transfer, get_wallet_balance as nomb
 import marasoft as ms
 import qorepay as qp
 import budpay as bp
+from payments_proxy import fixie_client
 
 # Shared APIRouter — exported back at module bottom for `server.py`.
 # Domain sub-modules under `/app/backend/routes/` attach endpoints via the same
@@ -178,7 +179,7 @@ async def list_banks(request: Request, _admin=Depends(get_current_admin)):
     secret, _ = await _get_secret_key(db)
     if secret:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with fixie_client(timeout=15) as client:
                 resp = await client.get(
                     "https://api.paystack.co/bank",
                     params={"country": "nigeria", "perPage": "200"},
@@ -211,7 +212,7 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
 
     if mode == "live" and secret:
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 # 1. Create transfer recipient
                 rec_resp = await client.post(
                     "https://api.paystack.co/transferrecipient",
@@ -229,7 +230,7 @@ async def pay_withdrawal_via_paystack(wid: str, payload: PaystackPayRequest, req
                 raise HTTPException(502, f"Paystack recipient error: {rec_data.get('message')}")
             recipient_code = rec_data["data"]["recipient_code"]
 
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 # 2. Initiate transfer
                 tr_resp = await client.post(
                     "https://api.paystack.co/transfer",
@@ -2085,7 +2086,7 @@ async def _refresh_pending_deposit(db, d: dict) -> dict:
             note_extra = f"Poll error: {e}"
     elif gateway == "paystack" and s.get("paystack_secret_key"):
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 resp = await client.get(
                     f"https://api.paystack.co/transaction/verify/{reference}",
                     headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
@@ -2291,7 +2292,7 @@ async def admin_bulk_backfill_deposit_gateway_ids(request: Request, _admin=Depen
                 res = await ms_check(enc_key=s["marasoft_encryption_key"], transaction_ref=ref)
                 gw_id = _extract_marasoft_gateway_id(res.get("raw"))
             elif method == "paystack" and has_paystack:
-                async with httpx.AsyncClient(timeout=20) as client:
+                async with fixie_client(timeout=20) as client:
                     resp = await client.get(
                         f"https://api.paystack.co/transaction/verify/{ref}",
                         headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
@@ -2398,7 +2399,7 @@ async def _refresh_one_withdrawal(db, w: dict) -> dict:
 
     elif paystack_ref and mode == "live" and s.get("paystack_secret_key"):
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
+            async with fixie_client(timeout=20) as client:
                 resp = await client.get(
                     f"https://api.paystack.co/transfer/verify/{paystack_ref}",
                     headers={"Authorization": f"Bearer {s['paystack_secret_key']}"},
@@ -2983,7 +2984,7 @@ async def _test_paystack(s: dict) -> dict:
         return {"ok": False, "message": "Paystack secret key not configured."}
     t0 = time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with fixie_client(timeout=15) as client:
             resp = await client.get(
                 "https://api.paystack.co/balance",
                 headers={"Authorization": f"Bearer {key}"},
